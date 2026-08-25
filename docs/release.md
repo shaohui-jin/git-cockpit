@@ -62,25 +62,28 @@ GitHub Actions 页 → 对应 workflow → **Run workflow**（`workflow_dispatch
 3. `pnpm publish`（package 目录内执行；`prepublishOnly` 会自动 typecheck + build，build 内含 tsup 与 postbuild.mjs 对 `node:sqlite` 的修复）
 4. 打 `core-vX` 并推送
 
-**`release-mcp-server.yml`**（tag 判据 `mcp-server-vX`，多两步保障）：
+**`release-mcp-server.yml`**（tag 判据 `mcp-server-vX`，多几步保障）：
 
 1. gate：`mcp-server-vX` 远程是否存在
-2. **确保 core 已发布**：检查 `core-vX`；若不存在则先构建并发布 core、推送 `core-v` tag（保证 mcp-server 发布后 npm 上的依赖可解析）
-3. 构建 web 前端
-4. typecheck + build mcp-server
-5. `pnpm publish`（`prepublishOnly` 自动 typecheck + build + 复制 `dist/web`）
-6. 打 `mcp-server-vX` 并推送
+2. **构建 core**：全新 checkout 后 `core/dist` 不存在（被 `.gitignore` 忽略），而 mcp-server 通过包名解析 core 的类型与运行时（`exports` 指向 `dist`），不先构建会直接 `TS2307 Cannot find module`
+3. **确保 core 已发布并可读**：检查 `core-vX`；若不存在则先 `pnpm publish` core 并立即打 `core-v` tag（作为「已发布」标记）；随后轮询 `npm view @shaohui_jin/git-cockpit-core@<version>`（官方 registry）直到可读，最多约 6 分钟——防御 npm 发布后的传播延迟，避免下游装到 mcp-server 时解析不到 core
+4. 构建 web 前端（产物随后被 mcp-server 的 `prepublishOnly` 复制进 `dist/web`）
+5. typecheck + build mcp-server
+6. `pnpm publish`（`prepublishOnly` 自动 typecheck + build + 复制 `dist/web`）
+7. 打 `mcp-server-vX` 并推送
 
 ## 5. 版本管理要点
 
 - core 与 mcp-server **版本号各自独立**。改动互不影响，按需单独发版
 - mcp-server 对 core 的依赖声明为 `workspace:^`：发布时自动转换为 `^0.1.0`。core 升 `0.2.0` 等 **minor 版本时不会**被 `^0.1.0` 自动带上（0.x caret 只锁定在 0.1.x 内），需要同步在 mcp-server 中体现时另行升级其依赖范围
-- 两个包发版无先后约束：先发 mcp-server 也可以，其 workflow 会自动先把 core 补发掉
+- 两个包发版无先后约束：先发 mcp-server 也可以，其 workflow 会自动先把 core 补发及轮询到可读
+- **两者一起升级版本（推荐做法）**：同时 bump core 与 mcp-server 的 version，推送后只跑 `release-mcp-server.yml`（或两个都跑）。CI 内置顺序保证——先发 core（含可读轮询）确认可拉取后再发 mcp-server，不会出现「mcp-server 已发布但依赖的 core 拉不到」的窗口
 
 ## 6. 失败重试与回滚
 
 - **任意步骤失败**：不会推送 tag → 修复后重新 push（或手动重跑 workflow）即可原样重试，不占用新版本号
 - **发布成功但 tag 未推送成功**（网络抖动）：此时 npm 上已有该版本。手动 `git tag -a mcp-server-vX -m ... && git push origin mcp-server-vX`，或直接重跑 workflow（gate 发现没有 tag 会再次 `pnpm publish`，npm 对相同版本会提示已存在——此时手动补 tag 即可）
+- **core 可读性轮询超时**：core 与 `core-v` tag 实际都已发布成功，只是轮询阶段 registry 仍不可读（网络/副本延迟）。此时 workflow 失败退出属于正常保护，**直接重跑即可**——gate 发现 `core-v` tag 已存在会跳过 publish，不会重复发布导致 already exists
 - **发布打错了想废弃**：npm 允许 unpublish（72 小时内且无下游依赖时），同时删除对应 tag。不建议覆盖同名版本
 
 ## 7. 本地发布与验证（可选）
@@ -108,6 +111,7 @@ dry-run 会打印 tarball 文件清单，重点核对：
 - **为什么用 `pnpm publish` 而不是 `npm publish`？** 只有 pnpm 会把 `workspace:` 协议依赖改写为真实版本号；`npm publish` 会把 `workspace:^` 原样打进包，导致安装方无法解析
 - **构建产物里 `node:sqlite` 前缀**？core 的 postbuild 会在打包后把 `from "sqlite"` 修正为 `from "node:sqlite"`（esbuild external 行为剥离 node: 前缀），所以包内代码可直接运行
 - **Node 版本要求**：core/mcp-server 的 `engines` 均为 `>=22.5.0`。低版本 Node 安装后运行会直接报错
+- **刚发布完为什么通过 npmmirror/淘宝镜像安装还是找不到新版**？CI 发布走官方 registry 且已内置「可读性轮询」（针对官方源）。npmmirror 等公网镜像对官方 registry 的同步存在分钟级到小时级延迟，国内用户装到最新版需要等镜像同步，属于正常现象，稍后重试即可
 - **本地静态服务找不到页面**？确认是按发布布局校验：源码布局 `../../web/dist`、发布布局 `dist/web`，`resolveWebDist` 会按优先级自动命中
 - **发布后 npm 上没有 README**？packages 各自带 `README.md`，npm 打包自动包含，无需在 `files` 中声明
 

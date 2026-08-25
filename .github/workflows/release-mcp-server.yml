@@ -1,8 +1,8 @@
 # Release MCP server to npm
 #
 # 判据：远程还没有 mcp-server-v{version} 这个 tag 就构建、发布 npm、最后打 tag。
-# mcp-server 依赖 core（workspace:*），发布前会先确保 core 已发布
-# （按 core-v{version} 判据，未发布则顺带发布 core），保证 npm 上依赖可解析。
+# mcp-server 依赖 core（workspace:^），发布前会先确保 core 已发布
+# （按 core-v{version} 判据，未发布则顺带发布 core），并轮询到 core 在 npm 可读。
 # web 前端产物在 prepublishOnly 中复制进 dist/web，随包一起发布。
 # tag 放在发布成功之后才打，代表「已发布」而不是「试过了」。
 #
@@ -65,6 +65,13 @@ jobs:
         if: steps.gate.outputs.should_release == 'true'
         run: pnpm install --frozen-lockfile
 
+      # 全新 checkout 后 core/dist 不存在（被 .gitignore 忽略），
+      # 而 mcp-server 通过包名解析 core 的 types/main（exports 指向 dist），
+      # 必须先构建 core，否则 typecheck 会报 TS2307 Cannot find module。
+      - name: Build core
+        if: steps.gate.outputs.should_release == 'true'
+        run: pnpm --filter @shaohui_jin/git-cockpit-core run build
+
       - name: Publish core if not yet released
         if: steps.gate.outputs.should_release == 'true'
         env:
@@ -81,11 +88,28 @@ jobs:
             fi
             echo "${CORE_TAG} 尚未发布，先发布 core。"
             pnpm --filter @shaohui_jin/git-cockpit-core publish
+            # publish 返回即已写入主 registry；立即打 tag 作为「已发布」标记，
+            # 这样即使下面的可读性轮询超时，重跑时也会跳过重复 publish（避免 already exists）
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git tag -a "${CORE_TAG}" -m "Release ${CORE_TAG}"
             git push origin "${CORE_TAG}"
           fi
+          # 等待 core@{version} 对 registry 可读（防御 npm 发布后的传播延迟）。
+          # mcp-server 的发布本身不校验依赖存在，但下游安装时 npm 要解析 core，
+          # 不等到它可读就发布 mcp-server，可能造成「装到新包但拉不到 core」。
+          echo "等待 @shaohui_jin/git-cockpit-core@${CORE_VERSION} 在 registry 可读..."
+          for i in $(seq 1 36); do
+            if npm view "@shaohui_jin/git-cockpit-core@${CORE_VERSION}" version --registry=https://registry.npmjs.org >/dev/null 2>&1; then
+              echo "core@${CORE_VERSION} 已可从 registry 解析（第 ${i} 次轮询）"
+              break
+            fi
+            if [ "$i" -eq 36 ]; then
+              echo "::error::等待 core@${CORE_VERSION} 可读超时（约 6 分钟）。core/tag 已发布，重跑本 workflow 即可恢复。"
+              exit 1
+            fi
+            sleep 10
+          done
 
       - name: Build web frontend
         if: steps.gate.outputs.should_release == 'true'
