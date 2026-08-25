@@ -37,9 +37,10 @@ function resolveWebDist(): string | null {
   // 源码布局下脚本位于 packages/mcp-server/dist，../.. 回到 packages，再进 web/dist
   const here = path.resolve(path.dirname(fileURLToPath(import.meta.url)));
   const candidates = [
-    path.resolve(here, '..', '..', 'web', 'dist'), // packages/mcp-server/dist → ../../web/dist
-    path.resolve(here, 'web', 'dist'), // 发布布局：dist/web（若产物直接打入包内）
-    path.resolve(here, '..', 'web', 'dist'), // 已安装于 node_modules/@shaohui_jin/git-cockpit-mcp-server/dist 时
+    path.resolve(here, '..', '..', 'web', 'dist'), // 源码布局：packages/mcp-server/dist → packages/web/dist
+    path.resolve(here, 'web'), // 发布布局：产物由 copy-web.mjs 打入 dist/web（含 index.html）
+    path.resolve(here, 'web', 'dist'), // 兼容旧式 dist/web/dist 布局
+    path.resolve(here, '..', 'web', 'dist'), // 兼容 npm 全局安装目录的旧式布局
     path.resolve(process.cwd(), 'dist', 'web'),
     path.resolve(process.cwd(), '..', 'web', 'dist'),
     path.resolve(process.cwd(), 'node_modules', '@shaohui_jin', 'git-cockpit-web', 'dist')
