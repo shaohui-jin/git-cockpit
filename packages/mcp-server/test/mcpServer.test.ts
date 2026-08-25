@@ -7,42 +7,48 @@
  * 且该异常发生在 Fastify hijack 的 /mcp 处理链路内被静默吞掉，导致
  * MCP 握手挂起、Cursor 等客户端报 Connection closed。
  */
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import { TOOL_DEFS, createMcpServer } from '../src/index.js';
 import { createTestRuntime, disposeTestRuntime, cleanupTmp } from './helpers.js';
 import type { Runtime } from '../src/index.js';
 
+type ServerLike = ReturnType<typeof createMcpServer>;
+
+/** 每个用例独立创建 runtime + McpServer，测试结束释放。 */
+function withServer(fn: (runtime: Runtime, server: ServerLike) => void): void {
+  const runtime = createTestRuntime();
+  try {
+    const server = createMcpServer(runtime);
+    fn(runtime, server);
+  } finally {
+    disposeTestRuntime(runtime);
+  }
+}
+
 describe('createMcpServer 工具注册', () => {
-  let runtime: Runtime | null = null;
+  afterAll(() => {
+    cleanupTmp();
+  });
 
   it('注册全部工具且不抛错', () => {
-    runtime = createTestRuntime();
-    expect(() => createMcpServer(runtime)).not.toThrow();
+    withServer((runtime, _server) => {
+      expect(() => createMcpServer(runtime)).not.toThrow();
+    });
   });
 
   it('注册的工具数量与 TOOL_DEFS 一致', () => {
-    runtime ??= createTestRuntime();
-    const server = createMcpServer(runtime);
-    // McpServer 内部 _registeredTools 为普通对象，直接断言数量
-    const reg = (server as unknown as { _registeredTools: Record<string, unknown> })._registeredTools;
-    expect(Object.keys(reg).length).toBe(TOOL_DEFS.length);
+    withServer((_runtime, server) => {
+      const reg = (server as unknown as { _registeredTools: Record<string, unknown> })._registeredTools;
+      expect(Object.keys(reg).length).toBe(TOOL_DEFS.length);
+    });
   });
 
   it('全部工具名与 TOOL_DEFS 对应', () => {
-    runtime ??= createTestRuntime();
-    const server = createMcpServer(runtime);
-    const reg = (server as unknown as { _registeredTools: Record<string, unknown> })._registeredTools;
-    for (const def of TOOL_DEFS) {
-      expect(reg[def.name], `缺少工具 ${def.name}`).toBeDefined();
-    }
-  });
-
-  it('注册失败或全部通过后清理运行时', () => {
-    if (runtime) {
-      disposeTestRuntime(runtime);
-      runtime = null;
-    }
-    cleanupTmp();
-    expect(true).toBe(true);
+    withServer((_runtime, server) => {
+      const reg = (server as unknown as { _registeredTools: Record<string, unknown> })._registeredTools;
+      for (const def of TOOL_DEFS) {
+        expect(reg[def.name], `缺少工具 ${def.name}`).toBeDefined();
+      }
+    });
   });
 });
