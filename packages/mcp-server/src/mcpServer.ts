@@ -35,8 +35,10 @@ export function createMcpServer(runtime: Runtime): McpServer {
   );
 
   for (const def of TOOL_DEFS) {
-    // SDK registerTool 的泛型联合推断在遍历场景下不稳定，统一收窄为运行时签名
-    const register = server.registerTool as unknown as (
+    // SDK registerTool 的泛型联合推断在遍历场景下不稳定，统一收窄为运行时签名。
+    // 注意：必须 bind(server)，SDK 1.30 的 registerTool 内部访问 this._registeredTools，
+    // 抽成裸函数调用会丢 this，注册时抛 TypeError 导致 MCP 握手挂起。
+    const register = server.registerTool.bind(server) as unknown as (
       name: string,
       config: { title?: string; description?: string; inputSchema?: unknown },
       cb: (args: unknown, extra: unknown) => Promise<unknown>
@@ -82,7 +84,7 @@ export class McpHttpHandler {
   private readonly sessions = new Map<string, McpHttpSession>();
   constructor(private readonly runtime: Runtime) {}
 
-  async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  async handle(req: IncomingMessage, res: ServerResponse, parsedBody?: unknown): Promise<void> {
     const headerId = req.headers['mcp-session-id'];
     if (typeof headerId === 'string' && headerId) {
       const session = this.sessions.get(headerId);
@@ -91,7 +93,7 @@ export class McpHttpHandler {
         res.end('MCP session not found');
         return;
       }
-      await session.transport.handleRequest(req, res, undefined);
+      await session.transport.handleRequest(req, res, parsedBody);
       return;
     }
 
@@ -106,7 +108,7 @@ export class McpHttpHandler {
       if (session.id) this.sessions.delete(session.id);
       void server.close().catch(() => undefined);
     };
-    await transport.handleRequest(req, res, undefined);
+    await transport.handleRequest(req, res, parsedBody);
     const sid = transport.sessionId;
     if (sid) {
       session.id = sid;

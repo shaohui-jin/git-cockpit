@@ -313,11 +313,13 @@ export async function createWebServer(
   // ---------------------------------------------------------------------------
   app.get('/mcp', async (req, reply) => {
     reply.hijack();
-    await mcpHttp.handle(req.raw, reply.raw);
+    await mcpHttp.handle(req.raw, reply.raw, undefined);
   });
   app.post('/mcp', async (req, reply) => {
+    // fastify 预读并解析了请求体（req.body）；SDK transport 需要 parsedBody 透传
+    // （handleRequest(req, res, parsedBody)），否则它再读 req.raw 时流已空，initialize 无响应。
     reply.hijack();
-    await mcpHttp.handle(req.raw, reply.raw);
+    await mcpHttp.handle(req.raw, reply.raw, req.body);
   });
 
   // SPA fallback（静态托管存在时）
