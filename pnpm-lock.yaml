@@ -58,7 +58,7 @@ importers:
         specifier: ^1.12.0
         version: 1.30.0(zod@3.25.76)
       '@shaohui_jin/git-cockpit-core':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
       fastify:
         specifier: ^5.2.1
