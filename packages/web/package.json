@@ -1,6 +1,6 @@
 {
   "name": "@shaohui_jin/git-cockpit-web",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "private": true,
   "type": "module",
   "description": "Git Cockpit Web 前端：仓库管理、状态/历史/日志/设置视图",

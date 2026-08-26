@@ -99,9 +99,9 @@ onUnmounted(() => {
 .brand {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 16px 16px 10px;
-  font-size: 16px;
+  gap: var(--gc-gap);
+  padding: var(--gc-pad) var(--gc-pad) var(--gc-gap);
+  font-size: 14px;
   font-weight: 600;
 }
 .brand-mark {
@@ -109,10 +109,10 @@ onUnmounted(() => {
   font-size: 18px;
 }
 .repo-box {
-  margin: 4px 12px 10px;
-  padding: 8px 10px;
+  margin: 0 var(--gc-pad) var(--gc-gap);
+  padding: var(--gc-gap);
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
+  border-radius: var(--gc-radius);
   background: var(--el-fill-color-lighter);
 }
 .repo-box-label {
@@ -135,14 +135,14 @@ onUnmounted(() => {
   color: var(--el-color-primary);
 }
 .aside-footer {
-  padding: 12px 16px;
+  padding: var(--gc-gap) var(--gc-pad);
   border-top: 1px solid var(--el-border-color-lighter);
 }
 .app-main {
   background: var(--el-bg-color-page);
 }
 .main-content {
-  padding: 20px;
+  padding: var(--gc-pad);
   width: 100%;
 }
 </style>

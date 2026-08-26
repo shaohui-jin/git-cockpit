@@ -74,7 +74,7 @@ export async function createWebServer(
   app.get('/api/health', async () => ({
     ok: true,
     service: 'git-cockpit',
-    version: '0.1.0',
+    version: '0.1.6',
     uptimeMs: process.uptime() * 1000
   }));
 
@@ -105,6 +105,32 @@ export async function createWebServer(
     }
     runtime.repoManager.remove(id);
     return { ok: true };
+  });
+
+  /** 激活/进入仓库：刷新最近打开排序，并记录一条操作日志（source=web） */
+  app.post<{ Params: { id: string } }>('/api/repos/:id/activate', async (req, reply) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      return reply.code(400).send({ error: '非法仓库 id' } as never);
+    }
+    const t0 = Date.now();
+    const repo = runtime.repoManager.activate(id);
+    if (!repo) {
+      return reply.code(404).send({ error: '仓库不存在或已失效' } as never);
+    }
+    runtime.auditLogger.log({
+      timestamp: new Date().toISOString(),
+      source: 'web',
+      tool: 'repo_activate',
+      repoPath: repo.path,
+      params: { id: repo.id, path: repo.path },
+      result: 'success',
+      error: null,
+      durationMs: Date.now() - t0,
+      dryRun: false
+    });
+    runtime.eventBus.emit('log', { tool: 'repo_activate', result: 'success', at: new Date().toISOString() });
+    return { repo };
   });
 
   // ---------------------------------------------------------------------------

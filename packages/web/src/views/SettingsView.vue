@@ -27,7 +27,7 @@ const dirty = computed(() => {
   );
 });
 
-const dangerTools = computed(() => settings.tools.filter((t) => t.risk === 'dangerous'));
+const dangerTools = computed(() => settings.tools.filter((t) => t.riskLevel === 'dangerous'));
 const dangerNames = computed(() => dangerTools.value.map((t) => t.name));
 
 function syncDraft(): void {
@@ -112,7 +112,7 @@ onMounted(async () => {
         </el-table-column>
         <el-table-column label="风险" width="90">
           <template #default="{ row }">
-            <el-tag :type="riskType(row.risk)" size="small" effect="dark">{{ riskLabel(row.risk) }}</el-tag>
+            <el-tag :type="riskType(row.riskLevel)" size="small" effect="dark">{{ riskLabel(row.riskLevel) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="描述" min-width="240">
@@ -165,14 +165,14 @@ onMounted(async () => {
 
 <style scoped>
 .page-title {
-  margin: 0 0 16px;
-  font-size: 18px;
+  margin: 0 0 var(--gc-gap);
+  font-size: 14px;
 }
 .mb {
-  margin-bottom: 14px;
+  margin-bottom: var(--gc-gap);
 }
 .form-tip {
-  margin-left: 12px;
+  margin-left: var(--gc-gap);
   font-size: 12px;
   color: var(--el-text-color-secondary);
 }
@@ -187,6 +187,6 @@ onMounted(async () => {
 }
 .action-bar {
   display: flex;
-  gap: 10px;
+  gap: var(--gc-gap);
 }
 </style>

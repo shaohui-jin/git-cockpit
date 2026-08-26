@@ -19,7 +19,7 @@ body,
 code,
 pre {
   font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
-  font-size: 12.5px;
+  font-size: 12px;
 }
 
 /* 操作日志 / diff 中使用的极简等宽排版 */

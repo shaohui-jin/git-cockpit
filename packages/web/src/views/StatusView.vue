@@ -88,43 +88,90 @@ const tabs = computed(() => [
 const activeList = computed<FileStatus[]>(() => tabLists.value[activeTab.value] ?? []);
 const totalFiles = computed(() => tabLists.value.all.length);
 
-/** 分支树节点 */
-interface TreeNode {
+/** 分支树节点：叶子带 branch（fullName 为完整分支名），非叶子为按 '/' 拆分的目录 */
+interface BranchTreeNode {
   key: string;
-  type: 'group' | 'local' | 'remote';
   label: string;
+  fullName?: string;
   branch?: BranchInfo;
-  children?: TreeNode[];
+  remote?: boolean;
+  children?: BranchTreeNode[];
 }
 
-const branchTree = computed<TreeNode[]>(() => {
+/** 分支面板：本地分支 或 单个远程分组 */
+interface BranchPane {
+  key: string;
+  title: string;
+  tree: BranchTreeNode[];
+}
+
+/** 按 '/' 分层构建分支树（忽略空分段） */
+function buildTree(entries: { name: string; branch: BranchInfo }[]): BranchTreeNode[] {
+  const roots: BranchTreeNode[] = [];
+  for (const { name, branch } of entries) {
+    const parts = name.split('/').filter((p) => p.length > 0);
+    if (parts.length === 0) continue;
+    let level = roots;
+    let prefix = '';
+    for (const [i, part] of parts.entries()) {
+      prefix = prefix ? `${prefix}/${part}` : part;
+      const existing = level.find((n) => n.label === part);
+      const node: BranchTreeNode = existing ?? { key: 'node:' + prefix, label: part };
+      if (!existing) level.push(node);
+      if (i === parts.length - 1) {
+        node.branch = branch;
+        node.fullName = name;
+        node.remote = branch.remote;
+      } else {
+        if (!node.children) node.children = [];
+        level = node.children;
+      }
+    }
+  }
+  sortTree(roots);
+  return roots;
+}
+
+/** 每层排序：目录在前，同级按名称字典序 */
+function sortTree(nodes: BranchTreeNode[]): void {
+  nodes.sort((a, b) => {
+    const ad = a.branch ? 1 : 0;
+    const bd = b.branch ? 1 : 0;
+    if (ad !== bd) return ad - bd;
+    return a.label.localeCompare(b.label);
+  });
+  for (const n of nodes) if (n.children) sortTree(n.children);
+}
+
+/** 递归统计叶子（分支）数，供标题计数 */
+function leafCount(nodes: BranchTreeNode[]): number {
+  let n = 0;
+  for (const node of nodes) n += node.branch ? 1 : leafCount(node.children ?? []);
+  return n;
+}
+
+const branchPanes = computed<BranchPane[]>(() => {
   const locals = branches.value.filter((b) => !b.remote);
   const remotes = branches.value.filter((b) => b.remote);
-  const remoteGroups = new Map<string, BranchInfo[]>();
+  // 远程按前缀分组；跳过无实际分支名的残缺 ref（如仅名为 'origin' 的空条目，正是之前空行的来源）
+  const remoteMap = new Map<string, { name: string; branch: BranchInfo }[]>();
   for (const r of remotes) {
-    const idx = r.name.indexOf('/');
-    const group = idx === -1 ? r.name : r.name.slice(0, idx);
-    const list = remoteGroups.get(group) ?? [];
-    list.push(r);
-    remoteGroups.set(group, list);
+    const slash = r.name.indexOf('/');
+    const remoteName = slash === -1 ? '' : r.name.slice(0, slash);
+    if (!remoteName) continue;
+    const list = remoteMap.get(remoteName) ?? [];
+    list.push({ name: r.name.slice(slash + 1), branch: r });
+    remoteMap.set(remoteName, list);
   }
-  const nodes: TreeNode[] = [];
-  nodes.push({
-    key: 'group:local',
-    type: 'group',
-    label: `本地分支（${locals.length}）`,
-    children: locals.map((b): TreeNode => ({ key: 'l:' + b.name, type: 'local', label: b.name, branch: b }))
-  });
-  for (const [remote, list] of remoteGroups) {
-    const sorted = [...list].sort((a, b) => a.name.localeCompare(b.name));
-    nodes.push({
-      key: 'group:remote:' + remote,
-      type: 'group',
-      label: `远程 · ${remote}（${sorted.length}）`,
-      children: sorted.map((b): TreeNode => ({ key: 'r:' + b.name, type: 'remote', label: b.name.slice(remote.length + 1), branch: b }))
-    });
+  const panes: BranchPane[] = [];
+  if (locals.length) {
+    panes.push({ key: 'local', title: `本地分支（${locals.length}）`, tree: buildTree(locals.map((b) => ({ name: b.name, branch: b }))) });
   }
-  return nodes;
+  for (const [remote, list] of remoteMap) {
+    const tree = buildTree(list);
+    panes.push({ key: 'remote:' + remote, title: `远程 · ${remote}（${leafCount(tree)}）`, tree });
+  }
+  return panes;
 });
 
 function syncText(b?: BranchInfo): string {
@@ -323,7 +370,7 @@ function dropStash(s: StashInfo): void {
 }
 
 /** 分支树节点操作 */
-function checkoutNode(n: TreeNode): void {
+function checkoutNode(n: BranchTreeNode): void {
   if (n.branch) void run('git_checkout', { branch: n.branch.name });
 }
 function pull(): void {
@@ -427,31 +474,41 @@ onMounted(() => {
           </div>
         </template>
         <div class="tree-scroll">
-          <template v-for="g in branchTree" :key="g.key">
-            <template v-if="g.type === 'group'">
-              <div class="group-label">{{ g.label }}</div>
-              <template v-for="n in g.children" :key="n.key">
-                <div v-if="n.type === 'local'" class="branch-node" :class="{ current: n.branch?.current }" @dblclick="n.branch?.current || checkoutNode(n)">
-                  <span class="node-name">{{ n.label }}</span>
-                  <span class="node-sync" :class="{ clean: !syncText(n.branch) && n.branch?.upstream }">{{ syncText(n.branch) }}</span>
+          <template v-for="pane in branchPanes" :key="pane.key">
+            <div class="group-label">{{ pane.title }}</div>
+            <el-tree
+              v-if="pane.tree.length"
+              :data="pane.tree"
+              :props="{ label: 'label', children: 'children' }"
+              node-key="key"
+              default-expand-all
+              :indent="14"
+              class="branch-tree"
+            >
+              <template #default="{ data }">
+                <span v-if="!data.branch" class="tree-dir">{{ data.label }}</span>
+                <div
+                  v-else
+                  class="branch-node"
+                  :class="{ current: data.branch?.current, remote: data.remote }"
+                  :title="data.fullName"
+                  @dblclick="data.branch?.current || checkoutNode(data)"
+                >
+                  <span class="node-name">{{ data.label }}</span>
+                  <span v-if="!data.remote" class="node-sync" :class="{ clean: !syncText(data.branch) && data.branch?.upstream }">{{ syncText(data.branch) }}</span>
                   <span class="node-actions">
-                    <template v-if="n.branch?.current">
+                    <template v-if="data.branch?.current">
                       <el-button size="small" text type="success" @click.stop="pull">拉取</el-button>
                       <el-button size="small" text type="primary" @click.stop="push">推送</el-button>
                     </template>
-                    <el-button v-else size="small" text type="primary" @click.stop="checkoutNode(n)">切换</el-button>
-                  </span>
-                </div>
-                <div v-if="n.type === 'remote'" class="branch-node remote" @dblclick="checkoutNode(n)">
-                  <span class="node-name">{{ n.label }}</span>
-                  <span class="node-actions">
-                    <el-button size="small" text type="primary" @click.stop="checkoutNode(n)">切换</el-button>
+                    <el-button v-else size="small" text type="primary" @click.stop="checkoutNode(data)">切换</el-button>
                   </span>
                 </div>
               </template>
-            </template>
+            </el-tree>
+            <div v-else class="pane-empty">暂无分支</div>
           </template>
-          <el-empty v-if="branchTree.length === 0" description="暂无分支" :image-size="60" />
+          <el-empty v-if="branchPanes.length === 0" description="暂无分支" :image-size="60" />
         </div>
       </el-card>
 
@@ -663,11 +720,11 @@ onMounted(() => {
 <style scoped>
 .page-title {
   margin: 0;
-  font-size: 18px;
+  font-size: 14px;
   flex: none;
 }
 .mb {
-  margin-bottom: 14px;
+  margin-bottom: var(--gc-gap);
 }
 .empty-tip {
   padding: 40px 0;
@@ -682,13 +739,13 @@ onMounted(() => {
   height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--gc-gap);
   overflow: hidden;
 }
 .page-head {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: var(--gc-gap);
   flex: none;
 }
 .head-branch {
@@ -703,7 +760,7 @@ onMounted(() => {
   flex: none;
 }
 .tracking {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--el-text-color-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -731,7 +788,7 @@ onMounted(() => {
   flex: 1;
   min-height: 0;
   display: flex;
-  gap: 14px;
+  gap: var(--gc-gap);
 }
 
 /* 左：分支树（内部滚动，占满高度） */
@@ -743,14 +800,14 @@ onMounted(() => {
   height: 100%;
 }
 .branch-panel :deep(.el-card__header) {
-  padding: 10px 14px;
+  padding: 8px 12px;
 }
 .branch-panel :deep(.el-card__body) {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 10px 8px;
+  padding: 8px;
 }
 .panel-head {
   display: flex;
@@ -759,7 +816,7 @@ onMounted(() => {
 }
 .panel-title {
   font-weight: 600;
-  font-size: 14px;
+  font-size: 13px;
 }
 .panel-actions {
   display: flex;
@@ -774,6 +831,37 @@ onMounted(() => {
   font-size: 12px;
   color: var(--el-text-color-secondary);
   padding: 8px 8px 4px;
+}
+/* 分支树（el-tree）紧凑适配 */
+.branch-tree {
+  background: transparent;
+  --el-tree-node-hover-bg-color: var(--el-fill-color-extra-light);
+}
+.branch-tree :deep(.el-tree-node__content) {
+  height: 28px;
+  padding-right: 4px;
+}
+.branch-tree :deep(.el-tree-node__expand-icon) {
+  font-size: 11px;
+  flex: none;
+}
+.branch-tree :deep(.branch-node),
+.branch-tree :deep(.tree-dir) {
+  flex: 1;
+  min-width: 0;
+}
+.tree-dir {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--el-text-color-regular);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pane-empty {
+  padding: 8px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 .branch-node {
   display: flex;
@@ -795,7 +883,7 @@ onMounted(() => {
 }
 .node-name {
   flex: 1;
-  font-size: 13px;
+  font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -829,13 +917,13 @@ onMounted(() => {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--gc-gap);
 }
 .toolbar-card {
   flex: none;
 }
 .toolbar-card :deep(.el-card__body) {
-  padding: 12px 16px;
+  padding: 8px 12px;
 }
 .toolbar {
   display: flex;
@@ -858,14 +946,14 @@ onMounted(() => {
   flex-direction: column;
 }
 .changes-card :deep(.el-card__header) {
-  padding: 10px 14px;
+  padding: 8px 12px;
 }
 .changes-card :deep(.el-card__body) {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 0 14px 12px;
+  padding: 0 12px 8px;
 }
 .card-head {
   display: flex;
@@ -874,7 +962,7 @@ onMounted(() => {
 }
 .card-title {
   font-weight: 600;
-  font-size: 14px;
+  font-size: 13px;
 }
 .card-actions {
   display: flex;
@@ -939,8 +1027,8 @@ onMounted(() => {
 .file-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 5px 4px;
+  gap: var(--gc-gap);
+  padding: 4px;
   border-bottom: 1px solid var(--el-border-color-lighter);
 }
 .file-row:last-child {
@@ -972,7 +1060,7 @@ onMounted(() => {
 }
 .file-path {
   flex: 1;
-  font-size: 13px;
+  font-size: 12px;
   font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
   word-break: break-all;
 }
@@ -985,14 +1073,14 @@ onMounted(() => {
   flex-direction: column;
 }
 .stash-card :deep(.el-card__header) {
-  padding: 10px 14px;
+  padding: 8px 12px;
 }
 .stash-card :deep(.el-card__body) {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 4px 14px 12px;
+  padding: 4px 12px 8px;
 }
 .stash-list {
   flex: 1;
@@ -1002,8 +1090,8 @@ onMounted(() => {
 .stash-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 2px;
+  gap: var(--gc-gap);
+  padding: 4px 2px;
   border-bottom: 1px solid var(--el-border-color-lighter);
 }
 .stash-row:last-child {
@@ -1014,7 +1102,7 @@ onMounted(() => {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--gc-gap);
 }
 .stash-ref {
   flex: none;
@@ -1061,9 +1149,9 @@ onMounted(() => {
 /* 差异抽屉 */
 .diff-summary {
   display: flex;
-  gap: 12px;
-  font-size: 13px;
-  margin-bottom: 8px;
+  gap: var(--gc-gap);
+  font-size: 12px;
+  margin-bottom: var(--gc-gap);
 }
 .diff-summary .add {
   color: var(--el-color-success);

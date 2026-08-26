@@ -121,16 +121,16 @@ onMounted(() => {
 
 <style scoped>
 .page-title {
-  margin: 0 0 16px;
-  font-size: 18px;
+  margin: 0 0 var(--gc-gap);
+  font-size: 14px;
 }
 .mb {
-  margin-bottom: 14px;
+  margin-bottom: var(--gc-gap);
 }
 .filter-bar {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--gc-gap);
   flex-wrap: wrap;
 }
 .tool-select {

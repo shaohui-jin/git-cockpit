@@ -191,16 +191,16 @@ onMounted(() => void refresh());
 
 <style scoped>
 .page-title {
-  margin: 0 0 16px;
-  font-size: 18px;
+  margin: 0 0 var(--gc-gap);
+  font-size: 14px;
 }
 .mb {
-  margin-bottom: 14px;
+  margin-bottom: var(--gc-gap);
 }
 .filter-bar {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--gc-gap);
   flex-wrap: wrap;
 }
 .branch-select {
@@ -213,7 +213,7 @@ onMounted(() => void refresh());
   width: 110px;
 }
 .hash {
-  font-size: 13px;
+  font-size: 12px;
 }
 .subject {
   font-weight: 500;
@@ -238,8 +238,8 @@ onMounted(() => void refresh());
   word-break: break-all;
 }
 .commit-subject {
-  margin: 8px 0 6px;
-  font-size: 18px;
+  margin: var(--gc-gap) 0 6px;
+  font-size: 14px;
 }
 .commit-meta {
   display: flex;
@@ -261,9 +261,9 @@ onMounted(() => void refresh());
 }
 .diff-summary {
   display: flex;
-  gap: 12px;
-  font-size: 13px;
-  margin-bottom: 8px;
+  gap: var(--gc-gap);
+  font-size: 12px;
+  margin-bottom: var(--gc-gap);
 }
 .diff-summary .add {
   color: var(--el-color-success);

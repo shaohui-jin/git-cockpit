@@ -47,8 +47,13 @@ async function removeRepo(id: number, path: string): Promise<void> {
   }
 }
 
-function openStatus(id: number): void {
-  repos.switchTo(id);
+async function openStatus(id: number): Promise<void> {
+  // 进入仓库：后端刷新「最近打开」排序并记录操作日志；失败则本地切换兜底
+  try {
+    await repos.activate(id);
+  } catch {
+    repos.switchTo(id);
+  }
   router.push('/status');
 }
 
@@ -114,16 +119,16 @@ onMounted(() => repos.load());
 
 <style scoped>
 .page-title {
-  margin: 0 0 16px;
-  font-size: 18px;
+  margin: 0 0 var(--gc-gap);
+  font-size: 14px;
 }
 .open-card,
 .list-card {
-  margin-bottom: 16px;
+  margin-bottom: var(--gc-gap);
 }
 .open-row {
   display: flex;
-  gap: 10px;
+  gap: var(--gc-gap);
 }
 .open-row .el-input {
   flex: 1;
@@ -134,7 +139,7 @@ onMounted(() => repos.load());
   align-items: center;
 }
 .repo-path {
-  font-size: 13px;
+  font-size: 12px;
 }
 </style>
 

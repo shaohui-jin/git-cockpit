@@ -88,6 +88,14 @@ export class RepoManager {
     return { service, record };
   }
 
+  /** 激活仓库：刷新最近打开时间，驱动「最近打开」列表重排到首位；仓库不存在返回 null */
+  activate(id: number): OpenedRepo | null {
+    const record = this.options.repoStore.getById(id);
+    if (!record) return null;
+    this.options.repoStore.open(record.path); // 同路径 open 仅更新 last_opened_at
+    return this.options.repoStore.getById(id) ?? record;
+  }
+
   /** 按路径取服务，未打开则报错（避免隐式副作用） */
   getByPath(repoPath: string): RepoHandle {
     const key = normalizePath(repoPath);

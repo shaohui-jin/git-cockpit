@@ -71,6 +71,11 @@ export function openRepo(path: string): Promise<{ repo: OpenedRepo }> {
   return request('POST', '/api/repos/open', { path });
 }
 
+/** 激活/进入仓库：后端刷新最近打开排序并记录操作日志 */
+export function activateRepo(id: number): Promise<{ repo: OpenedRepo }> {
+  return request('POST', `/api/repos/${id}/activate`);
+}
+
 /** 关闭并移除仓库记录 */
 export function removeRepo(id: number): Promise<{ ok: boolean }> {
   return request('DELETE', `/api/repos/${id}`);

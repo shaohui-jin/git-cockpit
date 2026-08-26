@@ -100,11 +100,11 @@ function onCancel(): void {
 
 <style scoped>
 .risk-alert {
-  margin-bottom: 14px;
+  margin-bottom: var(--gc-gap);
 }
 .cmd-box,
 .files-box {
-  margin-bottom: 12px;
+  margin-bottom: var(--gc-gap);
 }
 .cmd-label {
   font-size: 12px;
@@ -117,14 +117,14 @@ function onCancel(): void {
   background: var(--el-fill-color-light);
   border-radius: 6px;
   overflow-x: auto;
-  font-size: 12.5px;
+  font-size: 12px;
 }
 .file-item {
-  font-size: 12.5px;
+  font-size: 12px;
   padding: 2px 0;
 }
 .note-text {
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--el-text-color-secondary);
 }
 .risk-tag {
