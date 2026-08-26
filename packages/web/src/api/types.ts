@@ -73,6 +73,24 @@ export interface BranchInfo {
   commit: string;
   label: string;
   remote: boolean;
+  /** 上游跟踪分支，如 origin/main（仅本地分支 & 存在上游时） */
+  upstream?: string | null;
+  /** 领先上游的提交数 */
+  ahead?: number;
+  /** 落后上游的提交数 */
+  behind?: number;
+}
+
+/** 一条 stash 记录（对应 stash@{n}） */
+export interface StashInfo {
+  /** 序号，如 0 / 1（对应 stash@{n}） */
+  index: number;
+  /** 引用名，如 stash@{0} */
+  ref: string;
+  /** 保存说明（默认形如 "WIP on 分支名: 提交主题"） */
+  message: string;
+  /** 保存时间（ISO 字符串） */
+  date: string | null;
 }
 
 export interface TagInfo {

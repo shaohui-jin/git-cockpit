@@ -196,6 +196,10 @@ export async function createWebServer(
     })
   );
 
+  app.get<{ Params: { id: string } }>('/api/repos/:id/stashes', async (req, reply) =>
+    withRepo(req, reply, async ({ service }) => service.listStashes())
+  );
+
   // ---------------------------------------------------------------------------
   // 通用写操作入口（复用 MCP 同款安全链路）
   // ---------------------------------------------------------------------------

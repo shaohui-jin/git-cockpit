@@ -147,9 +147,32 @@ export type GitTagCreateArgs = z.infer<typeof GitTagCreateSchema>;
 export const GitStashSchema = z.object({
   ...writeBase,
   message: z.string().optional().describe('stash 消息'),
-  includeUntracked: z.boolean().optional().describe('包含未跟踪文件（-u）')
+  includeUntracked: z.boolean().optional().describe('包含未跟踪文件（-u）'),
+  paths: pathsField.describe('仅暂存这些文件（对应 WebStorm Shelve 的选择性暂存；空则暂存全部）')
 });
 export type GitStashArgs = z.infer<typeof GitStashSchema>;
+
+export const GitStashListSchema = z.object({ ...readonlyBase });
+export type GitStashListArgs = z.infer<typeof GitStashListSchema>;
+
+export const GitStashShowSchema = z.object({
+  ...readonlyBase,
+  index: z.number().int().min(0).optional().describe('stash 序号，缺省为 stash@{0}'),
+  maxPatchBytes: z.number().int().positive().optional().describe('diff 正文最大字节数，超出截断')
+});
+export type GitStashShowArgs = z.infer<typeof GitStashShowSchema>;
+
+export const GitStashApplySchema = z.object({
+  ...writeBase,
+  index: z.number().int().min(0).optional().describe('stash 序号，缺省为 stash@{0}')
+});
+export type GitStashApplyArgs = z.infer<typeof GitStashApplySchema>;
+
+export const GitStashDropSchema = z.object({
+  ...writeBase,
+  index: z.number().int().min(0).optional().describe('stash 序号，缺省为 stash@{0}')
+});
+export type GitStashDropArgs = z.infer<typeof GitStashDropSchema>;
 
 export const GitStashPopSchema = z.object({
   ...writeBase,

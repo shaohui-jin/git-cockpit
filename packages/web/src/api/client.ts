@@ -14,6 +14,7 @@ import type {
   RemoteInfo,
   RepoStatus,
   SettingsData,
+  StashInfo,
   TagInfo,
   ToolExecResult,
   ToolSummary
@@ -113,6 +114,10 @@ export function getShow(id: number, commit: string): Promise<{ commit: CommitInf
 
 export function listBranches(id: number): Promise<{ branches: BranchInfo[]; current: string | null }> {
   return request('GET', `/api/repos/${id}/branches`);
+}
+
+export function listStashes(id: number): Promise<StashInfo[]> {
+  return request('GET', `/api/repos/${id}/stashes`);
 }
 
 export function listTags(id: number): Promise<TagInfo[]> {

@@ -12,6 +12,7 @@ import type {
   RemoteInfo,
   RepoStatus,
   CommitInfo,
+  StashInfo,
   LogOptions,
   DiffOptions,
   GraphData
@@ -342,24 +343,52 @@ export class GitService extends EventEmitter {
     }
   }
 
-  /** 列出本地 + 远程分支 */
+  /**
+   * 列出本地 + 远程分支。
+   * 本地分支额外返回 上游(upstream) 与 ahead/behind 同步信息，供分支树直接展示 ↑↓。
+   */
   async listBranches(): Promise<{
     branches: BranchInfo[];
     current: string | null;
   }> {
-    const b = await this.enqueue(async () => this.git.branch(['-a', '--no-color']));
+    const [headsOut, remotesOut, currentRef] = await Promise.all([
+      this.run([
+        'for-each-ref',
+        '--format=%(refname:short)%00%(objectname:short)%00%(upstream:short)%00%(upstream:track)',
+        'refs/heads'
+      ]),
+      this.run(['for-each-ref', '--format=%(refname:short)%00%(objectname:short)', 'refs/remotes']).catch(() => ''),
+      this.run(['symbolic-ref', '--short', 'HEAD']).catch(() => '')
+    ]);
+    const current = currentRef.trim() || null;
     const branches: BranchInfo[] = [];
-    for (const [name, br] of Object.entries(b.branches)) {
+
+    for (const line of headsOut.split('\n')) {
+      if (!line.trim()) continue;
+      const [name, commit, upstream, track] = line.split('\0');
+      if (!name) continue;
+      const sync = parseUpstreamTrack(track ?? '');
       branches.push({
         name,
-        current: Boolean(br.current),
-        commit: br.commit ?? '',
-        label: br.label ?? '',
-        remote: name.startsWith('remotes/')
+        current: name === current,
+        commit: commit ?? '',
+        label: '',
+        remote: false,
+        upstream: upstream || null,
+        ahead: sync.ahead,
+        behind: sync.behind
       });
     }
+
+    for (const line of remotesOut.split('\n')) {
+      if (!line.trim()) continue;
+      const [name, commit] = line.split('\0');
+      if (!name) continue;
+      branches.push({ name, current: false, commit: commit ?? '', label: '', remote: true });
+    }
+
     branches.sort((x, y) => x.name.localeCompare(y.name));
-    return { branches, current: b.current || null };
+    return { branches, current };
   }
 
   /** 列出标签 */
@@ -713,12 +742,25 @@ export class GitService extends EventEmitter {
     }
   }
 
-  /** git stash（保存工作区） */
-  async stash(message?: string, options: { dryRun?: boolean; includeUntracked?: boolean } = {}): Promise<WritePreview | string> {
+  /**
+   * git stash（保存工作区）。
+   * 支持 paths：仅保存这些文件（对应 WebStorm Shelve 的“选择部分文件”，git stash push -- <paths>）。
+   */
+  async stash(
+    message?: string,
+    options: { dryRun?: boolean; includeUntracked?: boolean; paths?: string[] } = {}
+  ): Promise<WritePreview | string> {
     const cmd = ['stash', 'push'];
     if (options.includeUntracked) cmd.push('-u');
     if (message) cmd.push('-m', message);
-    if (options.dryRun) return GitService.preview(cmd, 'medium', undefined, '将暂存（stash）当前工作区更改');
+    const paths = options.paths ?? [];
+    for (const p of paths) if (p !== '.') this.validateRepoRelativePath(p);
+    // 注意：paths 指定的*未跟踪*文件也必须配合 includeUntracked(-u) 才会被 stash，
+    // 否则 git 会报 “pathspec ... did not match any file(s) known to git”。
+    // 调用方（如 UI 的选择性 stash）需自行确保未跟踪文件被选中时传入 includeUntracked。
+    if (paths.length) cmd.push('--', ...paths);
+    const note = paths.length ? `将暂存 ${paths.length} 个文件的更改（仅这些文件）` : '将暂存（stash）当前工作区更改';
+    if (options.dryRun) return GitService.preview(cmd, 'medium', paths.length ? paths : undefined, note);
     await this.prepareWrite();
     try {
       const out = await this.run(cmd);
@@ -730,6 +772,86 @@ export class GitService extends EventEmitter {
     } catch (err) {
       const msg = String((err as Error).message ?? '');
       throw new GitOperationError(this.extractGitMessage(msg), 'GIT_STASH_FAILED');
+    }
+  }
+
+  /** 列出所有 stash 记录（stash@{n} / 说明 / 时间） */
+  async listStashes(): Promise<StashInfo[]> {
+    try {
+      const out = await this.run(['log', '-g', '--format=%gD%x1f%gs%x1f%cI', 'refs/stash']);
+      const list: StashInfo[] = [];
+      for (const line of out.split('\n')) {
+        if (!line.trim()) continue;
+        const [ref, message, date] = line.split('\x1f');
+        // %gD 可能是 stash@{0} 或 refs/stash@{0}（取决于 git 版本），统一正则归一化
+        const m = /^(?:refs\/)?stash@\{(\d+)\}$/.exec(ref ?? '');
+        if (!m) continue;
+        const index = Number(m[1]);
+        list.push({
+          index,
+          ref: `stash@{${index}}`,
+          message: message ?? '',
+          date: date || null
+        });
+      }
+      return list;
+    } catch (err) {
+      const msg = String((err as Error).message ?? '');
+      // 没有任何 stash 时 refs/stash 不存在，git log 报错 → 返回空列表
+      if (/does not exist|unknown revision|bad revision|ambiguous argument/.test(msg)) {
+        return [];
+      }
+      throw new GitOperationError(this.extractGitMessage(msg), 'GIT_STASH_LIST_FAILED');
+    }
+  }
+
+  /** git stash show（查看某条 stash 的差异，不修改仓库） */
+  async stashShow(options: { index?: number; maxPatchBytes?: number } = {}): Promise<{
+    index: number;
+    ref: string;
+    patch: string;
+    truncated: boolean;
+  }> {
+    const idx = typeof options.index === 'number' && options.index >= 0 ? options.index : 0;
+    const ref = `stash@{${idx}}`;
+    const out = await this.run(['stash', 'show', '-p', '--include-untracked', ref]);
+    const maxBytes = options.maxPatchBytes ?? 2 * 1024 * 1024;
+    const truncated = Buffer.byteLength(out, 'utf8') > maxBytes;
+    return { index: idx, ref, patch: truncated ? out.slice(0, maxBytes) + '\n... [diff 过大已截断]' : out, truncated };
+  }
+
+  /** git stash apply（应用某条 stash，保留记录） */
+  async stashApply(options: { dryRun?: boolean; index?: number } = {}): Promise<WritePreview | string> {
+    const cmd = ['stash', 'apply'];
+    if (typeof options.index === 'number' && options.index >= 0) cmd.push(`stash@{${options.index}}`);
+    if (options.dryRun) return GitService.preview(cmd, 'medium', undefined, '将应用该 stash（记录保留，可反复应用）');
+    await this.prepareWrite();
+    try {
+      const out = await this.run(cmd);
+      this.emit('changed', { repoPath: this.repoPath, command: cmd });
+      return out;
+    } catch (err) {
+      const msg = String((err as Error).message ?? '');
+      if (/conflict|CONFLICT/.test(msg)) {
+        throw new GitOperationError('应用 stash 产生冲突，请解决冲突', 'STASH_APPLY_CONFLICT');
+      }
+      throw new GitOperationError(this.extractGitMessage(msg), 'GIT_STASH_APPLY_FAILED');
+    }
+  }
+
+  /** git stash drop（删除某条 stash 记录） */
+  async stashDrop(options: { dryRun?: boolean; index?: number } = {}): Promise<WritePreview | string> {
+    const cmd = ['stash', 'drop'];
+    if (typeof options.index === 'number' && options.index >= 0) cmd.push(`stash@{${options.index}}`);
+    if (options.dryRun) return GitService.preview(cmd, 'medium', undefined, '将删除该 stash 记录（删除后不可直接恢复）');
+    await this.prepareWrite();
+    try {
+      const out = await this.run(cmd);
+      this.emit('changed', { repoPath: this.repoPath, command: cmd });
+      return out;
+    } catch (err) {
+      const msg = String((err as Error).message ?? '');
+      throw new GitOperationError(this.extractGitMessage(msg), 'GIT_STASH_DROP_FAILED');
     }
   }
 
@@ -832,5 +954,19 @@ export class GitService extends EventEmitter {
 export const GIT_FIELD_SEP = '\x1f';
 export const GIT_RECORD_SEP = '\x1e';
 const GIT_LOG_FORMAT = `%H${GIT_FIELD_SEP}%P${GIT_FIELD_SEP}%an${GIT_FIELD_SEP}%ae${GIT_FIELD_SEP}%aI${GIT_FIELD_SEP}%cn${GIT_FIELD_SEP}%ce${GIT_FIELD_SEP}%cI${GIT_FIELD_SEP}%D${GIT_FIELD_SEP}%s${GIT_FIELD_SEP}%b${GIT_RECORD_SEP}`;
+
+/**
+ * 解析 `git for-each-ref --format=%(upstream:track)` 的跟踪状态输出，如：
+ * `[ahead 2]` / `[behind 3]` / `[ahead 1, behind 5]` / `[gone]` / 空串。
+ * 返回 { ahead, behind }，无法识别时均返回 0。
+ */
+function parseUpstreamTrack(track: string): { ahead: number; behind: number } {
+  const ahead = /ahead (\d+)/.exec(track);
+  const behind = /behind (\d+)/.exec(track);
+  return {
+    ahead: ahead ? Number(ahead[1]) : 0,
+    behind: behind ? Number(behind[1]) : 0
+  };
+}
 
 export type { DiffResult, FileStatus, DiffFileSummary, BranchInfo, TagInfo, RemoteInfo, RepoStatus, CommitInfo, GraphData };

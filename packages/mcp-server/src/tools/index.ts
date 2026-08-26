@@ -199,14 +199,49 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'git_stash',
-    description: '暂存（stash）当前工作区更改，可选包含未跟踪文件（-u）。支持 dry_run 预览。',
+    description: '暂存（stash）当前工作区更改，可选包含未跟踪文件（-u）；paths 可指定仅暂存部分文件（对应 WebStorm Shelve 的选择性暂存）。支持 dry_run 预览。',
     risk: 'write',
     schema: S.GitStashSchema,
     handler: async (args: Args, ctx) =>
       ctx.git.stash(args.message as string | undefined, {
         dryRun: args.dryRun as boolean | undefined,
-        includeUntracked: args.includeUntracked as boolean | undefined
+        includeUntracked: args.includeUntracked as boolean | undefined,
+        paths: (args.paths as string[]) ?? []
       })
+  },
+  {
+    name: 'git_stash_list',
+    description: '列出全部 stash 记录（stash@{n} / 说明 / 时间）。',
+    risk: 'readonly',
+    schema: S.GitStashListSchema,
+    handler: async (_args: Args, ctx) => ctx.git.listStashes()
+  },
+  {
+    name: 'git_stash_show',
+    description: '查看某条 stash 的差异内容（不修改仓库）。',
+    risk: 'readonly',
+    schema: S.GitStashShowSchema,
+    handler: async (args: Args, ctx) =>
+      ctx.git.stashShow({
+        index: args.index as number | undefined,
+        maxPatchBytes: args.maxPatchBytes as number | undefined
+      })
+  },
+  {
+    name: 'git_stash_apply',
+    description: '应用某条 stash（保留记录，可反复应用）。产生冲突会提示。支持 dry_run 预览。',
+    risk: 'write',
+    schema: S.GitStashApplySchema,
+    handler: async (args: Args, ctx) =>
+      ctx.git.stashApply({ dryRun: args.dryRun as boolean | undefined, index: args.index as number | undefined })
+  },
+  {
+    name: 'git_stash_drop',
+    description: '删除某条 stash 记录（删除后不可直接恢复）。支持 dry_run 预览。',
+    risk: 'write',
+    schema: S.GitStashDropSchema,
+    handler: async (args: Args, ctx) =>
+      ctx.git.stashDrop({ dryRun: args.dryRun as boolean | undefined, index: args.index as number | undefined })
   },
   {
     name: 'git_stash_pop',

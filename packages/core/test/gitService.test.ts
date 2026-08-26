@@ -241,6 +241,72 @@ describe('GitService 写操作与 dry-run', () => {
   });
 });
 
+describe('GitService stash 列表/选择/apply/drop/show', () => {
+  let dir: string;
+  let svc: GitService;
+
+  beforeEach(async () => {
+    cleanupTmp();
+    ({ dir } = await createSampleRepo());
+    svc = await GitService.open(dir);
+  });
+
+  afterAll(() => cleanupTmp());
+
+  it('listStashes 空列表返回空数组', async () => {
+    expect(await svc.listStashes()).toEqual([]);
+  });
+
+  it('stash 后可列出，show/apply/drop 可用', async () => {
+    fs.writeFileSync(path.join(dir, 'a.txt'), 'stash content\n');
+    await svc.stash('my stash note');
+
+    const list = await svc.listStashes();
+    expect(list.length).toBe(1);
+    expect(list[0]!.index).toBe(0);
+    expect(list[0]!.ref).toBe('stash@{0}');
+    expect(list[0]!.message).toContain('my stash note');
+    expect(list[0]!.date).toBeTruthy();
+
+    const shown = await svc.stashShow({ index: 0 });
+    expect(shown.ref).toBe('stash@{0}');
+    expect(shown.patch).toContain('stash content');
+
+    // apply 保留记录
+    await svc.stashApply({ index: 0 });
+    expect((await svc.listStashes()).length).toBe(1);
+    let st = await svc.getStatus();
+    expect(st.isClean).toBe(false);
+
+    // 重新 stash 后 drop
+    await svc.stash('again');
+    expect((await svc.listStashes()).length).toBe(2);
+    await svc.stashDrop({ index: 0 });
+    const after = await svc.listStashes();
+    expect(after.length).toBe(1);
+    expect(after[0]!.index).toBe(0); // drop 后索引重排
+  });
+
+  it('选择性 stash：仅保存指定路径（含未跟踪文件）', async () => {
+    fs.writeFileSync(path.join(dir, 'a.txt'), 'keep this change\n');
+    fs.writeFileSync(path.join(dir, 'b.txt'), 'stash me\n');
+    fs.writeFileSync(path.join(dir, 'new-untracked.txt'), 'new file\n');
+
+    await svc.stash('partial', { paths: ['b.txt', 'new-untracked.txt'], includeUntracked: true });
+
+    let st = await svc.getStatus();
+    // b.txt 与未跟踪文件被暂存，a.txt 保留
+    expect(st.unstaged.find((f) => f.path === 'a.txt')).toBeTruthy();
+    expect(st.unstaged.find((f) => f.path === 'b.txt')).toBeFalsy();
+    expect(st.untracked.includes('new-untracked.txt')).toBe(false);
+
+    const list = await svc.listStashes();
+    const shown = await svc.stashShow({ index: list[0]!.index });
+    expect(shown.patch).toContain('stash me');
+    expect(shown.patch).toContain('new file');
+  });
+});
+
 describe('GitService 串行队列', () => {
   it('高并发读写调用按序执行且不报错', async () => {
     cleanupTmp();
