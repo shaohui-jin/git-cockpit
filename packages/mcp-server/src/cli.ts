@@ -7,6 +7,7 @@
 import { createRuntime, disposeRuntime } from './runtime.js';
 import { createWebServer } from './webServer.js';
 import { startMcpStdio } from './mcpServer.js';
+import { version } from '../package.json'
 
 function printHelp(): void {
   console.log(`Git Cockpit - 基于 MCP 的 Git 可视化操作工具
@@ -33,7 +34,7 @@ export async function main(argv: string[]): Promise<number> {
     return 0;
   }
   if (command === 'version' || command === '--version' || command === '-v') {
-    console.log('0.1.0');
+    console.log(version);
     return 0;
   }
 

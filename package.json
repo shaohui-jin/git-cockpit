@@ -1,6 +1,6 @@
 {
   "name": "git-cockpit",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "private": true,
   "description": "Git Cockpit - 基于 MCP 的 Git 可视化操作工具（monorepo）",
   "license": "MIT",

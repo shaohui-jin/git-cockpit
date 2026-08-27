@@ -1,62 +1,55 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { html as diffToHtml } from 'diff2html';
+import { ColorSchemeType } from 'diff2html/lib-esm/types';
+import 'diff2html/bundles/css/diff2html.min.css';
 
 const props = defineProps<{
   patch: string;
 }>();
 
-interface Line {
-  type: 'meta' | 'hunk' | 'add' | 'del' | 'plain';
-  text: string;
-}
-
-/** 将 git diff 文本渲染为带 + / - / hunk 高亮的行 */
-const lines = computed<Line[]>(() => {
-  const out: Line[] = [];
-  for (const raw of props.patch.split('\n')) {
-    const t: Line['type'] =
-      raw.startsWith('diff --git') ||
-      raw.startsWith('index ') ||
-      raw.startsWith('---') ||
-      raw.startsWith('+++') ||
-      raw.startsWith('new file') ||
-      raw.startsWith('deleted file') ||
-      raw.startsWith('similarity') ||
-      raw.startsWith('rename ')
-        ? 'meta'
-        : raw.startsWith('@@')
-          ? 'hunk'
-          : raw.startsWith('+')
-            ? 'add'
-            : raw.startsWith('-')
-              ? 'del'
-              : 'plain';
-    out.push({ type: t, text: raw });
+/**
+ * 将 git diff 文本渲染为 diff2html（GitHub 风格）：
+ * - 每文件独立成块，带文件头 / 左右行号 / 增删着色 / 行内高亮
+ * - colorScheme: dark + theme.css 中的 .d2h-* 覆盖对齐 --gc 令牌
+ * - 空文本或解析异常时回退为「无差异」，由父级 empty 兜底
+ */
+const rendered = computed<string>(() => {
+  if (!props.patch.trim()) return '';
+  try {
+    return diffToHtml(props.patch, {
+      drawFileList: false,
+      outputFormat: 'line-by-line',
+      matching: 'lines',
+      colorScheme: ColorSchemeType.DARK,
+      renderNothingWhenEmpty: true
+    });
+  } catch {
+    return '';
   }
-  return out;
 });
+
+/** 渲染失败或空补丁时，用轻量方式展示原始文本（保底不出白屏） */
+const fallbackLines = computed<string[]>(() =>
+  rendered.value === '' ? props.patch.split('\n') : []
+);
 </script>
 
 <template>
-  <pre class="diff-pre mono"><template v-for="(l, i) in lines" :key="i"><span :class="l.type">{{ l.text }}</span>
+  <div class="diff-viewer">
+    <!-- eslint-disable-next-line vue/no-v-html -- diff2html 输出，非用户输入 -->
+    <div v-if="rendered" class="diff-html" v-html="rendered" />
+    <pre v-else-if="fallbackLines.length" class="diff-fallback mono"><template v-for="(l, i) in fallbackLines" :key="i">{{ l }}
 </template></pre>
+  </div>
 </template>
 
 <style scoped>
-.diff-pre .add {
-  color: #198754;
-  background: rgba(25, 135, 84, 0.08);
+.diff-viewer {
+  font-size: var(--gc-text);
+}
+/* 让 diff2html 覆盖样式（theme.css 全局定义 .d2h-*）在 scoped 内仍生效 */
+.diff-html :deep(.d2h-wrapper) {
   display: block;
-}
-.diff-pre .del {
-  color: #dc3545;
-  background: rgba(220, 53, 69, 0.08);
-  display: block;
-}
-.diff-pre .hunk {
-  color: var(--el-text-color-secondary);
-}
-.diff-pre .meta {
-  color: var(--el-color-primary);
 }
 </style>

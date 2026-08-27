@@ -22,34 +22,9 @@ pre {
   font-size: 12px;
 }
 
-/* 操作日志 / diff 中使用的极简等宽排版 */
+/* 操作日志中使用的极简等宽排版 */
 .mono {
   font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
-}
-
-.diff-pre {
-  margin: 0;
-  padding: 10px 12px;
-  background: var(--el-fill-color-light);
-  border-radius: 6px;
-  overflow: auto;
-  white-space: pre;
-  line-height: 1.5;
-  color: var(--el-text-color-primary);
-}
-.diff-pre .add {
-  color: #198754;
-  background: rgba(25, 135, 84, 0.08);
-}
-.diff-pre .del {
-  color: #dc3545;
-  background: rgba(220, 53, 69, 0.08);
-}
-.diff-pre .hunk {
-  color: var(--el-text-color-secondary);
-}
-.diff-pre .meta {
-  color: var(--el-color-primary);
 }
 
 .log-params {

@@ -21,11 +21,10 @@ const selectedBranch = ref('');
 const pathFilter = ref('');
 const maxCount = ref(50);
 
-/** 提交详情抽屉 */
+/** 提交详情抽屉：openCommit 成功后再置 visible，失败则拦截展开 */
 const showVisible = ref(false);
 const showCommit = ref<CommitInfo | null>(null);
 const showDiff = ref<DiffResult | null>(null);
-const showLoading = ref(false);
 
 const localBranches = computed(() => branches.value.filter((b) => !b.remote));
 const currentBranch = computed(() => branches.value.find((b) => b.current)?.name ?? '');
@@ -72,17 +71,22 @@ async function refresh(): Promise<void> {
 async function openCommit(c: CommitInfo): Promise<void> {
   const id = repoId();
   if (id === null) return;
-  showVisible.value = true;
-  showCommit.value = c;
-  showDiff.value = null;
-  showLoading.value = true;
+  loading.value = true;
   try {
+    // 先请求成功再展开抽屉：COMMIT_NOT_FOUND 等错误直接 message 提示并拦截展开
     const { diff } = await api.getShow(id, c.hash);
-    showDiff.value = diff;
+    showCommit.value = c;
+    console.log(diff);
+    showDiff.value = diff
+    showVisible.value = true;
   } catch (err) {
-    ElMessage.error(err instanceof Error ? err.message : String(err));
+    if (err instanceof api.ApiError && err.code === 'COMMIT_NOT_FOUND') {
+      ElMessage.warning(`提交不存在（${c.shortHash}），可能已被清理，请刷新列表`);
+    } else {
+      ElMessage.error(err instanceof Error ? err.message : String(err));
+    }
   } finally {
-    showLoading.value = false;
+    loading.value = false;
   }
 }
 
@@ -172,7 +176,7 @@ onMounted(() => void refresh());
           <pre v-if="showCommit.body" class="commit-body">{{ showCommit.body }}</pre>
         </div>
         <el-divider />
-        <div v-loading="showLoading" class="diff-wrap">
+        <div class="diff-wrap">
           <template v-if="showDiff">
             <div class="diff-summary">
               <span>{{ showDiff.files.length }} 个文件</span>
@@ -182,7 +186,7 @@ onMounted(() => void refresh());
             </div>
             <DiffViewer :patch="showDiff.rawPatch" />
           </template>
-          <el-empty v-else-if="!showLoading" description="无差异" :image-size="60" />
+          <el-empty v-else description="无差异" :image-size="60" />
         </div>
       </template>
     </el-drawer>

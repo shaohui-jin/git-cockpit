@@ -49,10 +49,26 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
     let code: string | undefined;
     let requiredApproval: boolean | undefined;
     try {
-      const data = (await res.json()) as { error?: string; code?: string; requiredApproval?: boolean };
-      message = data.error ?? message;
-      code = data.code;
-      requiredApproval = data.requiredApproval;
+      const data = (await res.json()) as {
+        error?: string | { code?: string; message?: string; requiredApproval?: boolean };
+        code?: string;
+        message?: string;
+        requiredApproval?: boolean;
+      };
+      // 错误体两种形态：平铺 { error, code }（tools 接口）与嵌套 { error: { code, message } }（withRepo 查询接口）
+      if (typeof data.error === 'string') {
+        message = data.error;
+        code = data.code;
+        requiredApproval = data.requiredApproval;
+      } else if (data.error && typeof data.error === 'object') {
+        message = data.error.message ?? message;
+        code = data.error.code ?? data.code;
+        requiredApproval = data.error.requiredApproval ?? data.requiredApproval;
+      } else if (data.message) {
+        message = data.message;
+        code = data.code;
+        requiredApproval = data.requiredApproval;
+      }
     } catch {
       /* 非 JSON 响应 */
     }
