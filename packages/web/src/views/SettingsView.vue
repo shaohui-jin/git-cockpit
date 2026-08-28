@@ -16,15 +16,17 @@ const draft = reactive<Draft>({
   requireApprovalFor: [],
   dryRunDefault: false
 });
+const githubTokenInput = ref('');
+const clearGithubToken = ref(false);
 const loaded = ref(false);
 const dirty = computed(() => {
   const p = settings.permissions;
   if (!p) return false;
-  return (
+  const permDirty =
     JSON.stringify([...draft.disabledTools].sort()) !== JSON.stringify([...p.disabledTools].sort()) ||
     JSON.stringify([...draft.requireApprovalFor].sort()) !== JSON.stringify([...p.requireApprovalFor].sort()) ||
-    draft.dryRunDefault !== p.dryRunDefault
-  );
+    draft.dryRunDefault !== p.dryRunDefault;
+  return permDirty || githubTokenInput.value.trim().length > 0 || clearGithubToken.value;
 });
 
 const dangerTools = computed(() => settings.tools.filter((t) => t.riskLevel === 'dangerous'));
@@ -36,6 +38,8 @@ function syncDraft(): void {
   draft.disabledTools = [...p.disabledTools];
   draft.requireApprovalFor = [...p.requireApprovalFor];
   draft.dryRunDefault = p.dryRunDefault;
+  githubTokenInput.value = '';
+  clearGithubToken.value = false;
   loaded.value = true;
 }
 
@@ -65,11 +69,21 @@ function riskLabel(r: string): string {
 
 async function save(): Promise<void> {
   try {
+    const token = githubTokenInput.value.trim();
     await settings.save({
-      disabledTools: [...draft.disabledTools],
-      requireApprovalFor: [...draft.requireApprovalFor],
-      dryRunDefault: draft.dryRunDefault
+      permissions: {
+        disabledTools: [...draft.disabledTools],
+        requireApprovalFor: [...draft.requireApprovalFor],
+        dryRunDefault: draft.dryRunDefault
+      },
+      ...(clearGithubToken.value
+        ? { mr: { githubToken: '' } }
+        : token
+          ? { mr: { githubToken: token } }
+          : {})
     });
+    githubTokenInput.value = '';
+    clearGithubToken.value = false;
     ElMessage.success('设置已保存');
   } catch (err) {
     ElMessage.error(err instanceof Error ? err.message : String(err));
@@ -93,6 +107,32 @@ onMounted(async () => {
         <el-form-item label="写操作默认 dry-run 预览">
           <el-switch v-model="draft.dryRunDefault" />
           <span class="form-tip">开启后所有写操作（MCP/CLI）默认只生成预览，不真正执行</span>
+        </el-form-item>
+      </el-form>
+    </el-card>
+
+    <el-card shadow="never" class="mb">
+      <template #header>MR 配置</template>
+      <el-form label-width="180px" label-position="left">
+        <el-form-item label="GitHub Token">
+          <div class="token-row">
+            <el-input
+              v-model="githubTokenInput"
+              type="password"
+              show-password
+              autocomplete="new-password"
+              placeholder="不回填已保存的 Token；留空则不改"
+              style="max-width: 420px"
+              :disabled="clearGithubToken"
+            />
+            <el-checkbox v-model="clearGithubToken" :disabled="!settings.githubTokenSet && !clearGithubToken">
+              清除已保存的 Token
+            </el-checkbox>
+          </div>
+          <div class="form-tip form-tip-block">
+            {{ settings.githubTokenSet ? '已保存 Token（不会在此显示）。' : '尚未配置。' }}
+            只用于 <span class="mono">git_mr_create</span> 调 GitHub REST，不进工具参数。
+          </div>
         </el-form-item>
       </el-form>
     </el-card>
@@ -176,6 +216,16 @@ onMounted(async () => {
   font-size: 12px;
   color: var(--el-text-color-secondary);
 }
+.form-tip-block {
+  display: block;
+  margin: 6px 0 0;
+}
+.token-row {
+  display: flex;
+  align-items: center;
+  gap: var(--gc-gap);
+  flex-wrap: wrap;
+}
 .card-head {
   display: flex;
   align-items: center;
@@ -187,6 +237,5 @@ onMounted(async () => {
 }
 .action-bar {
   display: flex;
-  gap: var(--gc-gap);
 }
 </style>

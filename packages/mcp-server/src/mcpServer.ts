@@ -32,7 +32,8 @@ export function createMcpServer(runtime: Runtime): McpServer {
         '4. 未指定 repoPath 时使用最近打开的仓库；',
         '5. 合并预演用 git_merge_preview / git_merge_rehearse（merge-tree，不改工作区），',
         '   into=合入目标/线上，from=我的分支；禁止用 git_merge 做预演。',
-        '6. 落盘用 git_apply_resolve（独立 worktree，主区不切换）；冲突时把选边后的 files 一并传入。'
+        '6. 落盘用 git_apply_resolve（独立 worktree，主区不切换）；冲突时把选边后的 files 一并传入。',
+        '7. 开 GitHub PR 用 git_mr_prepare（只读）/ git_mr_create（Token 在设置 MR 配置，不进工具参数）；非 GitHub 只给浏览器创建页。'
       ].join('\n')
     }
   );

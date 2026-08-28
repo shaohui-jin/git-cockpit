@@ -204,6 +204,34 @@ describe('Web API', () => {
     });
   });
 
+  it('GET/PUT /api/settings 读写 GitHub Token 只暴露 githubTokenSet', async () => {
+    const before = await server.app.inject({ method: 'GET', url: '/api/settings' });
+    expect(before.statusCode).toBe(200);
+    expect(before.json().mr.githubTokenSet).toBe(false);
+    expect(before.json().config.mr.githubToken).toBe('[REDACTED]');
+
+    const put = await server.app.inject({
+      method: 'PUT',
+      url: '/api/settings',
+      payload: { mr: { githubToken: 'ghs_secret' } }
+    });
+    expect(put.statusCode).toBe(200);
+    expect(put.json().mr.githubTokenSet).toBe(true);
+    expect(put.json().config.mr.githubToken).toBe('[REDACTED]');
+
+    const after = await server.app.inject({ method: 'GET', url: '/api/settings' });
+    expect(after.json().mr.githubTokenSet).toBe(true);
+    expect(JSON.stringify(after.json())).not.toContain('ghs_secret');
+
+    await server.app.inject({
+      method: 'PUT',
+      url: '/api/settings',
+      payload: { mr: { githubToken: '' } }
+    });
+    const cleared = await server.app.inject({ method: 'GET', url: '/api/settings' });
+    expect(cleared.json().mr.githubTokenSet).toBe(false);
+  });
+
   it('GET /api/logs 返回操作日志', async () => {
     const res = await server.app.inject({ method: 'GET', url: '/api/logs?limit=20' });
     expect(res.statusCode).toBe(200);

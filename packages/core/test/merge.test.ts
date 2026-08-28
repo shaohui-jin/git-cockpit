@@ -135,3 +135,42 @@ describe('worktree 落盘', () => {
     expect(merged).toBe('resolved\n');
   });
 });
+
+describe('prepareMr', () => {
+  beforeEach(() => cleanupTmp());
+  afterAll(() => cleanupTmp());
+
+  it('无远程时 platform 为 unknown，源分支回落到 from', async () => {
+    const { dir } = await createSampleRepo();
+    const svc = await GitService.open(dir);
+    const prep = await svc.prepareMr({ into: 'main', from: 'feature/x' });
+    expect(prep.platform).toBe('unknown');
+    expect(prep.sourceBranch).toBe('feature/x');
+    expect(prep.targetBranch).toBe('main');
+    expect(prep.createMrUrl).toBeNull();
+  });
+
+  it('GitHub remote 时 platform 为 github，并拼出 compare URL', async () => {
+    const { dir, git } = await createSampleRepo();
+    await git.addRemote('origin', 'git@github.com:acme/app.git');
+    const svc = await GitService.open(dir);
+    const prep = await svc.prepareMr({ into: 'main', from: 'feature/x' });
+    expect(prep.platform).toBe('github');
+    expect(prep.createMrUrl).toContain('/compare/');
+    expect(prep.createMrUrl).toContain('feature%2Fx');
+  });
+
+  it('已有临时分支时优先用它做 source', async () => {
+    const { dir } = await createSampleRepo();
+    const svc = await GitService.open(dir);
+    const applied = await svc.applyResolve({
+      into: 'main',
+      from: 'feature/x',
+      push: false,
+      files: []
+    });
+    if ('dryRun' in applied) throw new Error('不应返回 dry-run');
+    const prep = await svc.prepareMr({ into: 'main', from: 'feature/x' });
+    expect(prep.sourceBranch).toBe(applied.tempBranch);
+  });
+});

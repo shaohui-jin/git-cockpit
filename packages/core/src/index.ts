@@ -9,5 +9,7 @@ export {
   branchNameForMr,
   defaultTempBranchName,
   isSameBranchForMr,
-  buildCreateMrUrl
+  buildCreateMrUrl,
+  toHttpsRemoteUrl
 } from './merge.ts';
+export { createGithubPullRequest, githubPullsApiUrl, isGithubRemote, parseGithubRepo } from './mr.ts';

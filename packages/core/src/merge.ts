@@ -111,14 +111,10 @@ export function defaultTempBranchName(into: string, from: string, remotes: strin
 }
 
 /**
- * 把 git remote URL 转成浏览器「新建 MR/PR」页。无法识别时返回 null。
- * GitHub 走 compare；其余按 GitLab `-/merge_requests/new` 拼。
+ * git remote 可能是 `git@host:path.git` / ssh / https；网页和 GitHub API 要 https。
+ * simple-git 只返回配置里的原始 URL，不会做这种转换。
  */
-export function buildCreateMrUrl(
-  remoteUrl: string,
-  sourceBranch: string,
-  targetBranch: string
-): string | null {
+export function toHttpsRemoteUrl(remoteUrl: string): string | null {
   let url = remoteUrl.trim();
   if (!url) return null;
   if (url.startsWith('git@')) {
@@ -130,15 +126,33 @@ export function buildCreateMrUrl(
   } else {
     url = url.replace(/\.git$/, '');
   }
-
   try {
     const u = new URL(url);
+    return `${u.origin}${u.pathname.replace(/\/+$/, '')}`;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 把 git remote URL 转成浏览器「新建 MR/PR」页。无法识别时返回 null。
+ * GitHub 走 compare；其余按 GitLab `-/merge_requests/new` 拼。
+ */
+export function buildCreateMrUrl(
+  remoteUrl: string,
+  sourceBranch: string,
+  targetBranch: string
+): string | null {
+  const https = toHttpsRemoteUrl(remoteUrl);
+  if (!https) return null;
+  try {
+    const u = new URL(https);
     const host = u.hostname.toLowerCase();
     const repoPath = u.pathname.replace(/^\/+|\/+$/g, '');
     const src = encodeURIComponent(sourceBranch);
     const tgt = encodeURIComponent(targetBranch);
     if (host === 'github.com' || host.endsWith('.github.com')) {
-      return `${u.origin}/${repoPath}/compare/${encodeURIComponent(targetBranch)}...${encodeURIComponent(sourceBranch)}?expand=1`;
+      return `${u.origin}/${repoPath}/compare/${tgt}...${src}?expand=1`;
     }
     return `${u.origin}/${repoPath}/-/merge_requests/new?merge_request%5Bsource_branch%5D=${src}&merge_request%5Btarget_branch%5D=${tgt}`;
   } catch {

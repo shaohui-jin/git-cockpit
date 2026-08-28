@@ -1,6 +1,6 @@
 {
   "name": "@shaohui_jin/git-cockpit-mcp-server",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Git Cockpit - 基于 MCP 的 Git 可视化操作工具（MCP Server + Web 服务 + CLI）",
   "type": "module",
   "license": "MIT",

@@ -28,7 +28,7 @@ const REST_META: Record<string, { summary: string; tags: string[] }> = {
   'get /api/tools': { summary: '工具注册表（含风险与是否启用）', tags: ['系统'] },
   'get /api/logs': { summary: '操作审计日志', tags: ['系统'] },
   'get /api/settings': { summary: '配置与权限', tags: ['设置'] },
-  'put /api/settings': { summary: '更新权限配置', tags: ['设置'] },
+  'put /api/settings': { summary: '更新权限或 MR 配置（Token 只写不读）', tags: ['设置'] },
   'get /api/events': { summary: 'SSE：仓库变化与日志', tags: ['系统'] }
 };
 

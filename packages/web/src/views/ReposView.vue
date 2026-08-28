@@ -289,6 +289,5 @@ onMounted(() => repos.load());
 .node-actions {
   flex: none;
   display: flex;
-  gap: 2px;
 }
 </style>

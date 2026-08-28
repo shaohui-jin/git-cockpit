@@ -277,6 +277,33 @@ export interface LoggingConfig {
   redact: string[];
 }
 
+/** MR / PR：D-lite 只存 GitHub Token；不进工具参数 */
+export interface MrConfig {
+  githubToken: string;
+}
+
+export type MrPlatform = 'github' | 'other' | 'unknown';
+
+export interface PrepareMrResult {
+  platform: MrPlatform;
+  remote: string;
+  remoteUrl: string;
+  sourceBranch: string;
+  targetBranch: string;
+  title: string;
+  createMrUrl: string | null;
+}
+
+export interface CreateMrResult {
+  via: 'token' | 'browser';
+  url: string | null;
+  number?: number;
+  sourceBranch: string;
+  targetBranch: string;
+  title: string;
+  messages: string[];
+}
+
 /** 全局配置（对应 config.json） */
 export interface GitCockpitConfig {
   server: ServerConfig;
@@ -284,6 +311,7 @@ export interface GitCockpitConfig {
   git: GitConfig;
   permissions: PermissionsConfig;
   logging: LoggingConfig;
+  mr: MrConfig;
 }
 
 export const DEFAULT_CONFIG: GitCockpitConfig = {
@@ -301,7 +329,8 @@ export const DEFAULT_CONFIG: GitCockpitConfig = {
     requireApprovalFor: ['git_reset_hard', 'git_clean', 'git_push_force', 'git_branch_delete_force', 'git_rebase'],
     dryRunDefault: false
   },
-  logging: { level: 'info', redact: ['password', 'token', 'authorization'] }
+  logging: { level: 'info', redact: ['password', 'token', 'authorization'] },
+  mr: { githubToken: '' }
 };
 
 /** Git 操作相关错误（携带用户友好信息） */

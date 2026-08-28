@@ -144,11 +144,20 @@ onUnmounted(() => {
   padding: var(--gc-gap) var(--gc-pad);
   border-top: 1px solid var(--el-border-color-lighter);
 }
-.app-main {
-  background: var(--el-bg-color-page);
-}
 .main-content {
   padding: var(--gc-pad);
   width: 100%;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.main-content > * {
+  flex: 1;
+  min-height: 0;
+}
+.app-main {
+  overflow: hidden;
+  background: var(--el-bg-color-page);
 }
 </style>

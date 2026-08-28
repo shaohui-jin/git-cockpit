@@ -290,6 +290,9 @@ export async function createWebServer(
       requireApprovalFor: runtime.config.permissions.requireApprovalFor,
       dryRunDefault: runtime.config.permissions.dryRunDefault
     },
+    mr: {
+      githubTokenSet: Boolean(runtime.config.mr?.githubToken?.trim())
+    },
     tools: toolSummaries().map((t) => ({
       name: t.name,
       description: t.description,
@@ -299,16 +302,28 @@ export async function createWebServer(
   }));
 
   app.put<{
-    Body: { permissions?: { disabledTools?: string[]; requireApprovalFor?: string[]; dryRunDefault?: boolean } };
+    Body: {
+      permissions?: { disabledTools?: string[]; requireApprovalFor?: string[]; dryRunDefault?: boolean };
+      mr?: { githubToken?: string };
+    };
   }>('/api/settings', async (req, reply) => {
     const patch = req.body ?? {};
-    if (patch.permissions === undefined) {
-      return reply.code(400).send({ error: '仅支持更新 permissions 段' });
+    if (patch.permissions === undefined && patch.mr === undefined) {
+      return reply.code(400).send({ error: '仅支持更新 permissions 或 mr 段' });
     }
-    runtime.configStore.update({ permissions: patch.permissions });
+    if (patch.permissions !== undefined) {
+      runtime.configStore.update({ permissions: patch.permissions });
+    }
+    if (patch.mr !== undefined && typeof patch.mr.githubToken === 'string') {
+      runtime.configStore.update({ mr: { githubToken: patch.mr.githubToken } });
+    }
     runtime.config = runtime.configStore.get();
     runtime.permissions = new PermissionManager(runtime.config);
-    return { ok: true, config: runtime.configStore.snapshot() };
+    return {
+      ok: true,
+      config: runtime.configStore.snapshot(),
+      mr: { githubTokenSet: Boolean(runtime.config.mr?.githubToken?.trim()) }
+    };
   });
 
   // ---------------------------------------------------------------------------

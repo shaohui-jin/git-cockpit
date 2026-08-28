@@ -221,6 +221,27 @@ export const GitApplyResolveSchema = z.object({
 });
 export type GitApplyResolveArgs = z.infer<typeof GitApplyResolveSchema>;
 
+const mrIntoFrom = {
+  into: z.string().min(1).describe('合入目标（线上 / ours）。例如 origin/main'),
+  from: z.string().min(1).describe('我的分支（theirs）。例如 feature/x'),
+  remote: z.string().optional().describe('远程名，缺省 origin'),
+  sourceBranch: z.string().optional().describe('PR 源分支；缺省已有临时分支 merge/<from>-into-<into>，否则 from')
+};
+
+export const GitMrPrepareSchema = z.object({
+  ...readonlyBase,
+  ...mrIntoFrom
+});
+export type GitMrPrepareArgs = z.infer<typeof GitMrPrepareSchema>;
+
+export const GitMrCreateSchema = z.object({
+  ...writeBase,
+  ...mrIntoFrom,
+  title: z.string().optional().describe('PR 标题；缺省 Merge <source> into <target>'),
+  body: z.string().optional().describe('PR 正文')
+});
+export type GitMrCreateArgs = z.infer<typeof GitMrCreateSchema>;
+
 /** 高风险工具 */
 export const GitResetHardSchema = z.object({ ...writeBase, target: z.string().describe('要重置到的提交') });
 export type GitResetHardArgs = z.infer<typeof GitResetHardSchema>;

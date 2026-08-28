@@ -23,7 +23,8 @@ import type {
   MergePreviewResult,
   MergeRehearsalResult,
   ApplyResolveFile,
-  ApplyResolveResult
+  ApplyResolveResult,
+  PrepareMrResult
 } from './types.ts';
 import {
   assertMergeTreeVersion,
@@ -38,6 +39,7 @@ import {
   parseModernMergeTree,
   type GitVersion
 } from './merge.ts';
+import { isGithubRemote } from './mr.ts';
 
 export interface GitServiceOptions {
   maxConcurrentProcesses?: number;
@@ -1205,7 +1207,8 @@ export class GitService extends EventEmitter {
       this.validateRepoRelativePath(f.path);
     }
 
-    const remotes = (await this.listRemotes()).map((r) => r.name);
+    const remoteList = await this.listRemotes();
+    const remotes = remoteList.map((r) => r.name);
     const remoteNames = remotes.length ? remotes : ['origin'];
     if (isSameBranchForMr(into, from, remoteNames)) {
       throw new GitOperationError(
@@ -1281,7 +1284,7 @@ export class GitService extends EventEmitter {
         if (files.length === 0) {
           await wt('merge', '--abort');
           throw new GitOperationError(
-            '合并存在冲突，请先在预演中完成选边（网页三栏尚未提供，请在聊天窗口让 Agent 调用 git_merge_rehearse 后把 files 交给 git_apply_resolve）',
+            '合并存在冲突，请先完成选边（网页三栏或把 files 交给 git_apply_resolve）',
             'HAS_CONFLICTS'
           );
         }
@@ -1340,7 +1343,7 @@ export class GitService extends EventEmitter {
         messages.push(`已推送 ${remote}/${tempBranch}`);
       }
 
-      const remoteUrl = (await this.runAllowFail(['remote', 'get-url', remote])).stdout.trim();
+      const remoteUrl = urlOfRemote(remoteList, remote);
       const createMrUrl = buildCreateMrUrl(remoteUrl, tempBranch, branchNameForMr(into, remoteNames));
 
       this.emit('changed', { repoPath: this.repoPath, command: ['worktree', 'merge', tempBranch] });
@@ -1369,6 +1372,66 @@ export class GitService extends EventEmitter {
     }
   }
 
+  /**
+   * 只读：解析开 PR 用的源/目标分支与浏览器创建页。
+   * 优先已有临时分支 `merge/<from>-into-<into>`，否则用 from 的短分支名。
+   */
+  async prepareMr(options: {
+    into: string;
+    from: string;
+    remote?: string;
+    sourceBranch?: string;
+  }): Promise<PrepareMrResult> {
+    const into = options.into.trim();
+    const from = options.from.trim();
+    if (!into || !from) throw new GitOperationError('into / from 不能为空', 'INVALID_REF');
+
+    const remoteList = await this.listRemotes();
+    const remotes = remoteList.map((r) => r.name);
+    const remoteNames = remotes.length ? remotes : ['origin'];
+    if (isSameBranchForMr(into, from, remoteNames) && !options.sourceBranch?.trim()) {
+      throw new GitOperationError(
+        `「${from}」与「${into}」是同一分支，请自行 push/pull，不创建 PR。`,
+        'SAME_BRANCH'
+      );
+    }
+
+    const remote =
+      options.remote?.trim() || (remotes.includes('origin') ? 'origin' : (remotes[0] ?? 'origin'));
+    const remoteUrl = urlOfRemote(remoteList, remote);
+
+    const targetBranch = branchNameForMr(into, remoteNames);
+    let sourceBranch = options.sourceBranch?.trim() || defaultTempBranchName(into, from, remoteNames);
+    this.validateRefName(sourceBranch);
+    this.validateRefName(targetBranch);
+
+    if (!options.sourceBranch?.trim()) {
+      const { branches } = await this.listBranches();
+      const hasLocal = branches.some((b) => !b.remote && b.name === sourceBranch);
+      const hasRemote = branches.some((b) => b.remote && b.name === `${remote}/${sourceBranch}`);
+      if (!hasLocal && !hasRemote) {
+        sourceBranch = branchNameForMr(from, remoteNames);
+        this.validateRefName(sourceBranch);
+      }
+    }
+
+    const platform: PrepareMrResult['platform'] = !remoteUrl
+      ? 'unknown'
+      : isGithubRemote(remoteUrl)
+        ? 'github'
+        : 'other';
+
+    return {
+      platform,
+      remote,
+      remoteUrl,
+      sourceBranch,
+      targetBranch,
+      title: `Merge ${sourceBranch} into ${targetBranch}`,
+      createMrUrl: remoteUrl ? buildCreateMrUrl(remoteUrl, sourceBranch, targetBranch) : null
+    };
+  }
+
   /** 提取 git 报错中用户可读的部分 */
   private extractGitMessage(msg: string): string {
     const lines = msg.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
@@ -1390,6 +1453,11 @@ const GIT_LOG_FORMAT = `%H${GIT_FIELD_SEP}%P${GIT_FIELD_SEP}%an${GIT_FIELD_SEP}%
  * `[ahead 2]` / `[behind 3]` / `[ahead 1, behind 5]` / `[gone]` / 空串。
  * 返回 { ahead, behind }，无法识别时均返回 0。
  */
+function urlOfRemote(list: RemoteInfo[], name: string): string {
+  const r = list.find((x) => x.name === name);
+  return (r?.pushUrl || r?.fetchUrl || '').trim();
+}
+
 function parseUpstreamTrack(track: string): { ahead: number; behind: number } {
   const ahead = /ahead (\d+)/.exec(track);
   const behind = /behind (\d+)/.exec(track);

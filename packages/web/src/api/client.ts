@@ -182,8 +182,11 @@ export function getSettings(): Promise<SettingsData> {
   return request('GET', '/api/settings');
 }
 
-export function updateSettings(permissions: Partial<PermissionsPayload>): Promise<{ ok: boolean }> {
-  return request('PUT', '/api/settings', { permissions });
+export function updateSettings(body: {
+  permissions?: Partial<PermissionsPayload>;
+  mr?: { githubToken?: string };
+}): Promise<{ ok: boolean; mr?: { githubTokenSet: boolean } }> {
+  return request('PUT', '/api/settings', body);
 }
 
 export function getHealth(): Promise<HealthInfo> {

@@ -18,6 +18,12 @@
   --gc-gap: 8px;
   --gc-radius: 6px;
 
+  /* 合并选边：绿新增 / 蓝修改 / 红冲突（透明叠在现有底上） */
+  --gc-merge-add: color-mix(in srgb, var(--el-color-success) 16%, transparent);
+  --gc-merge-mod: color-mix(in srgb, var(--el-color-primary) 14%, transparent);
+  --gc-merge-conflict: color-mix(in srgb, var(--el-color-danger) 14%, transparent);
+  --gc-merge-code-line: 20px;
+
   /* ---- 字号：基础统一 12px，标题档位仅保留层级 ---- */
   --el-font-size-extra-large: 14px;
   --el-font-size-large: 13px;
@@ -108,6 +114,20 @@ html.dark body {
   margin-bottom: var(--gc-gap);
 }
 
+/* ---- 相邻按钮：覆盖 EP 默认 12px，统一 --gc-gap 8px
+   纯按钮容器不要再设 gap，交给这条相邻规则。
+   混合排版（中间有文字 / 标签 / Badge）的 flex 容器才用 gap，
+   并在该容器内把 .el-button+.el-button 的 margin 清掉，避免 8+8。 ---- */
+.el-button + .el-button {
+  margin-left: var(--gc-gap);
+}
+.el-button-group > .el-button + .el-button {
+  margin-left: 0;
+}
+.el-message-box__btns .el-button + .el-button {
+  margin-left: var(--gc-gap);
+}
+
 /* ---- 对话框 / 抽屉 / 消息框：内边距上限 12px ---- */
 .el-dialog__header {
   padding: var(--gc-pad) var(--gc-pad) 0;
@@ -169,7 +189,12 @@ html.dark body {
   white-space: nowrap;
 }
 
-/* ---- 空状态 ---- */
+/* 各视图根：占满 el-main，默认内部滚动 */
+.page {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
 .el-empty__description p {
   font-size: var(--gc-text);
 }

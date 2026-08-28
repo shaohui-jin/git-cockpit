@@ -730,7 +730,6 @@ onMounted(() => {
 }
 .panel-actions {
   display: flex;
-  gap: 2px;
 }
 .tree-scroll {
   flex: 1;
@@ -815,7 +814,6 @@ onMounted(() => {
   flex: none;
   visibility: hidden;
   display: flex;
-  gap: 2px;
 }
 .branch-node:hover .node-actions {
   visibility: visible;
@@ -840,12 +838,15 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
 }
 .toolbar-group {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  gap: var(--gc-gap);
+}
+.toolbar-group :deep(.el-button + .el-button) {
+  margin-left: 0;
 }
 
 /* 更改卡片：弹性占位，Tab 内容内部滚动 */
@@ -877,7 +878,10 @@ onMounted(() => {
 .card-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--gc-gap);
+}
+.card-actions :deep(.el-button + .el-button) {
+  margin-left: 0;
 }
 .changes-tabs {
   flex: 1;
@@ -940,6 +944,9 @@ onMounted(() => {
   gap: var(--gc-gap);
   padding: 4px;
   border-bottom: 1px solid var(--el-border-color-lighter);
+}
+.file-row :deep(.el-button + .el-button) {
+  margin-left: 0;
 }
 .file-row:last-child {
   border-bottom: none;

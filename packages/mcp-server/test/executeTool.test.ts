@@ -174,6 +174,76 @@ describe('git_merge_preview / git_apply_resolve', () => {
   });
 });
 
+describe('git_mr_prepare / git_mr_create', () => {
+  afterAll(() => cleanupTmp());
+
+  it('prepare 无远程时返回 unknown', async () => {
+    const runtime = createTestRuntime();
+    try {
+      const sample = await createSampleRepo();
+      await runtime.repoManager.open(sample.dir);
+      const def = TOOL_DEF_MAP.get('git_mr_prepare')!;
+      const exec = await executeTool(
+        def,
+        { into: 'main', from: 'feature/x', dryRun: false },
+        { runtime, source: 'mcp' }
+      );
+      expect(exec.success).toBe(true);
+      expect((exec.result as { platform: string; sourceBranch: string }).platform).toBe('unknown');
+      expect((exec.result as { sourceBranch: string }).sourceBranch).toBe('feature/x');
+    } finally {
+      disposeTestRuntime(runtime);
+    }
+  });
+
+  it('GitHub 远程未配 Token 时 create 失败', async () => {
+    const runtime = createTestRuntime();
+    try {
+      const sample = await createSampleRepo();
+      await sample.git.addRemote('origin', 'https://github.com/acme/app.git');
+      await runtime.repoManager.open(sample.dir);
+      const def = TOOL_DEF_MAP.get('git_mr_create')!;
+      const exec = await executeTool(
+        def,
+        { into: 'main', from: 'feature/x', dryRun: true },
+        { runtime, source: 'mcp' }
+      );
+      expect(exec.success).toBe(false);
+      expect(exec.error?.code).toBe('NO_TOKEN');
+    } finally {
+      disposeTestRuntime(runtime);
+    }
+  });
+
+  it('GitHub Token 创建 PR（mock fetch）', async () => {
+    const runtime = createTestRuntime({ mr: { githubToken: 'ghs_test' } });
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = (async (input, init) => {
+      expect(String(input)).toBe('https://api.github.com/repos/acme/app/pulls');
+      expect(init?.method).toBe('POST');
+      return new Response(JSON.stringify({ html_url: 'https://github.com/acme/app/pull/3', number: 3 }), {
+        status: 201
+      });
+    }) as typeof fetch;
+    try {
+      const sample = await createSampleRepo();
+      await sample.git.addRemote('origin', 'https://github.com/acme/app.git');
+      await runtime.repoManager.open(sample.dir);
+      const def = TOOL_DEF_MAP.get('git_mr_create')!;
+      const exec = await executeTool(
+        def,
+        { into: 'main', from: 'feature/x', sourceBranch: 'feature/x', dryRun: false },
+        { runtime, source: 'mcp' }
+      );
+      expect(exec.success).toBe(true);
+      expect(exec.result).toMatchObject({ via: 'token', number: 3 });
+    } finally {
+      globalThis.fetch = origFetch;
+      disposeTestRuntime(runtime);
+    }
+  });
+});
+
 describe('PermissionManager 交互', () => {
   it('PermissionError 属性正确', () => {
     const err = new PermissionError('拒绝', 'git_clean', true);

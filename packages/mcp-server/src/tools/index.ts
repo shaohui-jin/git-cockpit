@@ -2,7 +2,12 @@
  * 工具注册表：全部 MCP 工具的静态定义（名称/描述/风险等级/schema/handler）。
  * handler 直接调用 core GitService 的方法；统一安全链路由 executeTool 承担。
  */
-import type { GitService } from '@shaohui_jin/git-cockpit-core';
+import {
+  createGithubPullRequest,
+  GitOperationError,
+  githubPullsApiUrl,
+  type GitService
+} from '@shaohui_jin/git-cockpit-core';
 import * as S from './schemas.ts';
 import type { ToolDef } from './handlers.ts';
 
@@ -123,6 +128,20 @@ export const TOOL_DEFS: ToolDef[] = [
         remote: args.remote as string | undefined,
         path: args.path as string | undefined,
         maxFiles: args.maxFiles as number | undefined
+      })
+  },
+  {
+    name: 'git_mr_prepare',
+    description:
+      '只读：解析开 PR 的源/目标分支与浏览器创建页 URL。优先已有临时分支 merge/<from>-into-<into>。不调用 Token。into/from 含义同 git_merge_preview。',
+    risk: 'readonly',
+    schema: S.GitMrPrepareSchema,
+    handler: async (args: Args, ctx) =>
+      ctx.git.prepareMr({
+        into: args.into as string,
+        from: args.from as string,
+        remote: args.remote as string | undefined,
+        sourceBranch: args.sourceBranch as string | undefined
       })
   },
 
@@ -299,6 +318,71 @@ export const TOOL_DEFS: ToolDef[] = [
         tempBranch: args.tempBranch as string | undefined,
         dryRun: args.dryRun as boolean | undefined
       })
+  },
+  {
+    name: 'git_mr_create',
+    description:
+      '用设置里的 GitHub Token 创建 PR（REST）。非 GitHub 远程不调 API，只返回浏览器创建页。Token 不进本工具参数。dry_run 可预览。',
+    risk: 'write',
+    schema: S.GitMrCreateSchema,
+    handler: async (args: Args, ctx) => {
+      const prep = await ctx.git.prepareMr({
+        into: args.into as string,
+        from: args.from as string,
+        remote: args.remote as string | undefined,
+        sourceBranch: args.sourceBranch as string | undefined
+      });
+      const title = ((args.title as string | undefined) ?? '').trim() || prep.title;
+      const body = (args.body as string | undefined) ?? '';
+      const apiUrl = githubPullsApiUrl(prep.remoteUrl);
+      const token = ctx.runtime.config.mr?.githubToken ?? '';
+
+      if (prep.platform === 'github' && !token.trim()) {
+        throw new GitOperationError('未配置 GitHub Token（设置 → MR 配置）', 'NO_TOKEN');
+      }
+
+      if (args.dryRun) {
+        return {
+          dryRun: true,
+          command: apiUrl ? `POST ${apiUrl}` : `open ${prep.createMrUrl ?? ''}`,
+          args: [prep.sourceBranch, prep.targetBranch],
+          risk: 'medium' as const,
+          note:
+            prep.platform === 'github'
+              ? `将用设置中的 GitHub Token 创建 PR：${prep.sourceBranch} → ${prep.targetBranch}。标题：${title}`
+              : '远程不是 GitHub（或无法识别）。不会调用 Token API。确认后仅返回浏览器创建页 URL。'
+        };
+      }
+
+      if (prep.platform !== 'github' || !apiUrl) {
+        return {
+          via: 'browser',
+          url: prep.createMrUrl,
+          sourceBranch: prep.sourceBranch,
+          targetBranch: prep.targetBranch,
+          title,
+          messages: ['远程不是 GitHub，未调用 Token。请用浏览器打开创建页。']
+        };
+      }
+
+      const pr = await createGithubPullRequest({
+        remoteUrl: prep.remoteUrl,
+        token,
+        sourceBranch: prep.sourceBranch,
+        targetBranch: prep.targetBranch,
+        title,
+        body
+      });
+      return {
+        via: 'token',
+        url: pr.url,
+        number: pr.number,
+        sourceBranch: prep.sourceBranch,
+        targetBranch: prep.targetBranch,
+        title,
+        messages: [`已创建 PR #${pr.number}`]
+      };
+    }
   },
 
   // ---------------------------------------------------------------------------

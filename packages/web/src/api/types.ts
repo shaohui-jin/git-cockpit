@@ -176,6 +176,7 @@ export interface PermissionsPayload {
 export interface SettingsData {
   permissions: PermissionsPayload;
   tools: ToolSummary[];
+  mr: { githubTokenSet: boolean };
 }
 
 export interface HealthInfo {
@@ -220,5 +221,15 @@ export interface ApplyResolveResult {
   pushed: boolean;
   createMrUrl: string | null;
   previousBranch: string | null;
+  messages: string[];
+}
+
+export interface CreateMrResult {
+  via: 'token' | 'browser';
+  url: string | null;
+  number?: number;
+  sourceBranch: string;
+  targetBranch: string;
+  title: string;
   messages: string[];
 }
