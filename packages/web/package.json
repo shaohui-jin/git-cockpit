@@ -1,11 +1,12 @@
 {
   "name": "@shaohui_jin/git-cockpit-web",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "private": true,
   "type": "module",
-  "description": "Git Cockpit Web 前端：仓库管理、状态/历史/日志/设置视图",
+  "description": "Git Cockpit Web 前端：仓库管理、状态/合并/历史/日志/设置视图",
   "scripts": {
     "dev": "vite",
+    "start": "vite",
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit -p tsconfig.json"

@@ -10,9 +10,9 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import type { Runtime } from './runtime.js';
-import { executeTool, formatResultForMcp } from './tools/handlers.js';
-import { TOOL_DEFS } from './tools/index.js';
+import type { Runtime } from './runtime.ts';
+import { executeTool, formatResultForMcp } from './tools/handlers.ts';
+import { TOOL_DEFS } from './tools/index.ts';
 
 export const MCP_SERVER_INFO = { name: 'git-cockpit-mcp-server', version: '0.1.0' } as const;
 
@@ -29,7 +29,10 @@ export function createMcpServer(runtime: Runtime): McpServer {
         '2. 写操作（git_add/git_commit/git_push 等）默认可执行，但请先使用 dry_run=true 预览影响范围；',
         '3. 高风险工具（git_reset_hard/git_clean/git_push_force/git_branch_delete_force/git_rebase）默认禁用，',
         '   需管理员在配置中开启；执行时系统会自动备份当前状态；',
-        '4. 未指定 repoPath 时使用最近打开的仓库。'
+        '4. 未指定 repoPath 时使用最近打开的仓库；',
+        '5. 合并预演用 git_merge_preview / git_merge_rehearse（merge-tree，不改工作区），',
+        '   into=合入目标/线上，from=我的分支；禁止用 git_merge 做预演。',
+        '6. 落盘用 git_apply_resolve（独立 worktree，主区不切换）；冲突时把选边后的 files 一并传入。'
       ].join('\n')
     }
   );

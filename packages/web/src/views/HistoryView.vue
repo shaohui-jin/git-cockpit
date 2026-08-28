@@ -3,16 +3,18 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import * as api from '@/api/client';
 import { useReposStore } from '@/stores/repos';
+import { useBranchesStore } from '@/stores/branches';
 import { useRevision } from '@/composables/revision';
 import DiffViewer from '@/components/DiffViewer.vue';
-import type { BranchInfo, CommitInfo, DiffResult } from '@/api/types';
+import BranchTreeSelect from '@/components/BranchTreeSelect.vue';
+import type { CommitInfo, DiffResult } from '@/api/types';
 
 const repos = useReposStore();
+const branchStore = useBranchesStore();
 const { revision } = useRevision();
 const repoId = (): number | null => repos.currentId;
 
 const commits = ref<CommitInfo[]>([]);
-const branches = ref<BranchInfo[]>([]);
 const loading = ref(false);
 const loadError = ref('');
 
@@ -26,19 +28,7 @@ const showVisible = ref(false);
 const showCommit = ref<CommitInfo | null>(null);
 const showDiff = ref<DiffResult | null>(null);
 
-const localBranches = computed(() => branches.value.filter((b) => !b.remote));
-const currentBranch = computed(() => branches.value.find((b) => b.current)?.name ?? '');
-
-async function loadBranches(): Promise<void> {
-  const id = repoId();
-  if (id === null) return;
-  try {
-    const { branches: bs } = await api.listBranches(id);
-    branches.value = bs;
-  } catch {
-    /* ignore */
-  }
-}
+const currentBranch = computed(() => branchStore.current?.name ?? '');
 
 async function loadLog(): Promise<void> {
   const id = repoId();
@@ -65,7 +55,7 @@ async function loadLog(): Promise<void> {
 }
 
 async function refresh(): Promise<void> {
-  await Promise.all([loadBranches(), loadLog()]);
+  await loadLog();
 }
 
 async function openCommit(c: CommitInfo): Promise<void> {
@@ -95,7 +85,10 @@ function formatDate(iso: string): string {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
 }
 
-watch(repoId, () => void refresh());
+watch(repoId, () => {
+  selectedBranch.value = '';
+  void refresh();
+});
 watch(revision, () => void loadLog());
 watch([mode, selectedBranch, maxCount], () => void loadLog());
 
@@ -114,15 +107,11 @@ onMounted(() => void refresh());
           <el-radio-button value="all">全部分支</el-radio-button>
           <el-radio-button value="branch">指定分支</el-radio-button>
         </el-radio-group>
-        <el-select
+        <BranchTreeSelect
           v-if="mode === 'branch'"
           v-model="selectedBranch"
-          filterable
           placeholder="选择分支"
-          class="branch-select"
-        >
-          <el-option v-for="b in localBranches" :key="b.name" :label="b.name" :value="b.name" />
-        </el-select>
+        />
         <el-input v-model="pathFilter" clearable placeholder="按路径过滤（可选）" class="path-input" @keyup.enter="loadLog" />
         <el-select v-model="maxCount" class="count-select">
           <el-option label="20 条" :value="20" />
@@ -206,9 +195,6 @@ onMounted(() => void refresh());
   align-items: center;
   gap: var(--gc-gap);
   flex-wrap: wrap;
-}
-.branch-select {
-  width: 180px;
 }
 .path-input {
   width: 220px;

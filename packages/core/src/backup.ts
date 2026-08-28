@@ -1,4 +1,4 @@
-import { GitService } from './gitService.js';
+import { GitService } from './gitService.ts';
 
 export interface BackupResult {
   /** 创建的 stash 引用（如 stash@{0}），无改动时为 null */

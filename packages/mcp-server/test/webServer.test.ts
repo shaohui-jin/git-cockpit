@@ -4,10 +4,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createTestRuntime, disposeTestRuntime, createSampleRepo, cleanupTmp, initRepo, commitFile } from './helpers.js';
-import { createWebServer } from '../src/webServer.js';
-import type { Runtime } from '../src/index.js';
-import type { WebServerHandle } from '../src/index.js';
+import { createTestRuntime, disposeTestRuntime, createSampleRepo, cleanupTmp, initRepo, commitFile } from './helpers.ts';
+import { createWebServer } from '../src/webServer.ts';
+import type { Runtime } from '../src/index.ts';
+import type { WebServerHandle } from '../src/index.ts';
 import type { SimpleGit } from 'simple-git';
 
 describe('Web API', () => {
@@ -35,6 +35,19 @@ describe('Web API', () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.ok).toBe(true);
+  });
+
+  it('GET /docs 提供 OpenAPI 文档', async () => {
+    const ui = await server.app.inject({ method: 'GET', url: '/docs' });
+    expect(ui.statusCode).toBeGreaterThanOrEqual(200);
+    expect(ui.statusCode).toBeLessThan(400);
+    const spec = await server.app.inject({ method: 'GET', url: '/docs/json' });
+    expect(spec.statusCode).toBe(200);
+    const body = spec.json() as { paths?: Record<string, unknown>; info?: { title?: string } };
+    expect(body.info?.title).toBe('Git Cockpit API');
+    expect(body.paths?.['/api/health']).toBeTruthy();
+    expect(body.paths?.['/api/repos/{id}/tools/git_status']).toBeTruthy();
+    expect(body.paths?.['/api/repos/{id}/tools/{tool}']).toBeUndefined();
   });
 
   it('打开仓库并返回记录', async () => {

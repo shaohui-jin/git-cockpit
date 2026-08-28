@@ -1,20 +1,23 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted } from 'vue';
+import { computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { useReposStore } from '@/stores/repos';
 import { useSettingsStore } from '@/stores/settings';
+import { useBranchesStore } from '@/stores/branches';
 import { subscribeEvents } from '@/api/client';
 import { useRevision } from '@/composables/revision';
 
 const repos = useReposStore();
 const settings = useSettingsStore();
+const branches = useBranchesStore();
 const route = useRoute();
 const router = useRouter();
-const { bump } = useRevision();
+const { bump, revision } = useRevision();
 
 const menu = [
   { path: '/status', label: '状态', icon: '◧' },
+  { path: '/merge', label: '合并预演', icon: '⇄' },
   { path: '/history', label: '历史', icon: '◫' },
   { path: '/repos', label: '仓库管理', icon: '▤' },
   { path: '/logs', label: '操作日志', icon: '≡' },
@@ -34,7 +37,7 @@ let unsubscribe: (() => void) | null = null;
 onMounted(async () => {
   await repos.checkHealth();
   await Promise.all([repos.load(), settings.load().catch(() => undefined)]);
-  // 后端仓库变化与日志事件 → 递增修订号 → 各视图自动刷新
+  await branches.load();
   unsubscribe = subscribeEvents({
     onRepoChanged: () => bump(),
     onLog: () => bump(),
@@ -43,6 +46,9 @@ onMounted(async () => {
     }
   });
 });
+
+watch(() => repos.currentId, () => void branches.load());
+watch(revision, () => void branches.load());
 
 onUnmounted(() => {
   unsubscribe?.();

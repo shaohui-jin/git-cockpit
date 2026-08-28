@@ -2,8 +2,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { simpleGit, type SimpleGit } from 'simple-git';
 import { openDatabase } from '@shaohui_jin/git-cockpit-core';
-import { createRuntime, disposeRuntime } from '../src/index.js';
-import type { Runtime } from '../src/index.js';
+import { createRuntime, disposeRuntime } from '../src/index.ts';
+import type { Runtime } from '../src/index.ts';
 
 /** 测试临时目录基座（位于本包 test/tmp，受 workspace 写约束） */
 export function tmpBase(): string {

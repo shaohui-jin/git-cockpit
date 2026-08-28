@@ -3,8 +3,8 @@
  * handler 直接调用 core GitService 的方法；统一安全链路由 executeTool 承担。
  */
 import type { GitService } from '@shaohui_jin/git-cockpit-core';
-import * as S from './schemas.js';
-import type { ToolDef } from './handlers.js';
+import * as S from './schemas.ts';
+import type { ToolDef } from './handlers.ts';
 
 type Args = Record<string, unknown> & { repoPath?: string; dryRun?: boolean };
 
@@ -93,6 +93,37 @@ export const TOOL_DEFS: ToolDef[] = [
     risk: 'readonly',
     schema: S.GitGraphSchema,
     handler: async (args: Args, ctx) => ctx.git.getGraph(args.maxCount as number | undefined)
+  },
+  {
+    name: 'git_merge_preview',
+    description:
+      '用 git merge-tree 预演把 from 合入 into（不改工作区）。into=合入目标/线上/ours，from=我的分支/theirs。返回是否可干净合并及冲突文件列表。禁止用 git_merge 做预演。Git >= 2.38。',
+    risk: 'readonly',
+    schema: S.GitMergePreviewSchema,
+    handler: async (args: Args, ctx) =>
+      ctx.git.previewMerge({
+        into: args.into as string,
+        from: args.from as string,
+        fetch: args.fetch as boolean | undefined,
+        remote: args.remote as string | undefined,
+        path: args.path as string | undefined
+      })
+  },
+  {
+    name: 'git_merge_rehearse',
+    description:
+      '完整合并预演：冲突文件 + diff3 冲突正文 + ours/theirs/base（仍不改工作区）。选边后把 files[{path,resolvedContent}] 交给 git_apply_resolve。into/from 含义同 git_merge_preview。',
+    risk: 'readonly',
+    schema: S.GitMergeRehearseSchema,
+    handler: async (args: Args, ctx) =>
+      ctx.git.rehearseMerge({
+        into: args.into as string,
+        from: args.from as string,
+        fetch: args.fetch as boolean | undefined,
+        remote: args.remote as string | undefined,
+        path: args.path as string | undefined,
+        maxFiles: args.maxFiles as number | undefined
+      })
   },
 
   // ---------------------------------------------------------------------------
@@ -250,6 +281,24 @@ export const TOOL_DEFS: ToolDef[] = [
     schema: S.GitStashPopSchema,
     handler: async (args: Args, ctx) =>
       ctx.git.stashPop({ dryRun: args.dryRun as boolean | undefined, index: args.index as number | undefined })
+  },
+  {
+    name: 'git_apply_resolve',
+    description:
+      '在独立 git worktree 中把 from 合入 into 并提交到临时分支（主工作区不切换）。干净合并 files 可空；有冲突必须提供 files。默认 push 临时分支。不要用工作区 git_merge 代替本工具。',
+    risk: 'write',
+    schema: S.GitApplyResolveSchema,
+    handler: async (args: Args, ctx) =>
+      ctx.git.applyResolve({
+        into: args.into as string,
+        from: args.from as string,
+        files: args.files as { path: string; resolvedContent: string }[] | undefined,
+        remote: args.remote as string | undefined,
+        push: args.push as boolean | undefined,
+        keepLocal: args.keepLocal as boolean | undefined,
+        tempBranch: args.tempBranch as string | undefined,
+        dryRun: args.dryRun as boolean | undefined
+      })
   },
 
   // ---------------------------------------------------------------------------

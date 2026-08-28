@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_CONFIG, PermissionError, PermissionManager } from '../src/index.js';
-import type { GitCockpitConfig } from '../src/index.js';
+import { DEFAULT_CONFIG, PermissionError, PermissionManager } from '../src/index.ts';
+import type { GitCockpitConfig } from '../src/index.ts';
 
 function makeConfig(overrides: Partial<GitCockpitConfig['permissions']> = {}): GitCockpitConfig {
   return {

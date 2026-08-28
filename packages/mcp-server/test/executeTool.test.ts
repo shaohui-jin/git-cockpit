@@ -3,10 +3,10 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PermissionError, PermissionManager, TOOL_RISK_LEVELS } from '@shaohui_jin/git-cockpit-core';
-import { createTestRuntime, disposeTestRuntime, createSampleRepo, cleanupTmp } from './helpers.js';
-import { executeTool } from '../src/tools/handlers.js';
-import { TOOL_DEF_MAP } from '../src/tools/index.js';
-import type { Runtime } from '../src/index.js';
+import { createTestRuntime, disposeTestRuntime, createSampleRepo, cleanupTmp, commitFile } from './helpers.ts';
+import { executeTool } from '../src/tools/handlers.ts';
+import { TOOL_DEF_MAP } from '../src/tools/index.ts';
+import type { Runtime } from '../src/index.ts';
 import type { SimpleGit } from 'simple-git';
 
 describe('executeTool 安全链路', () => {
@@ -136,6 +136,40 @@ describe('executeTool 安全链路', () => {
       expect(exec.error?.code).toBe('NO_ACTIVE_REPO');
     } finally {
       disposeTestRuntime(runtime2);
+    }
+  });
+});
+
+describe('git_merge_preview / git_apply_resolve', () => {
+  afterAll(() => cleanupTmp());
+
+  it('预演干净合并与冲突仓库', async () => {
+    const runtime = createTestRuntime();
+    try {
+      const sample = await createSampleRepo();
+      await sample.git.checkout('feature/x');
+      await commitFile(sample.git, sample.dir, 'c.txt', 'feature content\n', 'feat: feature c');
+      await sample.git.checkout('main');
+      await runtime.repoManager.open(sample.dir);
+      const previewDef = TOOL_DEF_MAP.get('git_merge_preview')!;
+      const clean = await executeTool(
+        previewDef,
+        { into: 'main', from: 'feature/x', fetch: false, dryRun: false },
+        { runtime, source: 'mcp' }
+      );
+      expect(clean.success).toBe(true);
+      expect((clean.result as { clean: boolean }).clean).toBe(true);
+
+      const applyDef = TOOL_DEF_MAP.get('git_apply_resolve')!;
+      const applied = await executeTool(
+        applyDef,
+        { into: 'main', from: 'feature/x', fetch: false, push: false, dryRun: false },
+        { runtime, source: 'mcp' }
+      );
+      expect(applied.success).toBe(true);
+      expect((applied.result as { usedWorktree: boolean }).usedWorktree).toBe(true);
+    } finally {
+      disposeTestRuntime(runtime);
     }
   });
 });

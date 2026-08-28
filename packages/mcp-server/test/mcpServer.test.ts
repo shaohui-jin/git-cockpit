@@ -8,9 +8,9 @@
  * MCP 握手挂起、Cursor 等客户端报 Connection closed。
  */
 import { afterAll, describe, expect, it } from 'vitest';
-import { TOOL_DEFS, createMcpServer } from '../src/index.js';
-import { createTestRuntime, disposeTestRuntime, cleanupTmp } from './helpers.js';
-import type { Runtime } from '../src/index.js';
+import { TOOL_DEFS, createMcpServer } from '../src/index.ts';
+import { createTestRuntime, disposeTestRuntime, cleanupTmp } from './helpers.ts';
+import type { Runtime } from '../src/index.ts';
 
 type ServerLike = ReturnType<typeof createMcpServer>;
 

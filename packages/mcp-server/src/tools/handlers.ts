@@ -18,8 +18,8 @@ import {
   PermissionError
 } from '@shaohui_jin/git-cockpit-core';
 import type { BackupResult, RiskLevel } from '@shaohui_jin/git-cockpit-core';
-import type { RepoHandle } from '../repoManager.js';
-import type { Runtime } from '../runtime.js';
+import type { RepoHandle } from '../repoManager.ts';
+import type { Runtime } from '../runtime.ts';
 
 export interface ToolExecutionContext {
   runtime: Runtime;

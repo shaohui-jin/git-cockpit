@@ -19,11 +19,12 @@ import {
   RepoNotFoundError
 } from '@shaohui_jin/git-cockpit-core';
 import type { OpenedRepo } from '@shaohui_jin/git-cockpit-core';
-import { disposeRuntime } from './runtime.js';
-import type { Runtime } from './runtime.js';
-import { McpHttpHandler } from './mcpServer.js';
-import { executeTool } from './tools/handlers.js';
-import { TOOL_DEF_MAP, toolSummaries } from './tools/index.js';
+import { disposeRuntime } from './runtime.ts';
+import type { Runtime } from './runtime.ts';
+import { McpHttpHandler } from './mcpServer.ts';
+import { executeTool } from './tools/handlers.ts';
+import { TOOL_DEF_MAP, toolSummaries } from './tools/index.ts';
+import { registerApiDocs } from './openapi.ts';
 
 export interface WebServerHandle {
   app: FastifyInstance;
@@ -62,6 +63,8 @@ export async function createWebServer(
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Mcp-Session-Id', 'Authorization']
   });
+
+  await registerApiDocs(app);
 
   const staticDir = options.staticDir !== undefined ? options.staticDir : resolveWebDist();
   if (staticDir && fs.existsSync(staticDir)) {
@@ -231,6 +234,7 @@ export async function createWebServer(
   // ---------------------------------------------------------------------------
   app.post<{ Params: { id: string; tool: string }; Body: { params?: Record<string, unknown> } }>(
     '/api/repos/:id/tools/:tool',
+    { schema: { hide: true } },
     async (req, reply) => {
       const def = TOOL_DEF_MAP.get(req.params.tool);
       if (!def) return reply.code(404).send({ error: `未知工具: ${req.params.tool}` });
@@ -342,11 +346,11 @@ export async function createWebServer(
   // ---------------------------------------------------------------------------
   // MCP Streamable HTTP
   // ---------------------------------------------------------------------------
-  app.get('/mcp', async (req, reply) => {
+  app.get('/mcp', { schema: { hide: true } }, async (req, reply) => {
     reply.hijack();
     await mcpHttp.handle(req.raw, reply.raw, undefined);
   });
-  app.post('/mcp', async (req, reply) => {
+  app.post('/mcp', { schema: { hide: true } }, async (req, reply) => {
     // fastify 预读并解析了请求体（req.body）；SDK transport 需要 parsedBody 透传
     // （handleRequest(req, res, parsedBody)），否则它再读 req.raw 时流已空，initialize 无响应。
     reply.hijack();
@@ -356,7 +360,7 @@ export async function createWebServer(
   // SPA fallback（静态托管存在时）
   if (staticDir) {
     app.setNotFoundHandler(async (req, reply) => {
-      if (req.url.startsWith('/api') || req.url.startsWith('/mcp')) {
+      if (req.url.startsWith('/api') || req.url.startsWith('/mcp') || req.url.startsWith('/docs')) {
         return reply.code(404).send({ error: 'Not Found' });
       }
       const index = path.join(staticDir, 'index.html');

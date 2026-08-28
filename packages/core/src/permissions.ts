@@ -1,5 +1,5 @@
-import { PermissionError } from './types.js';
-import type { GitCockpitConfig, RiskLevel } from './types.js';
+import { PermissionError } from './types.ts';
+import type { GitCockpitConfig, RiskLevel } from './types.ts';
 
 /** 内置工具目录：工具名 -> 风险等级 */
 export const TOOL_RISK_LEVELS: Record<string, RiskLevel> = {
@@ -13,6 +13,10 @@ export const TOOL_RISK_LEVELS: Record<string, RiskLevel> = {
   git_remote_list: 'readonly',
   git_file_content: 'readonly',
   git_graph: 'readonly',
+  git_stash_list: 'readonly',
+  git_stash_show: 'readonly',
+  git_merge_preview: 'readonly',
+  git_merge_rehearse: 'readonly',
   // 写操作工具（默认开放，需预览/确认）
   git_add: 'write',
   git_unstage: 'write',
@@ -25,7 +29,10 @@ export const TOOL_RISK_LEVELS: Record<string, RiskLevel> = {
   git_push: 'write',
   git_tag_create: 'write',
   git_stash: 'write',
+  git_stash_apply: 'write',
+  git_stash_drop: 'write',
   git_stash_pop: 'write',
+  git_apply_resolve: 'write',
   // 高风险工具（默认禁用，需用户主动开启或审批）
   git_reset_hard: 'dangerous',
   git_clean: 'dangerous',

@@ -1,6 +1,6 @@
 {
   "name": "@shaohui_jin/git-cockpit-mcp-server",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Git Cockpit - 基于 MCP 的 Git 可视化操作工具（MCP Server + Web 服务 + CLI）",
   "type": "module",
   "license": "MIT",
@@ -21,10 +21,13 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
+    "start": "node dist/cli-entry.js start",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "prepublishOnly": "pnpm run typecheck && pnpm run build && node scripts/copy-web.mjs"
@@ -32,10 +35,13 @@
   "dependencies": {
     "@fastify/cors": "^10.0.2",
     "@fastify/static": "^8.0.3",
+    "@fastify/swagger": "^9.8.1",
+    "@fastify/swagger-ui": "^5.2.6",
     "@modelcontextprotocol/sdk": "^1.12.0",
     "@shaohui_jin/git-cockpit-core": "workspace:^",
     "fastify": "^5.2.1",
-    "zod": "^3.24.1"
+    "zod": "^3.24.1",
+    "zod-to-json-schema": "^3.25.2"
   },
   "devDependencies": {
     "simple-git": "^3.27.0",

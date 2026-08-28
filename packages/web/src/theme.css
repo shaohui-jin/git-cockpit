@@ -143,6 +143,32 @@ html.dark body {
   padding: 0 var(--gc-pad);
 }
 
+/* ---- Select / TreeSelect 下拉：宽度锁成触发器，长 option 省略 ----
+   EP 会给 .el-select-dropdown 写 inline min-width = 输入框宽度。
+   默认只用 min-width，内容更长时面板会撑开；width:0 让 used width 落在 min-width 上。
+   弹层 teleport 到 body，必须写在全局，scoped 够不着。 */
+.el-select-dropdown {
+  width: 0;
+  overflow-x: hidden;
+}
+
+.el-select-dropdown .el-select-dropdown__wrap,
+.el-select-dropdown .el-select-dropdown__list,
+.el-select-dropdown .el-tree {
+  max-width: 100%;
+}
+
+.el-select-dropdown .el-tree-node__content {
+  overflow: hidden;
+}
+
+.el-select-dropdown .el-tree-node__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ---- 空状态 ---- */
 .el-empty__description p {
   font-size: var(--gc-text);

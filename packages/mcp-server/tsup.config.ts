@@ -18,6 +18,9 @@ export default {
     'fastify',
     '@fastify/cors',
     '@fastify/static',
-    'zod'
+    '@fastify/swagger',
+    '@fastify/swagger-ui',
+    'zod',
+    'zod-to-json-schema'
   ]
 };

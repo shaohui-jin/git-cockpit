@@ -4,9 +4,9 @@
  * - git-cockpit mcp    以 stdio 模式运行 MCP Server（供客户端直接拉起）；
  * - git-cockpit version / --help。
  */
-import { createRuntime, disposeRuntime } from './runtime.js';
-import { createWebServer } from './webServer.js';
-import { startMcpStdio } from './mcpServer.js';
+import { createRuntime, disposeRuntime } from './runtime.ts';
+import { createWebServer } from './webServer.ts';
+import { startMcpStdio } from './mcpServer.ts';
 import { version } from '../package.json'
 
 function printHelp(): void {
@@ -51,6 +51,7 @@ export async function main(argv: string[]): Promise<number> {
     const host = process.env.GIT_COCKPIT_HOST ?? runtime.config.server.host;
     const server = await createWebServer(runtime, { host, port });
     console.log(`[git-cockpit] Web UI:      http://${host}:${port}`);
+    console.log(`[git-cockpit] API 文档:     http://${host}:${port}/docs`);
     console.log(`[git-cockpit] MCP (HTTP):  http://${host}:${port}/mcp`);
     console.log(`[git-cockpit] 数据目录:      ${dataDir}`);
     console.log(`[git-cockpit] Ctrl+C 退出`);

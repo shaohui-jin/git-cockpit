@@ -174,6 +174,70 @@ export interface GraphData {
   head: string | null;
 }
 
+/** `git` 命令允许非零退出时的捕获结果（如 merge-tree 冲突 = 1） */
+export interface GitCommandResult {
+  stdout: string;
+  stderr: string;
+  code: number;
+}
+
+/** 预演中的冲突文件（hunk 选边留给三栏；本阶段可只填 path） */
+export interface ConflictFile {
+  path: string;
+  contentConflict: boolean;
+  hunks: unknown[];
+  conflictContent?: string | null;
+  oursContent?: string | null;
+  theirsContent?: string | null;
+  baseContent?: string | null;
+}
+
+export type MergeOutcome = 'clean' | 'conflicts' | 'unrelated';
+
+/** merge-tree 预演结果（不改工作区） */
+export interface MergePreviewResult {
+  repoRoot: string;
+  into: string;
+  from: string;
+  intoSha: string;
+  fromSha: string;
+  /** 空字符串表示算不出共同祖先（无关历史） */
+  mergeBase: string;
+  clean: boolean;
+  fetched: boolean;
+  fetchAttempted: boolean;
+  fetchError?: string;
+  conflictFiles: ConflictFile[];
+  messages: string[];
+  outcome: MergeOutcome;
+  unrelatedHistories: boolean;
+  /** merge-tree --write-tree 的结果树；冲突时也有（blob 带冲突标记） */
+  resultTree?: string;
+}
+
+export type MergeRehearsalResult = MergePreviewResult;
+
+export interface ApplyResolveFile {
+  path: string;
+  resolvedContent: string;
+}
+
+export interface ApplyResolveResult {
+  repoRoot: string;
+  into: string;
+  from: string;
+  tempBranch: string;
+  intoSha: string;
+  fromSha: string;
+  commitSha: string;
+  pushed: boolean;
+  remote: string;
+  createMrUrl: string | null;
+  previousBranch: string | null;
+  usedWorktree: boolean;
+  messages: string[];
+}
+
 /** 操作日志条目（脱敏后存储） */
 export interface OperationLogEntry {
   timestamp: string;

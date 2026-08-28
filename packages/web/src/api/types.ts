@@ -184,3 +184,41 @@ export interface HealthInfo {
   version: string;
   uptimeMs: number;
 }
+
+export interface ConflictFile {
+  path: string;
+  contentConflict: boolean;
+  conflictContent?: string | null;
+  oursContent?: string | null;
+  theirsContent?: string | null;
+  baseContent?: string | null;
+}
+
+export type MergeOutcome = 'clean' | 'conflicts' | 'unrelated';
+
+export interface MergePreviewResult {
+  repoRoot: string;
+  into: string;
+  from: string;
+  intoSha: string;
+  fromSha: string;
+  mergeBase: string;
+  clean: boolean;
+  fetched: boolean;
+  fetchAttempted: boolean;
+  fetchError?: string;
+  conflictFiles: ConflictFile[];
+  messages: string[];
+  outcome: MergeOutcome;
+  unrelatedHistories: boolean;
+  resultTree?: string;
+}
+
+export interface ApplyResolveResult {
+  tempBranch: string;
+  commitSha: string;
+  pushed: boolean;
+  createMrUrl: string | null;
+  previousBranch: string | null;
+  messages: string[];
+}

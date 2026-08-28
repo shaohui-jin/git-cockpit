@@ -1,8 +1,8 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { BackupManager, GitService } from '../src/index.js';
-import { cleanupTmp, createSampleRepo } from './helpers.js';
+import { BackupManager, GitService } from '../src/index.ts';
+import { cleanupTmp, createSampleRepo } from './helpers.ts';
 
 describe('BackupManager 自动备份', () => {
   let dir: string;

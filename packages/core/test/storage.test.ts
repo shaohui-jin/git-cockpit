@@ -2,8 +2,8 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { DatabaseSync } from 'node:sqlite';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { AuditLogger, DEFAULT_CONFIG, RepoStore, openDatabase } from '../src/index.js';
-import { cleanupTmp, makeTmpDir } from './helpers.js';
+import { AuditLogger, DEFAULT_CONFIG, RepoStore, openDatabase } from '../src/index.ts';
+import { cleanupTmp, makeTmpDir } from './helpers.ts';
 
 describe('AuditLogger（SQLite）', () => {
   let dir: string;

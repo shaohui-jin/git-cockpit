@@ -1,8 +1,11 @@
+import { spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import { simpleGit, type SimpleGit } from 'simple-git';
-import { GitOperationError } from './types.js';
+import { GitOperationError } from './types.ts';
 import type {
   DiffResult,
   FileStatus,
@@ -15,8 +18,26 @@ import type {
   StashInfo,
   LogOptions,
   DiffOptions,
-  GraphData
-} from './types.js';
+  GraphData,
+  GitCommandResult,
+  MergePreviewResult,
+  MergeRehearsalResult,
+  ApplyResolveFile,
+  ApplyResolveResult
+} from './types.ts';
+import {
+  assertMergeTreeVersion,
+  branchNameForMr,
+  buildConflictContent,
+  buildCreateMrUrl,
+  defaultTempBranchName,
+  EMPTY_TREE_SHA,
+  isSameBranchForMr,
+  parseClassicMergeTree,
+  parseGitVersion,
+  parseModernMergeTree,
+  type GitVersion
+} from './merge.ts';
 
 export interface GitServiceOptions {
   maxConcurrentProcesses?: number;
@@ -47,6 +68,7 @@ export class GitService extends EventEmitter {
   readonly gitDir: string;
   private git: SimpleGit;
   private queue: Promise<unknown> = Promise.resolve();
+  private gitVersion: GitVersion | null = null;
 
   constructor(repoPath: string, gitDir: string, options: GitServiceOptions = {}) {
     super();
@@ -97,6 +119,14 @@ export class GitService extends EventEmitter {
   /** 执行原始 git 命令（参数数组传递，无 shell） */
   private run(args: string[]): Promise<string> {
     return this.enqueue(() => this.git.raw(args));
+  }
+
+  /**
+   * 允许非零退出码的 git 调用。merge-tree 冲突时退出码为 1，stdout 仍是有效预演结果，
+   * 不得当作 GIT_WRITE_FAILED。走 spawn 而非 simple-git.raw，以便同时拿到 stdout / stderr / code。
+   */
+  async runAllowFail(args: string[], env?: NodeJS.ProcessEnv): Promise<GitCommandResult> {
+    return this.enqueue(() => spawnGit(this.repoPath, args, env));
   }
 
   /** 检查 index.lock，存在则说明有并发写操作 */
@@ -939,6 +969,406 @@ export class GitService extends EventEmitter {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // 合并预演（merge-tree，不改工作区）与 worktree 落盘
+  // ---------------------------------------------------------------------------
+
+  /** 解析 `into` / `from` 为 commit SHA；失败抛 REV_NOT_FOUND */
+  async ensureRev(rev: string): Promise<string> {
+    const trimmed = rev.trim();
+    if (!trimmed) throw new GitOperationError('引用不能为空', 'INVALID_REF');
+    const r = await this.runAllowFail(['rev-parse', '--verify', `${trimmed}^{commit}`]);
+    if (r.code !== 0) {
+      throw new GitOperationError(
+        `无法解析引用「${trimmed}」：${(r.stderr || r.stdout).trim() || 'rev-parse 失败'}`,
+        'REV_NOT_FOUND'
+      );
+    }
+    return r.stdout.trim();
+  }
+
+  /** 两条提交的共同祖先；无关历史时返回 null（不抛） */
+  async tryMergeBase(a: string, b: string): Promise<string | null> {
+    const r = await this.runAllowFail(['merge-base', a, b]);
+    if (r.code !== 0) return null;
+    const sha = r.stdout.trim();
+    return sha || null;
+  }
+
+  /**
+   * 非交互 fetch（GIT_TERMINAL_PROMPT=0）。失败不抛，由预演结果标明 stale。
+   */
+  async fetchQuiet(remote = 'origin'): Promise<{ ok: boolean; error?: string }> {
+    const r = await this.runAllowFail(['fetch', '--prune', '--no-tags', remote], {
+      ...process.env,
+      GIT_TERMINAL_PROMPT: '0'
+    });
+    if (r.code === 0) return { ok: true };
+    return { ok: false, error: (r.stderr || r.stdout).trim().slice(0, 400) };
+  }
+
+  /** 缓存并校验本机 Git >= 2.38，否则抛 GIT_TOO_OLD */
+  private async assertMergeTreeSupported(): Promise<GitVersion> {
+    if (this.gitVersion) {
+      assertMergeTreeVersion(this.gitVersion);
+      return this.gitVersion;
+    }
+    const out = await this.run(['--version']);
+    const version = parseGitVersion(out);
+    assertMergeTreeVersion(version);
+    this.gitVersion = version;
+    return version;
+  }
+
+  /** `git show <rev>:<path>`；该 rev 无此文件时返回 null */
+  private async showFileAtRev(rev: string, filePath: string): Promise<string | null> {
+    const safe = this.validateRepoRelativePath(filePath).replace(/\\/g, '/');
+    const r = await this.runAllowFail(['show', `${rev}:${safe}`]);
+    if (r.code !== 0) return null;
+    return r.stdout;
+  }
+
+  /** 先走现代 merge-tree --write-tree；无结果时回落旧式三参 merge-tree */
+  private async runMergeTree(intoSha: string, fromSha: string, mergeBaseSha: string | null): Promise<ReturnType<typeof parseModernMergeTree>> {
+    await this.assertMergeTreeSupported();
+    const args = ['merge-tree', '--write-tree', '-z', '--messages', '--name-only'];
+    if (!mergeBaseSha) args.push('--allow-unrelated-histories');
+    args.push(intoSha, fromSha);
+    const modern = await this.runAllowFail(args);
+    const parsed = parseModernMergeTree(modern.stdout, modern.stderr, modern.code);
+    if (parsed.clean || parsed.conflictFiles.length > 0 || parsed.resultTree) {
+      return parsed;
+    }
+    if (!mergeBaseSha) {
+      return {
+        clean: false,
+        conflictFiles: [],
+        messages: [
+          ...parsed.messages,
+          '无法计算 merge-base，且 merge-tree 未能给出冲突文件列表（可能为无关历史）。'
+        ]
+      };
+    }
+    const classic = await this.runAllowFail(['merge-tree', mergeBaseSha, intoSha, fromSha]);
+    return parseClassicMergeTree(classic.stdout || classic.stderr);
+  }
+
+  /**
+   * 预演把 `from` 合入 `into`：只用 merge-tree，不改工作区、不做真实 merge。
+   * into = 合入目标（线上 / ours），from = 我的分支（theirs）。
+   */
+  async previewMerge(options: {
+    into: string;
+    from: string;
+    fetch?: boolean;
+    remote?: string;
+    path?: string;
+  }): Promise<MergePreviewResult> {
+    const into = options.into.trim();
+    const from = options.from.trim();
+    if (!into || !from) throw new GitOperationError('into / from 不能为空', 'INVALID_REF');
+
+    const remotes = (await this.listRemotes()).map((r) => r.name);
+    if (isSameBranchForMr(into, from, remotes.length ? remotes : ['origin'])) {
+      throw new GitOperationError(
+        `「${from}」与「${into}」是同一分支（如 master 与 origin/master），请自行 push/pull，无需预演合并。`,
+        'SAME_BRANCH'
+      );
+    }
+
+    const remote = options.remote ?? 'origin';
+    const shouldFetch = options.fetch !== false;
+    let fetched = false;
+    let fetchError: string | undefined;
+    if (shouldFetch) {
+      const fr = await this.fetchQuiet(remote);
+      fetched = fr.ok;
+      if (!fr.ok) fetchError = fr.error;
+    }
+
+    const intoSha = await this.ensureRev(into);
+    const fromSha = await this.ensureRev(from);
+    const base = await this.tryMergeBase(intoSha, fromSha);
+    const unrelated = base === null;
+    const parsed = await this.runMergeTree(intoSha, fromSha, base);
+
+    let conflictFiles = parsed.conflictFiles;
+    if (options.path) {
+      const want = this.validateRepoRelativePath(options.path).replace(/\\/g, '/');
+      conflictFiles = conflictFiles.filter((f) => f.path === want);
+    }
+
+    const messages = [...parsed.messages];
+    if (unrelated) {
+      messages.unshift(
+        '两条分支没有共同祖先（unrelated histories），git merge-base 无法计算。',
+        '已使用 --allow-unrelated-histories 继续预演合并结果。'
+      );
+    }
+    if (shouldFetch && !fetched) {
+      messages.unshift(`fetch ${remote} 未成功，使用本地已有引用继续预演。${fetchError ? `原因：${fetchError}` : ''}`);
+    }
+
+    const clean = unrelated ? false : parsed.clean;
+    return {
+      repoRoot: this.repoPath,
+      into,
+      from,
+      intoSha,
+      fromSha,
+      mergeBase: base ?? '',
+      clean,
+      fetched,
+      fetchAttempted: shouldFetch,
+      fetchError,
+      conflictFiles,
+      messages,
+      unrelatedHistories: unrelated,
+      outcome: unrelated ? 'unrelated' : clean ? 'clean' : 'conflicts',
+      resultTree: parsed.resultTree
+    };
+  }
+
+  /**
+   * 完整预演：冲突文件列表 + diff3 冲突正文（仍不改工作区）。
+   * 宿主 Agent 选边后把 files 交给 git_apply_resolve。
+   */
+  async rehearseMerge(options: {
+    into: string;
+    from: string;
+    fetch?: boolean;
+    remote?: string;
+    path?: string;
+    maxFiles?: number;
+  }): Promise<MergeRehearsalResult> {
+    const preview = await this.previewMerge(options);
+    if (preview.clean || (preview.unrelatedHistories && preview.conflictFiles.length === 0)) {
+      return preview;
+    }
+    const maxFiles = options.maxFiles ?? 20;
+    const base = preview.mergeBase || EMPTY_TREE_SHA;
+    const toLoad = preview.conflictFiles.slice(0, maxFiles);
+    const loaded: MergeRehearsalResult['conflictFiles'] = [];
+    for (const file of toLoad) {
+      const content = await buildConflictContent(
+        (rev, p) => this.showFileAtRev(rev, p),
+        (oursPath, basePath, theirsPath, labels) =>
+          this.runAllowFail([
+            'merge-file',
+            '-p',
+            '--diff3',
+            '-L',
+            labels.ours,
+            '-L',
+            'base',
+            '-L',
+            labels.theirs,
+            oursPath,
+            basePath,
+            theirsPath
+          ]),
+        base,
+        preview.intoSha,
+        preview.fromSha,
+        file.path
+      );
+      loaded.push({ ...file, ...content });
+    }
+    for (const file of preview.conflictFiles.slice(maxFiles)) {
+      loaded.push({ ...file, conflictContent: '（超出展示上限，已省略冲突正文）' });
+    }
+    return { ...preview, conflictFiles: loaded };
+  }
+
+  /**
+   * 独立 worktree 落盘：基于 into 建临时分支，merge from，写入已解决文件，可选 push。
+   * 主工作区 HEAD / 工作区文件全程不切换。
+   */
+  async applyResolve(options: {
+    into: string;
+    from: string;
+    files?: ApplyResolveFile[];
+    remote?: string;
+    push?: boolean;
+    keepLocal?: boolean;
+    tempBranch?: string;
+    dryRun?: boolean;
+  }): Promise<WritePreview | ApplyResolveResult> {
+    const into = options.into.trim();
+    const from = options.from.trim();
+    if (!into || !from) throw new GitOperationError('into / from 不能为空', 'INVALID_REF');
+    const files = options.files ?? [];
+    for (const f of files) {
+      if (!f.path || f.resolvedContent == null) {
+        throw new GitOperationError(`暂存文件缺少 path 或 resolvedContent：${f.path}`, 'INVALID_STASH');
+      }
+      this.validateRepoRelativePath(f.path);
+    }
+
+    const remotes = (await this.listRemotes()).map((r) => r.name);
+    const remoteNames = remotes.length ? remotes : ['origin'];
+    if (isSameBranchForMr(into, from, remoteNames)) {
+      throw new GitOperationError(
+        `「${from}」与「${into}」是同一分支，请自行 push/pull，不创建临时分支。`,
+        'SAME_BRANCH'
+      );
+    }
+
+    const remote = options.remote ?? 'origin';
+    const doPush = options.push !== false;
+    const keepLocal = options.keepLocal === true || !doPush;
+    const tempBranch = options.tempBranch?.trim() || defaultTempBranchName(into, from, remoteNames);
+    this.validateRefName(tempBranch);
+
+    const cmd = ['worktree', 'add', '-B', tempBranch, '<tmp>', into, '&&', 'merge', '--no-ff', '--no-commit', from];
+    if (doPush) cmd.push('&&', 'push', '-u', remote, `HEAD:refs/heads/${tempBranch}`);
+    if (options.dryRun) {
+      let affected = files.map((f) => f.path);
+      try {
+        const preview = await this.previewMerge({ into, from, fetch: false });
+        if (preview.conflictFiles.length) affected = preview.conflictFiles.map((f) => f.path);
+      } catch {
+        /* dry-run 仍返回命令预览 */
+      }
+      const note = [
+        '将在独立 worktree 中合并并提交到临时分支，主工作区不切换。',
+        doPush ? `成功后推送 ${remote}/${tempBranch}。` : `不推送，保留本地分支 ${tempBranch}。`,
+        files.length ? `将写入 ${files.length} 个已解决文件。` : '未提供已解决文件：仅干净合并可落盘。'
+      ].join(' ');
+      return GitService.preview(cmd, 'medium', affected.length ? affected : undefined, note);
+    }
+
+    await this.prepareWrite();
+    const previousBranch = (await this.runAllowFail(['branch', '--show-current'])).stdout.trim() || null;
+    if (previousBranch === tempBranch) {
+      throw new GitOperationError(
+        `主工作区当前正在检出临时分支「${tempBranch}」，请先切回其他分支后再落盘`,
+        'TEMP_BRANCH_CHECKED_OUT'
+      );
+    }
+
+    const intoSha = await this.ensureRev(into);
+    const fromSha = await this.ensureRev(from);
+    const parent = await mkdtemp(path.join(tmpdir(), 'git-cockpit-resolve-'));
+    const wtPath = path.join(parent, 'wt');
+    const messages: string[] = [];
+    let pushSucceeded = false;
+    let committed = false;
+
+    const wt = (...args: string[]) => this.runAllowFail(['-C', wtPath, ...args]);
+
+    try {
+      const addRun = await this.runAllowFail(['worktree', 'add', '-B', tempBranch, wtPath, intoSha]);
+      if (addRun.code !== 0) {
+        throw new GitOperationError(
+          `无法创建 worktree（主工作区未改动）：${(addRun.stderr || addRun.stdout).trim()}` +
+            `\n若「${tempBranch}」已在其他 worktree 中检出，请先移除该 worktree。`,
+          'WORKTREE_ADD_FAILED'
+        );
+      }
+      messages.push(`已在独立 worktree 处理：${wtPath}`);
+      messages.push(previousBranch ? `主工作区保持在「${previousBranch}」，未切换分支` : '主工作区 HEAD 未切换');
+
+      const mergeRun = await wt('merge', '--no-ff', '--no-commit', fromSha);
+      const unmergedRaw = await wt('diff', '--name-only', '--diff-filter=U');
+      const unmerged = unmergedRaw.stdout
+        .split('\n')
+        .map((l) => l.trim())
+        .filter(Boolean);
+      const stashPaths = new Set(files.map((f) => f.path.replace(/\\/g, '/')));
+
+      if (mergeRun.code !== 0 || unmerged.length > 0) {
+        if (files.length === 0) {
+          await wt('merge', '--abort');
+          throw new GitOperationError(
+            '合并存在冲突，请先在预演中完成选边（网页三栏尚未提供，请在聊天窗口让 Agent 调用 git_merge_rehearse 后把 files 交给 git_apply_resolve）',
+            'HAS_CONFLICTS'
+          );
+        }
+        await writeResolvedFiles(wtPath, files, (rel) => wt('add', '--', rel));
+        const still = (await wt('diff', '--name-only', '--diff-filter=U')).stdout
+          .split('\n')
+          .map((l) => l.trim())
+          .filter(Boolean);
+        const missing = still.filter((p) => !stashPaths.has(p.replace(/\\/g, '/')));
+        if (missing.length > 0) {
+          await wt('merge', '--abort');
+          throw new GitOperationError(
+            `以下冲突文件没有暂存解决结果，已中止合并（主工作区未改动）：\n${missing.join('\n')}`,
+            'UNRESOLVED_LEFT'
+          );
+        }
+        messages.push(`已按暂存覆盖 ${files.length} 个冲突文件`);
+      } else if (files.length > 0) {
+        await writeResolvedFiles(wtPath, files, (rel) => wt('add', '--', rel));
+        messages.push('git merge 无冲突；已按暂存内容对齐文件');
+      } else {
+        messages.push('git merge 无冲突；将提交合并结果到临时分支');
+      }
+
+      const resolvedAny = files.length > 0;
+      const commitMsg = resolvedAny
+        ? `resolve: merge ${from} into ${into} via ${tempBranch}\n\nApplied stash choices from Git Cockpit merge preview (worktree).`
+        : `merge: ${from} into ${into} via ${tempBranch}\n\nClean merge via Git Cockpit temp branch (worktree).`;
+      const commitRun = await wt('commit', '-m', commitMsg);
+      if (commitRun.code !== 0) {
+        await wt('merge', '--abort');
+        const detail = (commitRun.stderr || commitRun.stdout).trim();
+        const mergeText = `${mergeRun.stdout}\n${mergeRun.stderr}`;
+        if (/nothing to commit|no changes added/i.test(detail) || /Already up to date/i.test(mergeText)) {
+          throw new GitOperationError(`没有可合并的新提交（${from} → ${into}），无需推送临时分支`, 'NOTHING_TO_MERGE');
+        }
+        throw new GitOperationError(`提交失败（主工作区未改动）：${detail}`, 'COMMIT_FAILED');
+      }
+
+      const head = await wt('rev-parse', 'HEAD');
+      const commitSha = head.stdout.trim();
+      committed = true;
+      messages.push(`已提交 ${commitSha.slice(0, 7)} @ ${tempBranch}`);
+
+      let pushed = false;
+      if (doPush) {
+        const pushRun = await wt('push', '-u', remote, `HEAD:refs/heads/${tempBranch}`);
+        if (pushRun.code !== 0) {
+          throw new GitOperationError(
+            `本地临时分支已提交，但推送失败（主工作区仍在原分支）：${(pushRun.stderr || pushRun.stdout).trim()}`,
+            'PUSH_FAILED'
+          );
+        }
+        pushed = true;
+        pushSucceeded = true;
+        messages.push(`已推送 ${remote}/${tempBranch}`);
+      }
+
+      const remoteUrl = (await this.runAllowFail(['remote', 'get-url', remote])).stdout.trim();
+      const createMrUrl = buildCreateMrUrl(remoteUrl, tempBranch, branchNameForMr(into, remoteNames));
+
+      this.emit('changed', { repoPath: this.repoPath, command: ['worktree', 'merge', tempBranch] });
+      return {
+        repoRoot: this.repoPath,
+        into,
+        from,
+        tempBranch,
+        intoSha,
+        fromSha,
+        commitSha,
+        pushed,
+        remote,
+        createMrUrl,
+        previousBranch,
+        usedWorktree: true,
+        messages
+      };
+    } finally {
+      await this.runAllowFail(['worktree', 'remove', '--force', wtPath]);
+      await rm(parent, { recursive: true, force: true }).catch(() => undefined);
+      await this.runAllowFail(['worktree', 'prune']);
+      if (!pushSucceeded && !(keepLocal && committed)) {
+        await this.runAllowFail(['branch', '-D', tempBranch]);
+      }
+    }
+  }
+
   /** 提取 git 报错中用户可读的部分 */
   private extractGitMessage(msg: string): string {
     const lines = msg.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
@@ -967,6 +1397,57 @@ function parseUpstreamTrack(track: string): { ahead: number; behind: number } {
     ahead: ahead ? Number(ahead[1]) : 0,
     behind: behind ? Number(behind[1]) : 0
   };
+}
+
+/** 直接 spawn git，拿到 stdout / stderr / exit code；不抛错 */
+function spawnGit(cwd: string, args: string[], env?: NodeJS.ProcessEnv, timeoutMs = 60_000): Promise<GitCommandResult> {
+  return new Promise((resolve) => {
+    const child = spawn('git', args, {
+      cwd,
+      windowsHide: true,
+      shell: false,
+      env: env ?? process.env
+    });
+    let stdout = '';
+    let stderr = '';
+    let done = false;
+    const finish = (result: GitCommandResult) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      resolve(result);
+    };
+    const timer = setTimeout(() => {
+      child.kill();
+      finish({ stdout, stderr: `${stderr}\n(git 命令超时 ${timeoutMs}ms)`.trim(), code: 124 });
+    }, timeoutMs);
+    child.stdout?.on('data', (b: Buffer) => {
+      stdout += b.toString('utf8');
+    });
+    child.stderr?.on('data', (b: Buffer) => {
+      stderr += b.toString('utf8');
+    });
+    child.on('error', (err) => {
+      finish({ stdout, stderr: err.message, code: 127 });
+    });
+    child.on('close', (code) => {
+      finish({ stdout, stderr, code: code ?? 1 });
+    });
+  });
+}
+
+async function writeResolvedFiles(
+  workDir: string,
+  files: ApplyResolveFile[],
+  add: (rel: string) => Promise<GitCommandResult>
+): Promise<void> {
+  for (const f of files) {
+    const rel = f.path.replace(/\\/g, '/');
+    const abs = path.join(workDir, rel);
+    await mkdir(path.dirname(abs), { recursive: true });
+    await writeFile(abs, f.resolvedContent, 'utf8');
+    await add(rel);
+  }
 }
 
 export type { DiffResult, FileStatus, DiffFileSummary, BranchInfo, TagInfo, RemoteInfo, RepoStatus, CommitInfo, GraphData };

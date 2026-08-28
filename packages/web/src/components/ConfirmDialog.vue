@@ -32,7 +32,9 @@ const command = computed(() => {
 
 const risk = computed(() => {
   const p = props.preview;
-  if (p && 'risk' in p && typeof p.risk === 'string') return p.risk;
+  const raw = p && 'risk' in p && typeof (p as { risk?: unknown }).risk === 'string' ? String((p as { risk: string }).risk) : 'write';
+  if (raw === 'dangerous' || raw === 'high') return 'dangerous';
+  if (raw === 'readonly') return 'readonly';
   return 'write';
 });
 

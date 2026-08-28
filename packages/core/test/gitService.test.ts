@@ -1,8 +1,8 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { GitOperationError, GitService } from '../src/index.js';
-import { cleanupTmp, commitFile, createSampleRepo, initRepo, makeTmpDir } from './helpers.js';
+import { GitOperationError, GitService } from '../src/index.ts';
+import { cleanupTmp, commitFile, createSampleRepo, initRepo, makeTmpDir } from './helpers.ts';
 
 describe('GitService 打开与校验', () => {
   beforeEach(() => cleanupTmp());

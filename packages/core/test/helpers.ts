@@ -61,4 +61,17 @@ export async function createSampleRepo(): Promise<{ dir: string; git: SimpleGit 
   return { dir, git };
 }
 
+/** 两条分支改同一文件，预演应报内容冲突 */
+export async function createConflictRepo(): Promise<{ dir: string; git: SimpleGit }> {
+  const dir = makeTmpDir('conflict-');
+  const git = await initRepo(dir);
+  await commitFile(git, dir, 'a.txt', 'base\n', 'init: base');
+  await git.branch(['feature']);
+  await git.checkout('feature');
+  await commitFile(git, dir, 'a.txt', 'theirs\n', 'feat: theirs');
+  await git.checkout('main');
+  await commitFile(git, dir, 'a.txt', 'ours\n', 'fix: ours');
+  return { dir, git };
+}
+
 export { os };

@@ -1,7 +1,13 @@
-export * from './types.js';
-export * from './gitService.js';
-export * from './permissions.js';
-export * from './backup.js';
-export * from './auditLogger.js';
-export * from './repoStore.js';
-export * from './db.js';
+export * from './types.ts';
+export * from './gitService.ts';
+export * from './permissions.ts';
+export * from './backup.ts';
+export * from './auditLogger.ts';
+export * from './repoStore.ts';
+export * from './db.ts';
+export {
+  branchNameForMr,
+  defaultTempBranchName,
+  isSameBranchForMr,
+  buildCreateMrUrl
+} from './merge.ts';

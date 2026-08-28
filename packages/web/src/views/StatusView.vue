@@ -7,14 +7,16 @@ import { useToolAction } from '@/composables/useToolAction';
 import { useRevision } from '@/composables/revision';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import DiffViewer from '@/components/DiffViewer.vue';
+import { useBranchesStore } from '@/stores/branches';
+import type { BranchTreeNode } from '@/utils/branchTree';
 import type { BranchInfo, DiffResult, FileStatus, RepoStatus, StashInfo, ToolExecResult } from '@/api/types';
 
 const repos = useReposStore();
+const branchStore = useBranchesStore();
 const { revision } = useRevision();
 const repoId = (): number | null => repos.currentId;
 
 const status = ref<RepoStatus | null>(null);
-const branches = ref<BranchInfo[]>([]);
 const stashes = ref<StashInfo[]>([]);
 const loading = ref(false);
 const loadError = ref('');
@@ -52,6 +54,7 @@ const currentPath = computed(() => repos.current?.path ?? '');
 const currentBranch = computed(() => status.value?.currentShort ?? status.value?.current ?? '');
 const ahead = computed(() => status.value?.ahead ?? 0);
 const behind = computed(() => status.value?.behind ?? 0);
+const branchPanes = computed(() => branchStore.panes);
 
 /** 各标签页文件列表（untracked 转成 FileStatus 统一渲染） */
 const tabLists = computed(() => {
@@ -88,92 +91,6 @@ const tabs = computed(() => [
 const activeList = computed<FileStatus[]>(() => tabLists.value[activeTab.value] ?? []);
 const totalFiles = computed(() => tabLists.value.all.length);
 
-/** 分支树节点：叶子带 branch（fullName 为完整分支名），非叶子为按 '/' 拆分的目录 */
-interface BranchTreeNode {
-  key: string;
-  label: string;
-  fullName?: string;
-  branch?: BranchInfo;
-  remote?: boolean;
-  children?: BranchTreeNode[];
-}
-
-/** 分支面板：本地分支 或 单个远程分组 */
-interface BranchPane {
-  key: string;
-  title: string;
-  tree: BranchTreeNode[];
-}
-
-/** 按 '/' 分层构建分支树（忽略空分段） */
-function buildTree(entries: { name: string; branch: BranchInfo }[]): BranchTreeNode[] {
-  const roots: BranchTreeNode[] = [];
-  for (const { name, branch } of entries) {
-    const parts = name.split('/').filter((p) => p.length > 0);
-    if (parts.length === 0) continue;
-    let level = roots;
-    let prefix = '';
-    for (const [i, part] of parts.entries()) {
-      prefix = prefix ? `${prefix}/${part}` : part;
-      const existing = level.find((n) => n.label === part);
-      const node: BranchTreeNode = existing ?? { key: 'node:' + prefix, label: part };
-      if (!existing) level.push(node);
-      if (i === parts.length - 1) {
-        node.branch = branch;
-        node.fullName = name;
-        node.remote = branch.remote;
-      } else {
-        if (!node.children) node.children = [];
-        level = node.children;
-      }
-    }
-  }
-  sortTree(roots);
-  return roots;
-}
-
-/** 每层排序：目录在前，同级按名称字典序 */
-function sortTree(nodes: BranchTreeNode[]): void {
-  nodes.sort((a, b) => {
-    const ad = a.branch ? 1 : 0;
-    const bd = b.branch ? 1 : 0;
-    if (ad !== bd) return ad - bd;
-    return a.label.localeCompare(b.label);
-  });
-  for (const n of nodes) if (n.children) sortTree(n.children);
-}
-
-/** 递归统计叶子（分支）数，供标题计数 */
-function leafCount(nodes: BranchTreeNode[]): number {
-  let n = 0;
-  for (const node of nodes) n += node.branch ? 1 : leafCount(node.children ?? []);
-  return n;
-}
-
-const branchPanes = computed<BranchPane[]>(() => {
-  const locals = branches.value.filter((b) => !b.remote);
-  const remotes = branches.value.filter((b) => b.remote);
-  // 远程按前缀分组；跳过无实际分支名的残缺 ref（如仅名为 'origin' 的空条目，正是之前空行的来源）
-  const remoteMap = new Map<string, { name: string; branch: BranchInfo }[]>();
-  for (const r of remotes) {
-    const slash = r.name.indexOf('/');
-    const remoteName = slash === -1 ? '' : r.name.slice(0, slash);
-    if (!remoteName) continue;
-    const list = remoteMap.get(remoteName) ?? [];
-    list.push({ name: r.name.slice(slash + 1), branch: r });
-    remoteMap.set(remoteName, list);
-  }
-  const panes: BranchPane[] = [];
-  if (locals.length) {
-    panes.push({ key: 'local', title: `本地分支（${locals.length}）`, tree: buildTree(locals.map((b) => ({ name: b.name, branch: b }))) });
-  }
-  for (const [remote, list] of remoteMap) {
-    const tree = buildTree(list);
-    panes.push({ key: 'remote:' + remote, title: `远程 · ${remote}（${leafCount(tree)}）`, tree });
-  }
-  return panes;
-});
-
 function syncText(b?: BranchInfo): string {
   if (!b || b.remote || !b.upstream) return '';
   const parts: string[] = [];
@@ -198,14 +115,7 @@ async function loadStatus(): Promise<void> {
 }
 
 async function loadBranches(): Promise<void> {
-  const id = repoId();
-  if (id === null) return;
-  try {
-    const { branches: bs } = await api.listBranches(id);
-    branches.value = bs;
-  } catch {
-    /* 分支列表失败不阻塞状态页 */
-  }
+  await branchStore.load();
 }
 
 async function loadStashes(): Promise<void> {

@@ -12,8 +12,8 @@ import {
   openDatabase
 } from '@shaohui_jin/git-cockpit-core';
 import type { GitCockpitConfig } from '@shaohui_jin/git-cockpit-core';
-import { ConfigStore } from './config.js';
-import { RepoManager } from './repoManager.js';
+import { ConfigStore } from './config.ts';
+import { RepoManager } from './repoManager.ts';
 
 export interface RuntimeOptions {
   dataDir?: string;

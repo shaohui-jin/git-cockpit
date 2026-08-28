@@ -1,6 +1,7 @@
 import { createRouter, createWebHashHistory } from 'vue-router';
 import ReposView from '@/views/ReposView.vue';
 import StatusView from '@/views/StatusView.vue';
+import MergeView from '@/views/MergeView.vue';
 import HistoryView from '@/views/HistoryView.vue';
 import LogsView from '@/views/LogsView.vue';
 import SettingsView from '@/views/SettingsView.vue';
@@ -12,6 +13,7 @@ export const router = createRouter({
     { path: '/', redirect: '/status' },
     { path: '/repos', name: 'repos', component: ReposView, meta: { title: '仓库管理' } },
     { path: '/status', name: 'status', component: StatusView, meta: { title: '状态' } },
+    { path: '/merge', name: 'merge', component: MergeView, meta: { title: '合并预演' } },
     { path: '/history', name: 'history', component: HistoryView, meta: { title: '历史' } },
     { path: '/logs', name: 'logs', component: LogsView, meta: { title: '操作日志' } },
     { path: '/settings', name: 'settings', component: SettingsView, meta: { title: '设置' } }

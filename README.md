@@ -2,7 +2,7 @@
 
 基于 MCP（Model Context Protocol）的 Git 可视化操作工具：Web 端界面 + AI 调用能力，支持多仓库管理、安全的 Git 操作、与 Cursor/VS Code 集成。
 
-> 完整设计见 [设计文档.md](./设计文档.md)。
+> 完整设计见 [设计文档.md](docs/设计文档.md)。
 
 ## Monorepo 结构
 

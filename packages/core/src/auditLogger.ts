@@ -1,5 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
-import type { LoggingConfig, OperationLogEntry, OperationResult, OperationSource } from './types.js';
+import type { LoggingConfig, OperationLogEntry, OperationResult, OperationSource } from './types.ts';
 
 /**
  * 操作审计日志：写入 SQLite，支持脱敏与分页查询。

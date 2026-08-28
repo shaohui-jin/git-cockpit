@@ -16,6 +16,8 @@
     "declaration": true,
     "sourceMap": true,
     "declarationMap": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true
   }
 }
