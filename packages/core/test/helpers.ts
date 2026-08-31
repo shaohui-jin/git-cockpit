@@ -74,4 +74,23 @@ export async function createConflictRepo(): Promise<{ dir: string; git: SimpleGi
   return { dir, git };
 }
 
+/** 一条目标 + 两条干净来源 + 一条与目标冲突的来源，供矩阵 / 合入顺序 */
+export async function createSurveyRepo(): Promise<{ dir: string; git: SimpleGit }> {
+  const dir = makeTmpDir('survey-');
+  const git = await initRepo(dir);
+  await commitFile(git, dir, 'a.txt', 'base\n', 'init: base');
+  await git.branch(['feat-a']);
+  await git.branch(['feat-b']);
+  await git.branch(['feat-c']);
+  await git.checkout('feat-a');
+  await commitFile(git, dir, 'fa.txt', 'a only\n', 'feat: a file');
+  await git.checkout('feat-b');
+  await commitFile(git, dir, 'fb.txt', 'b only\n', 'feat: b file');
+  await git.checkout('feat-c');
+  await commitFile(git, dir, 'a.txt', 'theirs\n', 'feat: conflict theirs');
+  await git.checkout('main');
+  await commitFile(git, dir, 'a.txt', 'ours\n', 'fix: conflict ours');
+  return { dir, git };
+}
+
 export { os };

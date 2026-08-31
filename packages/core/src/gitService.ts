@@ -22,6 +22,9 @@ import type {
   GitCommandResult,
   MergePreviewResult,
   MergeRehearsalResult,
+  MergeSurveyPair,
+  MergeSurveyResult,
+  SuggestOrderResult,
   ApplyResolveFile,
   ApplyResolveResult,
   PrepareMrResult
@@ -41,6 +44,8 @@ import {
   type GitVersion
 } from './merge.ts';
 import { detectMrPlatform } from './mr.ts';
+import { crossPairs, MAX_SURVEY_PAIRS, parseTempBranches, runSurvey } from './survey.ts';
+import { suggestOrder, type ChainRunner } from './chain.ts';
 
 export interface GitServiceOptions {
   maxConcurrentProcesses?: number;
@@ -1091,16 +1096,58 @@ export class GitService extends EventEmitter {
 
     const intoSha = await this.ensureRev(into);
     const fromSha = await this.ensureRev(from);
-    const base = await this.tryMergeBase(intoSha, fromSha);
-    const unrelated = base === null;
-    const parsed = await this.runMergeTree(intoSha, fromSha, base);
+    const bySha = await this.previewMergeBySha(intoSha, fromSha);
 
-    let conflictFiles = parsed.conflictFiles;
+    let conflictFiles = bySha.conflictFiles;
     if (options.path) {
       const want = this.validateRepoRelativePath(options.path).replace(/\\/g, '/');
       conflictFiles = conflictFiles.filter((f) => f.path === want);
     }
 
+    const messages = [...bySha.messages];
+    if (shouldFetch && !fetched) {
+      messages.unshift(`fetch ${remote} 未成功，使用本地已有引用继续预演。${fetchError ? `原因：${fetchError}` : ''}`);
+    }
+
+    return {
+      repoRoot: this.repoPath,
+      into,
+      from,
+      fetched,
+      fetchAttempted: shouldFetch,
+      fetchError,
+      conflictFiles,
+      intoSha: bySha.intoSha,
+      fromSha: bySha.fromSha,
+      mergeBase: bySha.mergeBase,
+      clean: bySha.clean,
+      messages,
+      unrelatedHistories: bySha.unrelatedHistories,
+      outcome: bySha.outcome,
+      resultTree: bySha.resultTree
+    };
+  }
+
+  /**
+   * 已知两侧 SHA 的 merge-tree 预演。矩阵 / 合入顺序共用，不 fetch、不校验同名分支。
+   */
+  async previewMergeBySha(
+    intoSha: string,
+    fromSha: string
+  ): Promise<{
+    intoSha: string;
+    fromSha: string;
+    mergeBase: string;
+    clean: boolean;
+    unrelatedHistories: boolean;
+    outcome: MergePreviewResult['outcome'];
+    conflictFiles: MergePreviewResult['conflictFiles'];
+    resultTree?: string;
+    messages: string[];
+  }> {
+    const base = await this.tryMergeBase(intoSha, fromSha);
+    const unrelated = base === null;
+    const parsed = await this.runMergeTree(intoSha, fromSha, base);
     const messages = [...parsed.messages];
     if (unrelated) {
       messages.unshift(
@@ -1108,28 +1155,160 @@ export class GitService extends EventEmitter {
         '已使用 --allow-unrelated-histories 继续预演合并结果。'
       );
     }
-    if (shouldFetch && !fetched) {
-      messages.unshift(`fetch ${remote} 未成功，使用本地已有引用继续预演。${fetchError ? `原因：${fetchError}` : ''}`);
-    }
-
     const clean = unrelated ? false : parsed.clean;
     return {
-      repoRoot: this.repoPath,
-      into,
-      from,
       intoSha,
       fromSha,
       mergeBase: base ?? '',
       clean,
-      fetched,
-      fetchAttempted: shouldFetch,
-      fetchError,
-      conflictFiles,
-      messages,
       unrelatedHistories: unrelated,
       outcome: unrelated ? 'unrelated' : clean ? 'clean' : 'conflicts',
-      resultTree: parsed.resultTree
+      conflictFiles: parsed.conflictFiles,
+      resultTree: parsed.resultTree,
+      messages
     };
+  }
+
+  /** 游离两亲 commit，不被任何 ref 引用；身份写死以免仓库没配 user.email 时失败 */
+  async commitSimulatedMerge(tree: string, parents: string[]): Promise<string> {
+    const args = ['commit-tree', tree];
+    for (const p of parents) {
+      args.push('-p', p);
+    }
+    args.push('-m', 'git-cockpit: simulated merge (unreferenced)');
+    const r = await this.runAllowFail(args, {
+      ...process.env,
+      GIT_AUTHOR_NAME: 'git-cockpit',
+      GIT_AUTHOR_EMAIL: 'git-cockpit@localhost',
+      GIT_COMMITTER_NAME: 'git-cockpit',
+      GIT_COMMITTER_EMAIL: 'git-cockpit@localhost'
+    });
+    if (r.code !== 0 || !r.stdout.trim()) {
+      throw new GitOperationError(
+        `commit-tree 失败：${(r.stderr || r.stdout).trim() || '无输出'}`,
+        'COMMIT_TREE_FAILED'
+      );
+    }
+    return r.stdout.trim();
+  }
+
+  private makeRevResolver(): (ref: string) => Promise<string> {
+    const seen = new Map<string, Promise<string>>();
+    return (ref: string) => {
+      let hit = seen.get(ref);
+      if (!hit) {
+        hit = this.ensureRev(ref);
+        seen.set(ref, hit);
+      }
+      return hit;
+    };
+  }
+
+  private async loadTempBranches(remoteNames: string[]) {
+    const r = await this.runAllowFail([
+      'for-each-ref',
+      '--format=%(refname)',
+      'refs/heads/merge/',
+      'refs/remotes/'
+    ]);
+    return parseTempBranches(r.code === 0 ? r.stdout : '', remoteNames);
+  }
+
+  private async makeChainRunner(into: string): Promise<ChainRunner> {
+    const remotes = (await this.listRemotes()).map((r) => r.name);
+    const toSha = this.makeRevResolver();
+    return {
+      intoSha: await toSha(into),
+      remoteNames: remotes,
+      toSha,
+      previewBySha: async (intoSha, fromSha) => {
+        const p = await this.previewMergeBySha(intoSha, fromSha);
+        return {
+          clean: p.clean,
+          unrelatedHistories: p.unrelatedHistories,
+          conflictPaths: p.conflictFiles.map((f) => f.path),
+          resultTree: p.resultTree
+        };
+      },
+      commitTree: (tree, parents) => this.commitSimulatedMerge(tree, parents)
+    };
+  }
+
+  /**
+   * 批量预演：intos × froms（或显式 pairs），整批只 fetch 一次，只给冲突路径不给正文。
+   * 单格失败记 error，不拖垮整批。不改工作区。
+   */
+  async surveyMerges(options: {
+    intos?: string[];
+    froms?: string[];
+    pairs?: MergeSurveyPair[];
+    fetch?: boolean;
+    remote?: string;
+    cache?: boolean;
+  }): Promise<MergeSurveyResult> {
+    const pairs =
+      options.pairs?.map((p) => ({ into: p.into.trim(), from: p.from.trim() })).filter((p) => p.into && p.from) ??
+      crossPairs(
+        (options.intos ?? []).map((s) => s.trim()).filter(Boolean),
+        (options.froms ?? []).map((s) => s.trim()).filter(Boolean)
+      );
+    if (pairs.length === 0) {
+      throw new GitOperationError('请至少选择一个合入目标和一个来源分支', 'INVALID_REF');
+    }
+    if (pairs.length > MAX_SURVEY_PAIRS) {
+      throw new GitOperationError(
+        `组合数 ${pairs.length} 超过上限 ${MAX_SURVEY_PAIRS}，请缩小分支范围`,
+        'SURVEY_TOO_LARGE'
+      );
+    }
+
+    const remote = options.remote ?? 'origin';
+    let fetched = false;
+    if (options.fetch !== false) {
+      fetched = (await this.fetchQuiet(remote)).ok;
+    }
+
+    const remotes = (await this.listRemotes()).map((r) => r.name);
+    const toSha = this.makeRevResolver();
+    return runSurvey(
+      {
+        repoPath: this.repoPath,
+        remoteNames: remotes,
+        tempBranches: await this.loadTempBranches(remotes),
+        toSha,
+        previewBySha: async (intoSha, fromSha) => {
+          const p = await this.previewMergeBySha(intoSha, fromSha);
+          return {
+            clean: p.clean,
+            unrelatedHistories: p.unrelatedHistories,
+            conflictPaths: p.conflictFiles.map((f) => f.path),
+            resultTree: p.resultTree
+          };
+        }
+      },
+      { pairs, fetched, cache: options.cache }
+    );
+  }
+
+  /**
+   * 建议合入顺序：贪心挑能干净合入的，对比传入顺序。全程对象库，不改工作区。
+   */
+  async suggestMergeOrder(options: {
+    into: string;
+    branches: string[];
+    fetch?: boolean;
+    remote?: string;
+  }): Promise<SuggestOrderResult> {
+    const into = options.into.trim();
+    const branches = options.branches.map((b) => b.trim()).filter(Boolean);
+    if (!into) throw new GitOperationError('into 不能为空', 'INVALID_REF');
+    if (branches.length < 2) {
+      throw new GitOperationError('合入顺序至少需要 2 个来源分支', 'INVALID_REF');
+    }
+    if (options.fetch !== false) {
+      await this.fetchQuiet(options.remote ?? 'origin');
+    }
+    return suggestOrder(await this.makeChainRunner(into), into, branches);
   }
 
   /**

@@ -130,6 +130,34 @@ export const TOOL_DEFS: ToolDef[] = [
       })
   },
   {
+    name: 'git_merge_survey',
+    description:
+      '批量预演矩阵：intos × froms 每对跑一次 merge-tree，整批只 fetch 一次。只返回结论与冲突路径，不生成正文。适合发布前扫描。禁止用 git_merge 做预演。',
+    risk: 'readonly',
+    schema: S.GitMergeSurveySchema,
+    handler: async (args: Args, ctx) =>
+      ctx.git.surveyMerges({
+        intos: args.intos as string[],
+        froms: args.froms as string[],
+        fetch: args.fetch as boolean | undefined,
+        remote: args.remote as string | undefined
+      })
+  },
+  {
+    name: 'git_merge_order',
+    description:
+      '建议把多个 from 合入同一个 into 的顺序。对象库内 merge-tree + commit-tree 串行模拟，不改工作区、不建分支。返回建议顺序、能连续干净合入几个、从哪一步开始要人工。',
+    risk: 'readonly',
+    schema: S.GitMergeOrderSchema,
+    handler: async (args: Args, ctx) =>
+      ctx.git.suggestMergeOrder({
+        into: args.into as string,
+        branches: args.branches as string[],
+        fetch: args.fetch as boolean | undefined,
+        remote: args.remote as string | undefined
+      })
+  },
+  {
     name: 'git_mr_prepare',
     description:
       '只读：解析开 PR/MR 的源/目标、浏览器创建页、本机 gh/glab 是否可用（找不到会带官方安装地址）、可选审核人列表。Token 不进参数。into/from 同 git_merge_preview。',

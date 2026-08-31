@@ -2,7 +2,7 @@
  * 集成测试：executeTool 安全链路（权限、dry-run、备份、审计）与 MCP 工具行为。
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { PermissionError, PermissionManager, TOOL_RISK_LEVELS } from '@shaohui_jin/git-cockpit-core';
+import { PermissionError, PermissionManager, TOOL_RISK_LEVELS, normalizeRepoMethodKey } from '@shaohui_jin/git-cockpit-core';
 import { createTestRuntime, disposeTestRuntime, createSampleRepo, cleanupTmp, commitFile } from './helpers.ts';
 import { executeTool } from '../src/tools/handlers.ts';
 import { TOOL_DEF_MAP } from '../src/tools/index.ts';
@@ -174,6 +174,49 @@ describe('git_merge_preview / git_apply_resolve', () => {
   });
 });
 
+describe('git_merge_survey / git_merge_order', () => {
+  afterAll(() => cleanupTmp());
+
+  it('矩阵与合入顺序均为只读且不改工作区', async () => {
+    const runtime = createTestRuntime();
+    try {
+      const sample = await createSampleRepo();
+      await runtime.repoManager.open(sample.dir);
+      const surveyDef = TOOL_DEF_MAP.get('git_merge_survey')!;
+      expect(TOOL_RISK_LEVELS['git_merge_survey']).toBe('readonly');
+      const survey = await executeTool(
+        surveyDef,
+        { intos: ['main'], froms: ['feature/x', 'main'], fetch: false },
+        { runtime, source: 'mcp' }
+      );
+      expect(survey.success).toBe(true);
+      const cells = (survey.result as { cells: Array<{ from: string; outcome: string }> }).cells;
+      expect(cells.find((c) => c.from === 'feature/x')?.outcome).toBe('clean');
+      expect(cells.find((c) => c.from === 'main')?.outcome).toBe('same');
+
+      const orderDef = TOOL_DEF_MAP.get('git_merge_order')!;
+      expect(TOOL_RISK_LEVELS['git_merge_order']).toBe('readonly');
+      const order = await executeTool(
+        orderDef,
+        { into: 'main', branches: ['feature/x', 'main'], fetch: false },
+        { runtime, source: 'mcp' }
+      );
+      expect(order.success).toBe(true);
+      expect((order.result as { best: { cleanPrefix: number } }).best.cleanPrefix).toBeGreaterThanOrEqual(1);
+    } finally {
+      disposeTestRuntime(runtime);
+    }
+  });
+});
+
+function bindRepoMrMethod(runtime: Runtime, repoPath: string, method: 'token' | 'cli' | 'browser'): void {
+  const mr = runtime.config.mr;
+  runtime.configStore.update({
+    mr: { ...mr, method, repoMethods: { ...mr.repoMethods, [normalizeRepoMethodKey(repoPath)]: method } }
+  });
+  runtime.config = runtime.configStore.get();
+}
+
 describe('git_mr_prepare / git_mr_create', () => {
   afterAll(() => cleanupTmp());
 
@@ -202,6 +245,7 @@ describe('git_mr_prepare / git_mr_create', () => {
       const sample = await createSampleRepo();
       await sample.git.addRemote('origin', 'https://github.com/acme/app.git');
       await runtime.repoManager.open(sample.dir);
+      bindRepoMrMethod(runtime, sample.dir, 'token');
       const def = TOOL_DEF_MAP.get('git_mr_create')!;
       const exec = await executeTool(
         def,
@@ -251,6 +295,7 @@ describe('git_mr_prepare / git_mr_create', () => {
       const sample = await createSampleRepo();
       await sample.git.addRemote('origin', 'https://github.com/acme/app.git');
       await runtime.repoManager.open(sample.dir);
+      bindRepoMrMethod(runtime, sample.dir, 'token');
       const def = TOOL_DEF_MAP.get('git_mr_create')!;
       const exec = await executeTool(
         def,
@@ -283,6 +328,7 @@ describe('git_mr_prepare / git_mr_create', () => {
       const sample = await createSampleRepo();
       await sample.git.addRemote('origin', 'https://gitlab.com/acme/app.git');
       await runtime.repoManager.open(sample.dir);
+      bindRepoMrMethod(runtime, sample.dir, 'token');
       const def = TOOL_DEF_MAP.get('git_mr_create')!;
       const exec = await executeTool(
         def,

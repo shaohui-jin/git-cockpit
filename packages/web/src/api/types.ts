@@ -298,3 +298,47 @@ export interface PrepareMrResult {
   candidates: Array<{ username: string; name?: string; role?: string }>;
   messages: string[];
 }
+
+export type SurveyOutcome = 'clean' | 'conflicts' | 'unrelated' | 'same' | 'error';
+
+export interface MergeSurveyCell {
+  into: string;
+  from: string;
+  intoSha: string;
+  fromSha: string;
+  outcome: SurveyOutcome;
+  conflictPaths: string[];
+  resultTree?: string;
+  tempBranch?: { name: string; local: boolean; remote: boolean };
+  error?: string;
+}
+
+export interface MergeSurveyResult {
+  repoRoot: string;
+  fetched: boolean;
+  generatedAt: number;
+  cells: MergeSurveyCell[];
+}
+
+export interface MergeChainResult {
+  into: string;
+  intoSha: string;
+  order: string[];
+  steps: Array<{
+    from: string;
+    fromSha: string;
+    outcome: SurveyOutcome;
+    conflictPaths: string[];
+    commit: string;
+  }>;
+  cleanPrefix: number;
+  blockedAt: string | null;
+  blockedPaths: string[];
+  blockedReason?: string;
+}
+
+export interface SuggestOrderResult {
+  best: MergeChainResult;
+  baseline: MergeChainResult;
+  tried: number;
+}

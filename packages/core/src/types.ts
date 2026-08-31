@@ -217,6 +217,68 @@ export interface MergePreviewResult {
 
 export type MergeRehearsalResult = MergePreviewResult;
 
+/** 批量预演格子结论；same / error 只在矩阵出现 */
+export type SurveyOutcome = MergeOutcome | 'same' | 'error';
+
+export interface MergeSurveyPair {
+  into: string;
+  from: string;
+}
+
+export interface TempBranchState {
+  name: string;
+  local: boolean;
+  /** 远程已有同名 merge/*，才谈得上单独开 MR */
+  remote: boolean;
+}
+
+export interface MergeSurveyCell {
+  into: string;
+  from: string;
+  intoSha: string;
+  fromSha: string;
+  outcome: SurveyOutcome;
+  /** 只有路径：批量不生成冲突正文 */
+  conflictPaths: string[];
+  resultTree?: string;
+  tempBranch?: TempBranchState;
+  error?: string;
+}
+
+export interface MergeSurveyResult {
+  repoRoot: string;
+  fetched: boolean;
+  generatedAt: number;
+  cells: MergeSurveyCell[];
+}
+
+export interface MergeChainStep {
+  from: string;
+  fromSha: string;
+  outcome: SurveyOutcome;
+  conflictPaths: string[];
+  /** 这一步之后的游离 commit；冲突或跳过时为空 */
+  commit: string;
+}
+
+export interface MergeChainResult {
+  into: string;
+  intoSha: string;
+  order: string[];
+  steps: MergeChainStep[];
+  /** 从头能连续干净合入几个 */
+  cleanPrefix: number;
+  blockedAt: string | null;
+  blockedPaths: string[];
+  blockedReason?: string;
+}
+
+export interface SuggestOrderResult {
+  best: MergeChainResult;
+  baseline: MergeChainResult;
+  tried: number;
+}
+
 export interface ApplyResolveFile {
   path: string;
   resolvedContent: string;

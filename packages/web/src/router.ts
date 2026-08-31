@@ -13,7 +13,8 @@ export const router = createRouter({
     { path: '/', redirect: '/status' },
     { path: '/repos', name: 'repos', component: ReposView, meta: { title: '仓库管理' } },
     { path: '/status', name: 'status', component: StatusView, meta: { title: '状态' } },
-    { path: '/merge', name: 'merge', component: MergeView, meta: { title: '合并预演' } },
+    { path: '/merge', name: 'merge', component: MergeView, meta: { title: '合并' } },
+    { path: '/matrix', redirect: { path: '/merge', query: { mode: 'matrix' } } },
     { path: '/history', name: 'history', component: HistoryView, meta: { title: '历史' } },
     { path: '/logs', name: 'logs', component: LogsView, meta: { title: '操作日志' } },
     { path: '/settings', name: 'settings', component: SettingsView, meta: { title: '设置' } }

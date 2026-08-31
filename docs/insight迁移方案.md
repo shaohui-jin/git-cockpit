@@ -2,11 +2,11 @@
 
 > **日期**：2026-08-31  
 > **对照**：`D:\_myproject\git-insight` 与本仓库 core + mcp-server + web  
-> **已拍板**：不做 Cursor 扩展；Git 能力用本仓库 `GitService` / simple-git 重写，不引进 insight-core；Insight「Git 配置」在此改名为 **MR 配置**（方式 A 本机 gh/glab、C Token、D 浏览器页，**不做 B 下载 CLI**）；**不配置 LLM、不做网页 AI 选边**；Cockpit **不内置对话或选边模型**，只提供工具给外部 Agent 调用。Insight 后期全部下架。  
+> **已拍板**：不做 Cursor 扩展；Git 能力用本仓库 `GitService` / simple-git 重写，不引进 insight-core；Insight「Git 配置」在此改名为 **MR 配置**（方式 A 本机 gh/glab、B Token、C 浏览器页，**不做 Insight 原方式 B 下载 CLI**）；**不配置 LLM、不做网页 AI 选边**；Cockpit **不内置对话或选边模型**，只提供工具给外部 Agent 调用。Insight 后期全部下架。  
 > **硬约束（执行栈，必须遵守）**：仓库里的 git 事实一律走 **现有 `GitService` / simple-git**。simple-git 有高层 API 用高层；没有的用现有 `raw` / `runAllowFail`。禁止再按 Insight 自研 `runGit` 另装一套命令封装。只有 git/simple-git **确实做不到** 的事（SSH remote → https 网页/API、GitHub/GitLab REST、gh/glab CLI）才允许手写，且不得与已有方法重复。详见 **§5.0**。  
 > **设计文档**只描述已落地行为。本文只保留规划、硬约束与 **尚未迁入** 项。
 
-**已迁入设计文档（本文不再展开实现细节）**：merge-tree 预演、worktree 落盘、网页三栏 hunk 选边、开 PR/MR（`git_mr_prepare` / `git_mr_create`）、设置「MR 配置」（按仓开单方式 A CLI / B Token / C 浏览器页、按 hostname 存 Token、保存前校验、Windows 扫系统 Path 探测 gh/glab、已登录 CLI 可校验摘要）。见 [设计文档.md](./设计文档.md) 4.1 / 4.2 / 6.4 / 9。
+**已迁入设计文档（本文不再展开实现细节）**：merge-tree 预演、worktree 落盘、网页三栏 hunk 选边、开 PR/MR（`git_mr_prepare` / `git_mr_create`）、设置「MR 配置」、合并矩阵与合入顺序（`git_merge_survey` / `git_merge_order`）、合并页单对/矩阵闭环（回程条、只记本地临时分支、格子阶段、矩阵上推送临时分支与申请 MR、SSE 过期条）。见 [设计文档.md](./设计文档.md) 4.1 / 4.2 / 6.4 / 6.9 / 9。
 
 ---
 
@@ -28,9 +28,9 @@ Cockpit **没有产品级「AI 入口」**（没有聊天框、没有选边模�
 
 ## 1. 两个产品实际在解决什么
 
-| | Git Insight | Git Cockpit（现状 + 剩余迁入） |
+| | Git Insight | Git Cockpit（已落地） |
 |--|-------------|------------------------------|
-| 主问题 | 「合不合得进去」：不碰工作区算合并；worktree 落盘、开 MR | 「日常怎么安全地 git」+ 已有预演/手选/落盘 + Token/CLI/浏览器开 PR/MR + 待迁入矩阵 |
+| 主问题 | 「合不合得进去」：不碰工作区算合并；worktree 落盘、开 MR | 「日常怎么安全地 git」+ 预演/手选/落盘 + 矩阵闭环 + Token/CLI/浏览器开 PR/MR |
 | Git 执行 | 自研 `runGit` spawn | **本仓库 GitService + simple-git**（`raw` / `runAllowFail`），同一套队列与校验 |
 | 写隔离 | 预演在对象库；落盘独立 worktree | 日常写打在当前工作区；**落盘已走独立 worktree**，不污染主区 |
 | 与模型的关系 | 扩展内调 vscode.lm / Chat 桥 / OpenAI HTTP | **不调任何模型**。宿主 Agent 可选调用 MCP 工具 |
@@ -45,16 +45,13 @@ Insight 里拼 git/glab/gh，是因为 merge-tree / worktree / MR API 不是「�
 
 | Insight 能力 | 迁入 Cockpit | 做法 |
 |--------------|--------------|------|
-| 合并预演 `merge-tree` | **已落地** | 设计文档 4.1 / 6.4 |
-| 冲突正文 + 网页三栏选边 | **已落地** | 正文 rehearsal + `ConflictResolvePanel`；blame 未做 |
-| 冲突 blame | 可后置 | 矩阵阶段再补，进 GitService |
-| 合并矩阵 / 合入顺序 | 要 | 只读；survey 一次 fetch；顺序用 `commit-tree` 游离 commit |
+| 冲突 blame | **未做** | 可后置，进 GitService |
 | 「AI 选边」产品功能 | **不迁** | 不调模型。聊天里由宿主自己读工具结果并选边（§4） |
-| 一键解决并推送 | **已落地** | `git_apply_resolve` + worktree |
-| 一键申请 MR | **已落地** | 见设计文档 4.1 / 4.2 / 6.4 |
 | Insight 的 LLM / AI 设置项 | **不迁** | 无 `aiApiBaseUrl` / Key / Model |
-| 机械 resolver（gitignore 并集等） | 可后置 | 配置只来自 `~/.git-cockpit`，禁止读仓库文件 |
-| 冲突预警 | 可后置 | daemon + SSE，默认关；无状态栏 |
+| 机械 resolver（gitignore 并集等） | **不迁** | 已拍板不做 |
+| 冲突预警 | **不迁** | 已拍板不做 |
+| 多条合成一条批量分支再推 | **不做本期** | 与「矩阵逐条推送」分开；风险高 |
+| 选边 / trail 入库 | **不迁** | 会话在 Pinia；做成的结果认 Git 临时分支 |
 | 分支图 G6 | 见 §10 | `git_graph` 已有数据，前端另做 |
 | Skill | 可做薄 markdown | 只写「请调 Cockpit 哪些工具」，不是扩展 |
 | Cursor 扩展 / vscode.lm 桥 | **不做** | Insight 下架后无替代壳 |
@@ -67,7 +64,7 @@ Insight 里拼 git/glab/gh，是因为 merge-tree / worktree / MR API 不是「�
 
 已迁入设计文档，**不是待办**。实现口径见 [设计文档.md](./设计文档.md) 4.2 / 6.4 / 9。本文不再列交互或接口细节。
 
-明确不做（仍有效）：下载 gh/glab 到数据目录（Insight 原方式 B）；LLM / AI 设置；机械 resolver 不在本期。
+明确不做（仍有效）：下载 gh/glab 到数据目录（Insight 原方式 B）；LLM / AI 设置；机械 resolver；冲突预警；选边/trail 入库。
 
 ---
 
@@ -135,10 +132,11 @@ Cockpit 只提供预演数据、网页手选和落盘接口。所谓「丢给 AI
 
 ```
 packages/core/src/
-  gitService.ts     现有（含 runAllowFail、previewMerge / rehearseMerge / applyResolve / prepareMr）
+  gitService.ts     现有（含 surveyMerges / suggestMergeOrder）
   merge.ts          已落地：预演解析 / 分支短名 / diff3 / toHttpsRemoteUrl / 浏览器 MR URL
+  survey.ts / chain.ts  已落地：矩阵与合入顺序（见设计文档）
   mr.ts / mrCli.ts / mrToken.ts  已落地：开 PR/MR 与设置 MR 配置（见设计文档）
-packages/web        合并预演页已有三栏选边 + 创建 PR/MR；待做矩阵 UI
+packages/web        合并页（单对三栏 + 矩阵闭环：记本地、回程条、格子阶段、推送临时分支、申请 MR）
 packages/mcp-server 只注册工具，executeTool 收口；`/docs` 已有
 ```
 
@@ -146,7 +144,7 @@ packages/mcp-server 只注册工具，executeTool 收口；`/docs` 已有
 
 - `runAllowFail`：merge-tree 冲突 exit 1 是结果不是异常。
 - worktree：创建/删除/push 排进 **主仓库队列**；主工作区不切换。
-- 命令一律参数数组。矩阵阶段再补 `commit-tree` / `blame`——同样进 GitService，不另起执行层。
+- 命令一律参数数组。blame 若补同样进 GitService，不另起执行层。
 - Git **≥ 2.38**，否则预演直接报错，禁止退回工作区 merge。
 
 ### 5.4 权限
@@ -171,24 +169,20 @@ packages/mcp-server 只注册工具，executeTool 收口；`/docs` 已有
 
 ## 7. Insight 迁入分期
 
-Insight 停更并下架；**不**做「扩展改壳」。预演、三栏手选、worktree 落盘、开 PR/MR 与 MR 配置已在设计文档，本表不再列。
+Insight 停更并下架；**不**做「扩展改壳」。预演、三栏手选、worktree 落盘、开 PR/MR、MR 配置、矩阵与合入顺序、矩阵只记本地并回矩阵推送/开 MR 已在设计文档，本表不再列。
 
 | 阶段 | 内容 | 状态 |
 |------|------|------|
-| E | 矩阵、合入顺序、可选预警（默认关） | 未做 |
+| E | 可选预警（默认关） | **不做** |
 | F | 可选 Skill markdown；停发 Insight MCP；扩展与 npm 下架 | 未做 |
 
 聊天里的选边不另开发（预演 + 落盘工具已够）。
 
 ---
 
-## 8. 工具草案（尚未落地）
+## 8. 工具（已迁入设计文档）
 
-已落地见设计文档：`git_merge_preview`、`git_merge_rehearse`、`git_apply_resolve`、`git_mr_prepare`、`git_mr_create`。
-
-只读待做：`git_merge_survey`、`git_merge_order`
-
-Web 预演可用 GET 以免大 patch 进审计（当前预演仍走 tools POST）；**落盘与建 MR 必须 executeTool**。
+预演 / 落盘 / 开 MR / 矩阵工具均已落地，见设计文档 4.1。Web 预演仍走 tools POST；可选优化：只读预演改 GET 以免大 patch 进审计。**落盘与建 MR 必须 executeTool**。
 
 ---
 
@@ -202,18 +196,21 @@ Web 预演可用 GET 以免大 patch 进审计（当前预演仍走 tools POST�
 |----|------|
 | Cursor / VS Code 扩展 | 已拍板；Insight 下架后不保留壳 |
 | 网页 AI 选边、LLM 配置、Chat 桥、vscode.lm | Cockpit 不内置模型 |
+| 机械 resolver、冲突预警、选边/trail 入库 | 已拍板不做 |
+| 多条合成一条批量分支再推 | 不做本期；矩阵已能逐条推送临时分支 |
 | 下载 gh/glab 到本机目录（原方式 B） | 无扩展可写路径；用户自装或用 Token |
 | 远程 Docker 多租户 / 扩展市场 ID | 继续本地单用户 daemon；需要时另立项 |
 
 ### 10.2 随 Insight 迁入做（§7 剩余）
 
-矩阵/顺序、可选预警与 Skill markdown。
+仍随 Insight 迁入：Skill markdown 与 Insight 下架流程。冲突 blame 可后置。
 
 ### 10.3 设计里提过、与 Insight 无强绑定、可排期
 
 | 项 | 建议 |
 |----|------|
-| 分支图 UI | `git_graph` 已返回数据；独立页 SVG 或 G6，不阻塞矩阵 |
+| 分支图 UI | `git_graph` 已返回数据；独立页 SVG 或 G6 |
+| 只读预演改 GET | 当前仍走 tools POST；改 GET 可避免大 patch 进审计 |
 | 工作区 `git_merge` 的 Web 按钮 | 工具已有，与 merge-tree 预演并存，勿混用 |
 | tag / rebase / force push / 删分支的 Web 按钮 | MCP 已有；按需加到状态页，走现有确认框 |
 | reflog / 从 `backup/pre-op-*` 恢复 UI | 高危备份的配套 |
@@ -227,7 +224,7 @@ Web 预演可用 GET 以免大 patch 进审计（当前预演仍走 tools POST�
 
 ## 11. 尚未实现：剩余工作量与建议顺序
 
-对照当前代码：日常 Git、**预演 + 网页三栏选边 + 落盘 + MR 配置开 PR/MR** 已落地（见设计文档）。下文是仍未做的项。
+对照当前代码：日常 Git、**预演 + 网页三栏选边 + 落盘 + 矩阵闭环（记本地、回矩阵推送/开 MR）+ 合入顺序 + MR 配置开 PR/MR** 已落地（见设计文档）。下文是仍未做的项。
 
 工作量按 **1 名熟悉本仓库的全栈、可对着 Insight 源码搬** 估人天（含自测；不含 Insight 下架流程）。搬的是产品行为，**执行栈仍遵守 §5.0**。
 
@@ -235,9 +232,8 @@ Web 预演可用 GET 以免大 patch 进审计（当前预演仍走 tools POST�
 
 | 优先级 | 项 | 人天 | 做成后能用什么 | 依赖 |
 |--------|----|------|----------------|------|
-| **P2** | **E 矩阵 + 合入顺序**（先 API，矩阵 UI 另计） | API 3–4；矩阵 UI 3–5 | 多分支发布前扫描 | 预演已有 |
-| **P3** | 冲突 blame、机械 resolver | 2–4 | 选边时看谁改的；自动并规则文件 | 三栏已有 |
-| **P3** | 预警（默认关）、Skill markdown、Insight 下架 | 1–2 + 流程 | 锦上添花 | — |
+| **P3** | 冲突 blame | 1–2 | 选边时看红块两侧最后是谁改的 | 三栏已有 |
+| **P3** | Skill markdown、Insight 下架 | 1–2 + 流程 | 锦上添花 | — |
 
 **聊天窗口处理冲突** 与 **网页手选** 均已具备，不单独排期。
 
@@ -250,13 +246,13 @@ Web 预演可用 GET 以免大 patch 进审计（当前预演仍走 tools POST�
 | 克隆远程 | 1–2 | 与预演无关 |
 | reflog / 备份分支恢复 UI | 2–3 | 高危配套 |
 | 分支图 UI | 4–8 | `git_graph` 已有数据；不挡矩阵 |
-| Playwright E2E | 2–4 | 预演/选边/落盘已有，可随时写 |
+| Playwright E2E | 2–4 | 预演/选边/落盘/矩阵闭环已有，可随时写 |
 
 ### 11.3 建议你先做哪几块
 
 按入口选：
 
-1. **多分支发布扫描**：做 **E 矩阵**（API 先于 UI）。
+1. **选边增强**：冲突 blame（P3），可选。
 
-**不要先做**：分支图、克隆、扩展、LLM。  
-开 PR/MR 与 MR 配置已具备，见设计文档。
+**不要先做**：分支图、克隆、扩展、LLM、批量合入、机械 resolver、预警。  
+开 PR/MR、MR 配置、矩阵与合入顺序、矩阵只记本地并回矩阵推送/开 MR 已具备，见设计文档。

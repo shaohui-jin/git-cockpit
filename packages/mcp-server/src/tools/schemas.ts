@@ -100,6 +100,24 @@ export const GitMergeRehearseSchema = z.object({
 });
 export type GitMergeRehearseArgs = z.infer<typeof GitMergeRehearseSchema>;
 
+export const GitMergeSurveySchema = z.object({
+  ...readonlyBase,
+  intos: z.array(z.string().min(1)).min(1).describe('合入目标（线上 / ours）列表'),
+  froms: z.array(z.string().min(1)).min(1).describe('我的分支（theirs）列表'),
+  fetch: z.boolean().optional().describe('是否先非交互 fetch。缺省 true；整批只 fetch 一次'),
+  remote: z.string().optional().describe('fetch 使用的远程名，缺省 origin')
+});
+export type GitMergeSurveyArgs = z.infer<typeof GitMergeSurveySchema>;
+
+export const GitMergeOrderSchema = z.object({
+  ...readonlyBase,
+  into: z.string().min(1).describe('合入目标（线上 / ours）'),
+  branches: z.array(z.string().min(1)).min(2).describe('待依次合入的来源分支（至少 2 个）'),
+  fetch: z.boolean().optional().describe('是否先非交互 fetch。缺省 true'),
+  remote: z.string().optional().describe('fetch 使用的远程名，缺省 origin')
+});
+export type GitMergeOrderArgs = z.infer<typeof GitMergeOrderSchema>;
+
 /** 写操作公共参数 */
 const writeBase = { repoPath, dryRun };
 const pathsField = z.array(z.string()).default([]).describe('文件路径列表；缺省为空即全部文件');

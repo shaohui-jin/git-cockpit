@@ -1,23 +1,24 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ElMessage } from 'element-plus';
 import { useReposStore } from '@/stores/repos';
 import { useSettingsStore } from '@/stores/settings';
 import { useBranchesStore } from '@/stores/branches';
+import { useMergeSessionStore } from '@/stores/mergeSession';
 import { subscribeEvents } from '@/api/client';
 import { useRevision } from '@/composables/revision';
 
 const repos = useReposStore();
 const settings = useSettingsStore();
 const branches = useBranchesStore();
+const mergeSession = useMergeSessionStore();
 const route = useRoute();
 const router = useRouter();
 const { bump, revision } = useRevision();
 
 const menu = [
   { path: '/status', label: '状态', icon: '◧' },
-  { path: '/merge', label: '合并预演', icon: '⇄' },
+  { path: '/merge', label: '合并', icon: '⇄' },
   { path: '/history', label: '历史', icon: '◫' },
   { path: '/repos', label: '仓库管理', icon: '▤' },
   { path: '/logs', label: '操作日志', icon: '≡' },
@@ -30,7 +31,10 @@ const currentLabel = computed(() => {
   return r?.path ?? '未选择仓库';
 });
 
-const isActive = (p: string): boolean => (p === '/status' ? route.path === '/status' : route.path.startsWith(p));
+function goMenu(p: string): void {
+  if (p === route.path) return;
+  void router.push(p);
+}
 
 let unsubscribe: (() => void) | null = null;
 
@@ -39,7 +43,10 @@ onMounted(async () => {
   await repos.load();
   await Promise.all([settings.load(repos.currentId).catch(() => undefined), branches.load()]);
   unsubscribe = subscribeEvents({
-    onRepoChanged: () => bump(),
+    onRepoChanged: (payload) => {
+      bump();
+      mergeSession.onRepoChanged(payload.repoPath);
+    },
     onLog: () => bump(),
     onError: () => {
       // SSE 断开会由浏览器自动重连；这里仅静默
@@ -75,7 +82,7 @@ onUnmounted(() => {
       </div>
 
       <el-menu :default-active="route.path" class="nav-menu">
-        <el-menu-item v-for="m in menu" :key="m.path" :index="m.path" @click="router.push(m.path)">
+        <el-menu-item v-for="m in menu" :key="m.path" :index="m.path" @click="goMenu(m.path)">
           <span class="menu-icon">{{ m.icon }}</span>
           <span>{{ m.label }}</span>
         </el-menu-item>

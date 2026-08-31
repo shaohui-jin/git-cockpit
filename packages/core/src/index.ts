@@ -42,3 +42,4 @@ export {
   upsertMrHost
 } from './mr.ts';
 export { maskToken, validateMrToken, validateGithubTokenFormat, validateGitlabTokenFormat } from './mrToken.ts';
+export { crossPairs, clearMergeSurveyCache, MAX_SURVEY_PAIRS, parseTempBranches } from './survey.ts';

@@ -17,6 +17,8 @@ export const TOOL_RISK_LEVELS: Record<string, RiskLevel> = {
   git_stash_show: 'readonly',
   git_merge_preview: 'readonly',
   git_merge_rehearse: 'readonly',
+  git_merge_survey: 'readonly',
+  git_merge_order: 'readonly',
   git_mr_prepare: 'readonly',
   // 写操作工具（默认开放，需预览/确认）
   git_add: 'write',
