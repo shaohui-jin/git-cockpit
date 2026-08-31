@@ -9,6 +9,7 @@ import type {
   GraphData,
   HealthInfo,
   LogEntry,
+  MrSettings,
   OpenedRepo,
   PermissionsPayload,
   RemoteInfo,
@@ -178,15 +179,33 @@ export function listLogs(opts: { limit?: number; tool?: string } = {}): Promise<
   return request('GET', `/api/logs${qs ? `?${qs}` : ''}`);
 }
 
-export function getSettings(): Promise<SettingsData> {
-  return request('GET', '/api/settings');
+export function getSettings(repoId?: number | null, opts?: { validateToken?: boolean }): Promise<SettingsData> {
+  const q = new URLSearchParams();
+  if (repoId != null) q.set('repoId', String(repoId));
+  if (opts?.validateToken) q.set('validateToken', '1');
+  const qs = q.toString();
+  return request('GET', `/api/settings${qs ? `?${qs}` : ''}`);
 }
 
-export function updateSettings(body: {
-  permissions?: Partial<PermissionsPayload>;
-  mr?: { githubToken?: string };
-}): Promise<{ ok: boolean; mr?: { githubTokenSet: boolean } }> {
-  return request('PUT', '/api/settings', body);
+export function updateSettings(
+  body: {
+    permissions?: Partial<PermissionsPayload>;
+    mr?: {
+      method?: MrSettings['method'];
+      defaultRemote?: string;
+      upsertHost?: {
+        host: string;
+        platform?: 'github' | 'gitlab';
+        token?: string;
+        apiBaseUrl?: string;
+      };
+      deleteHost?: string;
+    };
+  },
+  repoId?: number | null
+): Promise<{ ok: boolean; mr?: MrSettings }> {
+  const q = repoId != null ? `?repoId=${repoId}` : '';
+  return request('PUT', `/api/settings${q}`, body);
 }
 
 export function getHealth(): Promise<HealthInfo> {

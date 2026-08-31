@@ -575,7 +575,7 @@ onMounted(() => {
     </el-dialog>
 
     <!-- stash：选择文件 + 静默选项 -->
-    <el-dialog v-model="stashVisible" title="暂存改动 Stash" width="560px">
+    <el-dialog v-model="stashVisible" title="暂存改动 Stash" width="660px">
       <el-alert
         class="stash-tip"
         title="可勾选左侧更改列表的文件随本次 stash 一起保存；不勾选则保存全部更改。"
@@ -583,7 +583,7 @@ onMounted(() => {
         :closable="false"
         show-icon
       />
-      <el-form label-width="90px">
+      <el-form label-width="100px">
         <el-form-item label="说明（可选）">
           <el-input v-model="stashMessage" placeholder="留空则使用默认说明（WIP on 分支: 提交）" />
         </el-form-item>

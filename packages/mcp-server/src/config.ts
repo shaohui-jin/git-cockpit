@@ -4,8 +4,8 @@
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { DEFAULT_CONFIG, expandHome } from '@shaohui_jin/git-cockpit-core';
-import type { GitCockpitConfig } from '@shaohui_jin/git-cockpit-core';
+import { DEFAULT_CONFIG, expandHome, normalizeMrConfig } from '@shaohui_jin/git-cockpit-core';
+import type { GitCockpitConfig, MrConfigRaw } from '@shaohui_jin/git-cockpit-core';
 
 export type DeepPartial<T> = {
   [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
@@ -64,6 +64,7 @@ export class ConfigStore {
     }
     let merged = deepMerge(structuredClone(DEFAULT_CONFIG), fileConfig);
     if (overrides) merged = deepMerge(merged, overrides);
+    merged.mr = normalizeMrConfig(merged.mr as MrConfigRaw);
     return merged;
   }
 
@@ -74,6 +75,7 @@ export class ConfigStore {
   /** 合并并持久化；返回新配置 */
   update(patch: DeepPartial<GitCockpitConfig>): GitCockpitConfig {
     this.config = deepMerge(this.config, patch);
+    this.config = { ...this.config, mr: normalizeMrConfig(this.config.mr as MrConfigRaw) };
     this.save();
     return this.config;
   }
@@ -93,7 +95,7 @@ export class ConfigStore {
         const out: Record<string, unknown> = {};
         for (const [k, val] of Object.entries(v)) {
           const lower = k.toLowerCase();
-          if (/password|token|secret|authorization|url/i.test(lower)) out[k] = '[REDACTED]';
+          if (/password|token|secret|authorization/i.test(lower)) out[k] = '[REDACTED]';
           else out[k] = redact(val);
         }
         return out;

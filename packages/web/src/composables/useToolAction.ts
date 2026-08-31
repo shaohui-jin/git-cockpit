@@ -89,11 +89,21 @@ export function useToolAction(repoId: () => number | null) {
           '需要审批',
           { confirmButtonText: '去开启', cancelButtonText: '取消', type: 'warning' }
         )
-          .then(() => router.push('/settings'))
+          .then(() => router.push({ path: '/settings', query: { tab: 'git' } }))
           .catch(() => undefined);
       } else {
         ElMessage.error(exec.error?.message ?? '操作被拒绝');
       }
+      return;
+    }
+    if (exec.error?.code === 'NO_TOKEN') {
+      ElMessageBox.confirm(
+        exec.error.message || '当前域名尚未配置 Token。',
+        '未配置 Token',
+        { confirmButtonText: '去 MR 配置', cancelButtonText: '取消', type: 'warning' }
+      )
+        .then(() => router.push({ path: '/settings' }))
+        .catch(() => undefined);
       return;
     }
     ElMessage.error(exec.error?.message ?? '操作失败');

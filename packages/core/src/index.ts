@@ -10,6 +10,35 @@ export {
   defaultTempBranchName,
   isSameBranchForMr,
   buildCreateMrUrl,
+  pickRemoteName,
   toHttpsRemoteUrl
 } from './merge.ts';
-export { createGithubPullRequest, githubPullsApiUrl, isGithubRemote, parseGithubRepo } from './mr.ts';
+export {
+  createGithubPullRequest,
+  createGitlabMergeRequest,
+  createPullOrMergeRequest,
+  detectMrPlatform,
+  enrichPrepareMr,
+  githubPullsApiUrl,
+  gitlabApiRoot,
+  GH_INSTALL_URL,
+  GLAB_INSTALL_URL,
+  isGithubRemote,
+  isGitlabRemote,
+  parseGithubRepo,
+  parseGitlabProject,
+  probeAllMrCli,
+  probeMrCli,
+  readCliAuthToken,
+  resolveCliBin,
+  findMrHost,
+  hostnameOf,
+  normalizeHostName,
+  normalizeMrConfig,
+  normalizeRepoMethodKey,
+  methodForRepo,
+  resolveMrPlatform,
+  tokenForRemote,
+  upsertMrHost
+} from './mr.ts';
+export { maskToken, validateMrToken, validateGithubTokenFormat, validateGitlabTokenFormat } from './mrToken.ts';

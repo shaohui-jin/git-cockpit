@@ -37,9 +37,10 @@ import {
   parseClassicMergeTree,
   parseGitVersion,
   parseModernMergeTree,
+  pickRemoteName,
   type GitVersion
 } from './merge.ts';
-import { isGithubRemote } from './mr.ts';
+import { detectMrPlatform } from './mr.ts';
 
 export interface GitServiceOptions {
   maxConcurrentProcesses?: number;
@@ -1396,8 +1397,7 @@ export class GitService extends EventEmitter {
       );
     }
 
-    const remote =
-      options.remote?.trim() || (remotes.includes('origin') ? 'origin' : (remotes[0] ?? 'origin'));
+    const remote = pickRemoteName(into, remotes, options.remote);
     const remoteUrl = urlOfRemote(remoteList, remote);
 
     const targetBranch = branchNameForMr(into, remoteNames);
@@ -1415,11 +1415,7 @@ export class GitService extends EventEmitter {
       }
     }
 
-    const platform: PrepareMrResult['platform'] = !remoteUrl
-      ? 'unknown'
-      : isGithubRemote(remoteUrl)
-        ? 'github'
-        : 'other';
+    const platform = detectMrPlatform(remoteUrl || '');
 
     return {
       platform,
@@ -1428,7 +1424,10 @@ export class GitService extends EventEmitter {
       sourceBranch,
       targetBranch,
       title: `Merge ${sourceBranch} into ${targetBranch}`,
-      createMrUrl: remoteUrl ? buildCreateMrUrl(remoteUrl, sourceBranch, targetBranch) : null
+      createMrUrl: remoteUrl ? buildCreateMrUrl(remoteUrl, sourceBranch, targetBranch) : null,
+      cli: null,
+      candidates: [],
+      messages: []
     };
   }
 

@@ -73,8 +73,8 @@ const defaultExpandedKeys = computed<string[]>(() => {
     const keys: string[] = [];
     let prefix = '';
     // 最后一段是仓库名（叶子），只取目录段做展开 key
-    for (let i = 0; i < parts.length - 1; i++) {
-      prefix = prefix ? `${prefix}/${parts[i]}` : parts[i];
+    for (const part of parts.slice(0, -1)) {
+      prefix = prefix ? `${prefix}/${part}` : part;
       keys.push('dir:' + prefix);
     }
     if (keys.length > 0) return keys;

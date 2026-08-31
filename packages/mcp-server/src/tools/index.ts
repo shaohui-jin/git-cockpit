@@ -3,9 +3,8 @@
  * handler 直接调用 core GitService 的方法；统一安全链路由 executeTool 承担。
  */
 import {
-  createGithubPullRequest,
-  GitOperationError,
-  githubPullsApiUrl,
+  enrichPrepareMr,
+  createPullOrMergeRequest,
   type GitService
 } from '@shaohui_jin/git-cockpit-core';
 import * as S from './schemas.ts';
@@ -133,16 +132,19 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     name: 'git_mr_prepare',
     description:
-      '只读：解析开 PR 的源/目标分支与浏览器创建页 URL。优先已有临时分支 merge/<from>-into-<into>。不调用 Token。into/from 含义同 git_merge_preview。',
+      '只读：解析开 PR/MR 的源/目标、浏览器创建页、本机 gh/glab 是否可用（找不到会带官方安装地址）、可选审核人列表。Token 不进参数。into/from 同 git_merge_preview。',
     risk: 'readonly',
     schema: S.GitMrPrepareSchema,
-    handler: async (args: Args, ctx) =>
-      ctx.git.prepareMr({
+    handler: async (args: Args, ctx) => {
+      const mr = ctx.runtime.config.mr;
+      const prep = await ctx.git.prepareMr({
         into: args.into as string,
         from: args.from as string,
-        remote: args.remote as string | undefined,
+        remote: (args.remote as string | undefined)?.trim() || undefined,
         sourceBranch: args.sourceBranch as string | undefined
-      })
+      });
+      return enrichPrepareMr({ prep, mr, cwd: ctx.git.repoPath });
+    }
   },
 
   // ---------------------------------------------------------------------------
@@ -322,66 +324,26 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     name: 'git_mr_create',
     description:
-      '用设置里的 GitHub Token 创建 PR（REST）。非 GitHub 远程不调 API，只返回浏览器创建页。Token 不进本工具参数。dry_run 可预览。',
+      '按设置 MR 配置开 PR/MR：Token REST、本机 gh/glab，或浏览器创建页。Token 不进本工具参数。找不到 CLI 时结果里带官方安装地址。dry_run 可预览。',
     risk: 'write',
     schema: S.GitMrCreateSchema,
     handler: async (args: Args, ctx) => {
+      const mr = ctx.runtime.config.mr;
       const prep = await ctx.git.prepareMr({
         into: args.into as string,
         from: args.from as string,
-        remote: args.remote as string | undefined,
+        remote: (args.remote as string | undefined)?.trim() || undefined,
         sourceBranch: args.sourceBranch as string | undefined
       });
-      const title = ((args.title as string | undefined) ?? '').trim() || prep.title;
-      const body = (args.body as string | undefined) ?? '';
-      const apiUrl = githubPullsApiUrl(prep.remoteUrl);
-      const token = ctx.runtime.config.mr?.githubToken ?? '';
-
-      if (prep.platform === 'github' && !token.trim()) {
-        throw new GitOperationError('未配置 GitHub Token（设置 → MR 配置）', 'NO_TOKEN');
-      }
-
-      if (args.dryRun) {
-        return {
-          dryRun: true,
-          command: apiUrl ? `POST ${apiUrl}` : `open ${prep.createMrUrl ?? ''}`,
-          args: [prep.sourceBranch, prep.targetBranch],
-          risk: 'medium' as const,
-          note:
-            prep.platform === 'github'
-              ? `将用设置中的 GitHub Token 创建 PR：${prep.sourceBranch} → ${prep.targetBranch}。标题：${title}`
-              : '远程不是 GitHub（或无法识别）。不会调用 Token API。确认后仅返回浏览器创建页 URL。'
-        };
-      }
-
-      if (prep.platform !== 'github' || !apiUrl) {
-        return {
-          via: 'browser',
-          url: prep.createMrUrl,
-          sourceBranch: prep.sourceBranch,
-          targetBranch: prep.targetBranch,
-          title,
-          messages: ['远程不是 GitHub，未调用 Token。请用浏览器打开创建页。']
-        };
-      }
-
-      const pr = await createGithubPullRequest({
-        remoteUrl: prep.remoteUrl,
-        token,
-        sourceBranch: prep.sourceBranch,
-        targetBranch: prep.targetBranch,
-        title,
-        body
+      return createPullOrMergeRequest({
+        prep,
+        mr,
+        cwd: ctx.git.repoPath,
+        title: args.title as string | undefined,
+        body: args.body as string | undefined,
+        reviewers: args.reviewers as string[] | undefined,
+        dryRun: args.dryRun as boolean | undefined
       });
-      return {
-        via: 'token',
-        url: pr.url,
-        number: pr.number,
-        sourceBranch: prep.sourceBranch,
-        targetBranch: prep.targetBranch,
-        title,
-        messages: [`已创建 PR #${pr.number}`]
-      };
     }
   },
 

@@ -173,10 +173,59 @@ export interface PermissionsPayload {
   dryRunDefault: boolean;
 }
 
+export type MrMethod = 'cli' | 'token' | 'browser';
+
+export interface MrTokenStatus {
+  ok: boolean;
+  statusLabel: string;
+  titleStatus: string;
+  login?: string;
+  expiresMessage?: string;
+  error?: string;
+}
+
+export interface MrCliStatus {
+  name: 'gh' | 'glab';
+  found: boolean;
+  loggedIn: boolean;
+  error?: string;
+  installUrl: string;
+  tokenStatus?: MrTokenStatus | null;
+}
+
+export interface MrHostPublic {
+  host: string;
+  platform: 'github' | 'gitlab';
+  tokenSet: boolean;
+  tokenPreview: string;
+  apiBaseUrl: string;
+}
+
+export interface MrCurrentHost {
+  host: string | null;
+  origin: string | null;
+  platform: 'github' | 'gitlab' | 'unknown';
+  remote: string;
+  remoteUrl: string;
+  tokenSet: boolean;
+  tokenPreview: string;
+  tokenStatus: MrTokenStatus | null;
+  apiBaseUrl: string;
+}
+
+export interface MrSettings {
+  method: MrMethod;
+  defaultRemote: string;
+  remotes: RemoteInfo[];
+  current: MrCurrentHost | null;
+  hosts: MrHostPublic[];
+  cli: { gh: MrCliStatus; glab: MrCliStatus };
+}
+
 export interface SettingsData {
   permissions: PermissionsPayload;
   tools: ToolSummary[];
-  mr: { githubTokenSet: boolean };
+  mr: MrSettings;
 }
 
 export interface HealthInfo {
@@ -225,11 +274,27 @@ export interface ApplyResolveResult {
 }
 
 export interface CreateMrResult {
-  via: 'token' | 'browser';
+  via: 'token' | 'gh' | 'glab' | 'browser';
   url: string | null;
   number?: number;
   sourceBranch: string;
   targetBranch: string;
   title: string;
+  messages: string[];
+  cliInstallUrl?: string | null;
+}
+
+export interface PrepareMrResult {
+  platform: 'github' | 'gitlab' | 'unknown';
+  remote: string;
+  remoteUrl: string;
+  sourceBranch: string;
+  targetBranch: string;
+  title: string;
+  createMrUrl: string | null;
+  cli: 'gh' | 'glab' | null;
+  cliError?: string;
+  cliInstallUrl?: string | null;
+  candidates: Array<{ username: string; name?: string; role?: string }>;
   messages: string[];
 }

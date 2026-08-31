@@ -160,6 +160,15 @@ describe('prepareMr', () => {
     expect(prep.createMrUrl).toContain('feature%2Fx');
   });
 
+  it('GitLab remote 时 platform 为 gitlab', async () => {
+    const { dir, git } = await createSampleRepo();
+    await git.addRemote('origin', 'https://gitlab.com/acme/app.git');
+    const svc = await GitService.open(dir);
+    const prep = await svc.prepareMr({ into: 'main', from: 'feature/x' });
+    expect(prep.platform).toBe('gitlab');
+    expect(prep.createMrUrl).toContain('merge_requests/new');
+  });
+
   it('已有临时分支时优先用它做 source', async () => {
     const { dir } = await createSampleRepo();
     const svc = await GitService.open(dir);

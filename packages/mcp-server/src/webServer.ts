@@ -16,9 +16,23 @@ import {
   GitOperationError,
   GitService,
   PermissionManager,
-  RepoNotFoundError
+  detectMrPlatform,
+  findMrHost,
+  hostnameOf,
+  methodForRepo,
+  normalizeHostName,
+  normalizeMrConfig,
+  normalizeRepoMethodKey,
+  pickRemoteName,
+  probeAllMrCli,
+  readCliAuthToken,
+  RepoNotFoundError,
+  toHttpsRemoteUrl,
+  upsertMrHost,
+  maskToken,
+  validateMrToken
 } from '@shaohui_jin/git-cockpit-core';
-import type { OpenedRepo } from '@shaohui_jin/git-cockpit-core';
+import type { MrCliStatus, MrTokenStatus, OpenedRepo } from '@shaohui_jin/git-cockpit-core';
 import { disposeRuntime } from './runtime.ts';
 import type { Runtime } from './runtime.ts';
 import { McpHttpHandler } from './mcpServer.ts';
@@ -283,46 +297,115 @@ export async function createWebServer(
   // ---------------------------------------------------------------------------
   // 配置 / 权限
   // ---------------------------------------------------------------------------
-  app.get('/api/settings', async () => ({
-    config: runtime.configStore.snapshot(),
-    permissions: {
-      disabledTools: runtime.config.permissions.disabledTools,
-      requireApprovalFor: runtime.config.permissions.requireApprovalFor,
-      dryRunDefault: runtime.config.permissions.dryRunDefault
-    },
-    mr: {
-      githubTokenSet: Boolean(runtime.config.mr?.githubToken?.trim())
-    },
-    tools: toolSummaries().map((t) => ({
-      name: t.name,
-      description: t.description,
-      riskLevel: runtime.permissions.getRiskLevel(t.name),
-      enabled: runtime.permissions.isEnabled(t.name)
-    }))
-  }));
+  app.get<{ Querystring: { repoId?: string; validateToken?: string } }>('/api/settings', async (req) => {
+    const repoId = req.query.repoId ? Number(req.query.repoId) : undefined;
+    return {
+      config: runtime.configStore.snapshot(),
+      permissions: {
+        disabledTools: runtime.config.permissions.disabledTools,
+        requireApprovalFor: runtime.config.permissions.requireApprovalFor,
+        dryRunDefault: runtime.config.permissions.dryRunDefault
+      },
+      mr: await mrClientView(runtime, Number.isInteger(repoId) ? repoId : undefined, {
+        validateToken: req.query.validateToken === '1' || req.query.validateToken === 'true'
+      }),
+      tools: toolSummaries().map((t) => ({
+        name: t.name,
+        description: t.description,
+        riskLevel: runtime.permissions.getRiskLevel(t.name),
+        enabled: runtime.permissions.isEnabled(t.name)
+      }))
+    };
+  });
 
   app.put<{
+    Querystring: { repoId?: string };
     Body: {
       permissions?: { disabledTools?: string[]; requireApprovalFor?: string[]; dryRunDefault?: boolean };
-      mr?: { githubToken?: string };
+      mr?: {
+        method?: 'cli' | 'token' | 'browser' | 'auto';
+        defaultRemote?: string;
+        upsertHost?: {
+          host: string;
+          platform?: 'github' | 'gitlab';
+          token?: string;
+          apiBaseUrl?: string;
+          clearToken?: boolean;
+        };
+        deleteHost?: string;
+      };
     };
   }>('/api/settings', async (req, reply) => {
     const patch = req.body ?? {};
     if (patch.permissions === undefined && patch.mr === undefined) {
       return reply.code(400).send({ error: '仅支持更新 permissions 或 mr 段' });
     }
+    let pendingTokenStatus: MrTokenStatus | undefined;
+    const repoIdForMr =
+      req.query.repoId && Number.isInteger(Number(req.query.repoId)) ? Number(req.query.repoId) : undefined;
     if (patch.permissions !== undefined) {
       runtime.configStore.update({ permissions: patch.permissions });
     }
-    if (patch.mr !== undefined && typeof patch.mr.githubToken === 'string') {
-      runtime.configStore.update({ mr: { githubToken: patch.mr.githubToken } });
+    if (patch.mr !== undefined) {
+      const next = normalizeMrConfig(runtime.config.mr);
+      if (
+        patch.mr.method === 'cli' ||
+        patch.mr.method === 'token' ||
+        patch.mr.method === 'browser'
+      ) {
+        next.method = patch.mr.method;
+        const handle =
+          repoIdForMr != null
+            ? await runtime.repoManager.getById(repoIdForMr)
+            : await runtime.repoManager.getCurrent();
+        if (handle) {
+          next.repoMethods = {
+            ...next.repoMethods,
+            [normalizeRepoMethodKey(handle.service.repoPath)]: patch.mr.method
+          };
+        }
+      } else if (patch.mr.method === 'auto') {
+        next.method = 'browser';
+      }
+      if (typeof patch.mr.defaultRemote === 'string') {
+        next.defaultRemote = patch.mr.defaultRemote.trim() || 'origin';
+      }
+      if (patch.mr.upsertHost?.host) {
+        const token = patch.mr.upsertHost.token?.trim();
+        const plat = patch.mr.upsertHost.platform;
+        if (token) {
+          if (plat !== 'github' && plat !== 'gitlab') {
+            return reply.code(400).send({ error: '请先选择 GitHub 或 GitLab' });
+          }
+          const ctx = await repoRemoteContext(runtime, repoIdForMr);
+          const status = await validateMrToken({
+            platform: plat,
+            token,
+            remoteUrl: remoteUrlForValidation(patch.mr.upsertHost.host, ctx),
+            apiBaseUrl: patch.mr.upsertHost.apiBaseUrl
+          });
+          if (!status.ok) {
+            return reply.code(400).send({ error: status.titleStatus, tokenStatus: status });
+          }
+          pendingTokenStatus = status;
+        }
+        next.hosts = upsertMrHost(next.hosts, patch.mr.upsertHost);
+      }
+      if (typeof patch.mr.deleteHost === 'string' && patch.mr.deleteHost.trim()) {
+        const del = normalizeHostName(patch.mr.deleteHost);
+        next.hosts = next.hosts.filter((h) => h.host !== del);
+      }
+      runtime.configStore.update({ mr: next });
     }
     runtime.config = runtime.configStore.get();
     runtime.permissions = new PermissionManager(runtime.config);
     return {
       ok: true,
       config: runtime.configStore.snapshot(),
-      mr: { githubTokenSet: Boolean(runtime.config.mr?.githubToken?.trim()) }
+      mr: await mrClientView(runtime, repoIdForMr, {
+        tokenStatus: pendingTokenStatus,
+        tokenStatusHost: patch.mr?.upsertHost?.host
+      })
     };
   });
 
@@ -408,4 +491,190 @@ function toError(err: unknown): { code: string; message: string; requiredApprova
   if (err instanceof RepoNotFoundError) return { code: 'REPO_NOT_FOUND', message: err.message };
   if (err instanceof Error) return { code: 'INTERNAL_ERROR', message: err.message.slice(0, 500) };
   return { code: 'INTERNAL_ERROR', message: String(err) };
+}
+
+async function withCliTokenStatus(
+  cli: { gh: MrCliStatus; glab: MrCliStatus },
+  opts: {
+    validate: boolean;
+    platform: 'github' | 'gitlab' | 'unknown';
+    remoteUrl: string;
+    apiBaseUrl: string;
+    host: string | null;
+    cwd?: string;
+  }
+): Promise<{ gh: MrCliStatus; glab: MrCliStatus }> {
+  if (!opts.validate) return cli;
+  const jobs: Promise<void>[] = [];
+  if (cli.gh.loggedIn && opts.platform !== 'gitlab') {
+    jobs.push(
+      (async () => {
+        const token = await readCliAuthToken('gh', { cwd: opts.cwd, hostname: opts.host ?? undefined });
+        if (!token) return;
+        cli.gh.tokenStatus = await validateMrToken({
+          platform: 'github',
+          token,
+          remoteUrl: opts.remoteUrl,
+          apiBaseUrl: opts.apiBaseUrl,
+          skipFormat: true
+        });
+      })()
+    );
+  }
+  if (cli.glab.loggedIn && opts.platform !== 'github') {
+    jobs.push(
+      (async () => {
+        const token = await readCliAuthToken('glab', { cwd: opts.cwd, hostname: opts.host ?? undefined });
+        if (!token) return;
+        cli.glab.tokenStatus = await validateMrToken({
+          platform: 'gitlab',
+          token,
+          remoteUrl: opts.remoteUrl,
+          apiBaseUrl: opts.apiBaseUrl,
+          skipFormat: true
+        });
+      })()
+    );
+  }
+  await Promise.all(jobs);
+  return cli;
+}
+
+function remoteUrlForValidation(
+  host: string,
+  ctx: { remoteUrl: string; host: string | null } | null
+): string {
+  const name = normalizeHostName(host);
+  if (ctx?.remoteUrl && ctx.host === name) return ctx.remoteUrl;
+  return `https://${name}/verify/token.git`;
+}
+
+async function repoRemoteContext(
+  runtime: Runtime,
+  repoId?: number
+): Promise<{ remoteUrl: string; host: string | null } | null> {
+  try {
+    const handle =
+      repoId != null && Number.isInteger(repoId)
+        ? await runtime.repoManager.getById(repoId)
+        : await runtime.repoManager.getCurrent();
+    if (!handle) return null;
+    const remotes = await handle.service.listRemotes();
+    const mr = normalizeMrConfig(runtime.config.mr);
+    const names = remotes.map((r) => r.name);
+    const preferred = names.includes(mr.defaultRemote) ? mr.defaultRemote : undefined;
+    const remote = pickRemoteName('', names, preferred);
+    const hit = remotes.find((r) => r.name === remote);
+    const remoteUrl = (hit?.pushUrl || hit?.fetchUrl || '').trim();
+    return { remoteUrl, host: remoteUrl ? hostnameOf(remoteUrl) : null };
+  } catch {
+    return null;
+  }
+}
+
+async function mrClientView(
+  runtime: Runtime,
+  repoId?: number,
+  opts?: { validateToken?: boolean; tokenStatus?: MrTokenStatus; tokenStatusHost?: string }
+) {
+  const mr = normalizeMrConfig(runtime.config.mr);
+  let remotes: Array<{ name: string; fetchUrl: string | null; pushUrl: string | null }> = [];
+  let repoPath: string | undefined;
+  let current: {
+    host: string | null;
+    origin: string | null;
+    platform: 'github' | 'gitlab' | 'unknown';
+    remote: string;
+    remoteUrl: string;
+    tokenSet: boolean;
+    tokenPreview: string;
+    tokenStatus: MrTokenStatus | null;
+    apiBaseUrl: string;
+  } | null = null;
+  try {
+    const handle =
+      repoId != null && Number.isInteger(repoId)
+        ? await runtime.repoManager.getById(repoId)
+        : await runtime.repoManager.getCurrent();
+    if (handle) {
+      repoPath = handle.service.repoPath;
+      remotes = await handle.service.listRemotes();
+      const names = remotes.map((r) => r.name);
+      const preferred = names.includes(mr.defaultRemote) ? mr.defaultRemote : undefined;
+      const remote = pickRemoteName('', names, preferred);
+      const hit = remotes.find((r) => r.name === remote);
+      const remoteUrl = (hit?.pushUrl || hit?.fetchUrl || '').trim();
+      const host = remoteUrl ? hostnameOf(remoteUrl) : null;
+      const https = remoteUrl ? toHttpsRemoteUrl(remoteUrl) : null;
+      let origin: string | null = null;
+      if (https) {
+        try {
+          origin = new URL(https).origin;
+        } catch {
+          origin = null;
+        }
+      }
+      const detected = remoteUrl ? detectMrPlatform(remoteUrl) : 'unknown';
+      const profile = remoteUrl ? findMrHost(mr, remoteUrl) : undefined;
+      const platform = profile?.platform ?? detected;
+      const token = profile?.token?.trim() ?? '';
+      let tokenStatus: MrTokenStatus | null = null;
+      if (
+        opts?.tokenStatus &&
+        host &&
+        opts.tokenStatusHost &&
+        normalizeHostName(opts.tokenStatusHost) === host
+      ) {
+        tokenStatus = opts.tokenStatus;
+      }
+      if (!tokenStatus && opts?.validateToken && token && (platform === 'github' || platform === 'gitlab')) {
+        tokenStatus = await validateMrToken({
+          platform,
+          token,
+          remoteUrl,
+          apiBaseUrl: profile?.apiBaseUrl
+        });
+      }
+      current = {
+        host,
+        origin,
+        platform,
+        remote,
+        remoteUrl,
+        tokenSet: Boolean(token),
+        tokenPreview: token ? maskToken(token) : '',
+        tokenStatus,
+        apiBaseUrl: profile?.apiBaseUrl ?? ''
+      };
+    }
+  } catch {
+    current = null;
+  }
+  const hostsPublic = mr.hosts.map((h) => ({
+    host: h.host,
+    platform: h.platform,
+    tokenSet: Boolean(h.token.trim()),
+    tokenPreview: h.token.trim() ? maskToken(h.token) : '',
+    apiBaseUrl: h.apiBaseUrl
+  }));
+  const currentHost = current?.host ?? null;
+  const showHosts =
+    Boolean(currentHost) && current?.platform !== 'unknown'
+      ? hostsPublic.filter((h) => h.host === currentHost)
+      : [];
+  return {
+    method: methodForRepo(mr, repoPath),
+    defaultRemote: mr.defaultRemote,
+    remotes,
+    current,
+    hosts: showHosts,
+    cli: await withCliTokenStatus(await probeAllMrCli(repoPath), {
+      validate: Boolean(opts?.validateToken),
+      platform: current?.platform ?? 'unknown',
+      remoteUrl: current?.remoteUrl ?? '',
+      apiBaseUrl: current?.apiBaseUrl ?? '',
+      host: current?.host ?? null,
+      cwd: repoPath
+    })
+  };
 }

@@ -1,19 +1,19 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import * as api from '@/api/client';
 import { useReposStore } from '@/stores/repos';
 import { useBranchesStore } from '@/stores/branches';
-import { useSettingsStore } from '@/stores/settings';
 import { useToolAction } from '@/composables/useToolAction';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import BranchTreeSelect from '@/components/BranchTreeSelect.vue';
 import ConflictResolvePanel from '@/components/ConflictResolvePanel.vue';
-import type { ApplyResolveResult, BranchInfo, CreateMrResult, MergePreviewResult, ToolExecResult } from '@/api/types';
+import type { ApplyResolveResult, BranchInfo, CreateMrResult, MergePreviewResult, PrepareMrResult, ToolExecResult } from '@/api/types';
 
 const repos = useReposStore();
 const branchStore = useBranchesStore();
-const settingsStore = useSettingsStore();
+const router = useRouter();
 const repoId = (): number | null => repos.currentId;
 
 const { confirmVisible, pending, canRun, previewAndConfirm, executeConfirmed, cancel } = useToolAction(repoId);
@@ -26,6 +26,8 @@ const loadError = ref('');
 const preview = ref<MergePreviewResult | null>(null);
 const applyResult = ref<ApplyResolveResult | null>(null);
 const prResult = ref<CreateMrResult | null>(null);
+const mrPrep = ref<PrepareMrResult | null>(null);
+const mrReviewers = ref<string[]>([]);
 const lastWriteTool = ref<'git_apply_resolve' | 'git_mr_create' | null>(null);
 const resolvePanel = ref<{ buildFiles: () => Array<{ path: string; resolvedContent: string }> } | null>(null);
 const resolvePending = ref(0);
@@ -147,7 +149,8 @@ async function runCreatePr(): Promise<void> {
   const ok = await previewAndConfirm('git_mr_create', {
     into: into.value,
     from: from.value,
-    sourceBranch: applyResult.value.tempBranch
+    sourceBranch: applyResult.value.tempBranch,
+    reviewers: mrReviewers.value
   });
   if (!ok) lastWriteTool.value = null;
 }
@@ -158,16 +161,32 @@ async function onConfirmed(): Promise<void> {
   if (lastWriteTool.value === 'git_apply_resolve') {
     applyResult.value = exec.result as ApplyResolveResult;
     prResult.value = null;
+    mrPrep.value = null;
+    mrReviewers.value = [];
     ElMessage.success(applyResult.value.pushed ? '已落盘并推送临时分支' : '已落盘到本地临时分支');
+    const id = repoId();
+    if (id != null) {
+      try {
+        const prepExec = await api.runTool(id, 'git_mr_prepare', {
+          into: into.value,
+          from: from.value,
+          sourceBranch: applyResult.value.tempBranch
+        });
+        if (prepExec.success && prepExec.result && typeof prepExec.result === 'object') {
+          mrPrep.value = prepExec.result as PrepareMrResult;
+        }
+      } catch {
+        mrPrep.value = null;
+      }
+    }
   } else if (lastWriteTool.value === 'git_mr_create') {
     prResult.value = exec.result as CreateMrResult;
-    ElMessage.success(prResult.value.via === 'token' ? '已用 Token 创建 PR' : '已返回浏览器创建页');
+    const via = prResult.value.via;
+    ElMessage.success(
+      via === 'token' || via === 'gh' || via === 'glab' ? '已创建 PR/MR' : '已返回浏览器创建页'
+    );
   }
 }
-
-onMounted(() => {
-  void settingsStore.load();
-});
 
 watch(
   () => repos.currentId,
@@ -258,11 +277,42 @@ watch(
         <p v-if="applyResult.createMrUrl" class="tip">
           <a :href="applyResult.createMrUrl" target="_blank" rel="noreferrer">打开创建 MR/PR 页面</a>
         </p>
-        <p v-if="settingsStore.githubTokenSet" class="tip">
-          <el-button type="primary" size="small" @click="runCreatePr">用 Token 创建 PR</el-button>
+        <p v-if="mrPrep?.cliError && !mrPrep.cli" class="tip">{{ mrPrep.cliError }}</p>
+        <p v-if="mrPrep?.cliInstallUrl && !mrPrep.cli" class="tip">
+          官方下载：
+          <a :href="mrPrep.cliInstallUrl" target="_blank" rel="noreferrer">{{ mrPrep.cliInstallUrl }}</a>
+        </p>
+        <div class="tip">
+          <span class="field-label">审核人</span>
+          <el-select
+            v-model="mrReviewers"
+            multiple
+            filterable
+            allow-create
+            default-first-option
+            placeholder="可选，回车添加用户名"
+            style="min-width: 240px"
+          >
+            <el-option
+              v-for="c in mrPrep?.candidates ?? []"
+              :key="c.username"
+              :label="c.name ? `${c.username}（${c.name}）` : c.username"
+              :value="c.username"
+            />
+          </el-select>
+        </div>
+        <p class="tip">
+          <el-button type="primary" size="small" @click="runCreatePr">创建 PR/MR</el-button>
+          <el-button size="small" @click="router.push({ path: '/settings' })">MR 配置</el-button>
         </p>
         <p v-if="prResult?.url" class="tip">
-          <a :href="prResult.url" target="_blank" rel="noreferrer">{{ prResult.via === 'token' ? `已创建 PR${prResult.number != null ? ' #' + prResult.number : ''}` : '打开创建页' }}</a>
+          <a :href="prResult.url" target="_blank" rel="noreferrer">{{
+            prResult.via === 'browser' ? '打开创建页' : `已创建${prResult.number != null ? ' #' + prResult.number : ''}`
+          }}</a>
+        </p>
+        <p v-if="prResult?.cliInstallUrl" class="tip">
+          未检测到本机 CLI，请自行安装：
+          <a :href="prResult.cliInstallUrl" target="_blank" rel="noreferrer">{{ prResult.cliInstallUrl }}</a>
         </p>
       </el-card>
     </template>

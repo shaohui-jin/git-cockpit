@@ -24,6 +24,10 @@
   --gc-merge-conflict: color-mix(in srgb, var(--el-color-danger) 14%, transparent);
   --gc-merge-code-line: 20px;
 
+  /* 下拉键盘/鼠标激活行：暗色 overlay 上 fill-light 几乎看不出，用主色半透明拉开对比 */
+  --gc-select-active: color-mix(in srgb, var(--el-color-primary) 28%, transparent);
+  --gc-select-current: color-mix(in srgb, var(--el-color-primary) 40%, transparent);
+
   /* ---- 字号：基础统一 12px，标题档位仅保留层级 ---- */
   --el-font-size-extra-large: 14px;
   --el-font-size-large: 13px;
@@ -187,6 +191,21 @@ html.dark body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 下拉激活行：hover / 上下键 用 --gc-select-active，已选项略深（叠在 hover 上时仍保持更深） */
+.el-select-dropdown .el-tree {
+  --el-tree-node-hover-bg-color: var(--gc-select-active);
+}
+.el-select-dropdown .el-select-dropdown__item.is-hovering,
+.el-select-dropdown .el-select-dropdown__item.hover {
+  background-color: var(--gc-select-active);
+}
+.el-select-dropdown .el-tree-node.is-current > .el-tree-node__content {
+  background-color: var(--gc-select-current);
+}
+.el-select-dropdown .el-select-dropdown__item.is-selected {
+  background-color: var(--gc-select-current);
 }
 
 /* 各视图根：占满 el-main，默认内部滚动 */

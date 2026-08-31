@@ -1,7 +1,7 @@
 /**
  * 集成测试：Fastify Web API（仓库管理、状态/历史查询、通用写操作、设置、SSE）。
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { createTestRuntime, disposeTestRuntime, createSampleRepo, cleanupTmp, initRepo, commitFile } from './helpers.ts';
@@ -9,6 +9,7 @@ import { createWebServer } from '../src/webServer.ts';
 import type { Runtime } from '../src/index.ts';
 import type { WebServerHandle } from '../src/index.ts';
 import type { SimpleGit } from 'simple-git';
+import { maskToken } from '@shaohui_jin/git-cockpit-core';
 
 describe('Web API', () => {
   let runtime: Runtime;
@@ -204,32 +205,138 @@ describe('Web API', () => {
     });
   });
 
-  it('GET/PUT /api/settings 读写 GitHub Token 只暴露 githubTokenSet', async () => {
+  it('PUT /api/settings 无效 Token 不落盘', async () => {
     const before = await server.app.inject({ method: 'GET', url: '/api/settings' });
-    expect(before.statusCode).toBe(200);
-    expect(before.json().mr.githubTokenSet).toBe(false);
-    expect(before.json().config.mr.githubToken).toBe('[REDACTED]');
+    expect(before.json().mr.hosts).toEqual([]);
 
-    const put = await server.app.inject({
+    const bad = await server.app.inject({
       method: 'PUT',
       url: '/api/settings',
-      payload: { mr: { githubToken: 'ghs_secret' } }
+      payload: { mr: { upsertHost: { host: 'github.com', platform: 'github', token: 'nope' } } }
     });
-    expect(put.statusCode).toBe(200);
-    expect(put.json().mr.githubTokenSet).toBe(true);
-    expect(put.json().config.mr.githubToken).toBe('[REDACTED]');
+    expect(bad.statusCode).toBe(400);
+    expect(bad.json().error).toContain('格式错误');
+    expect(bad.json().tokenStatus.ok).toBe(false);
 
     const after = await server.app.inject({ method: 'GET', url: '/api/settings' });
-    expect(after.json().mr.githubTokenSet).toBe(true);
-    expect(JSON.stringify(after.json())).not.toContain('ghs_secret');
+    expect(after.json().mr.hosts).toEqual([]);
+  });
 
-    await server.app.inject({
-      method: 'PUT',
-      url: '/api/settings',
-      payload: { mr: { githubToken: '' } }
+  it('GET/PUT /api/settings 按域名保存 Token，明文不回显', async () => {
+    const tokenA = `glpat-${'A'.repeat(20)}`;
+    const tokenB = `glpat-${'B'.repeat(20)}`;
+    const fetchMock = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url.includes('/personal_access_tokens/self')) {
+        return new Response(JSON.stringify({ expires_at: null, active: true, revoked: false }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      if (url.includes('/user')) {
+        return new Response(JSON.stringify({ username: 'alice' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      return new Response('not found', { status: 404 });
     });
-    const cleared = await server.app.inject({ method: 'GET', url: '/api/settings' });
-    expect(cleared.json().mr.githubTokenSet).toBe(false);
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      const before = await server.app.inject({ method: 'GET', url: '/api/settings' });
+      expect(before.statusCode).toBe(200);
+      expect(before.json().mr.method).toBe('browser');
+      expect(before.json().mr.defaultRemote).toBe('origin');
+      expect(Array.isArray(before.json().mr.remotes)).toBe(true);
+      expect(before.json().mr.hosts).toEqual([]);
+      expect(before.json().mr.cli.gh.installUrl).toContain('cli.github.com');
+      expect(before.json().mr.cli.glab.installUrl).toContain('gitlab.com/gitlab-org/cli');
+      expect(before.json().config.mr.hosts).toEqual([]);
+
+      const putA = await server.app.inject({
+        method: 'PUT',
+        url: '/api/settings',
+        payload: { mr: { upsertHost: { host: 'git.a.com', platform: 'gitlab', token: tokenA } } }
+      });
+      expect(putA.statusCode).toBe(200);
+      expect(putA.json().config.mr.hosts).toEqual([
+        expect.objectContaining({ host: 'git.a.com', platform: 'gitlab', token: '[REDACTED]' })
+      ]);
+      expect(JSON.stringify(putA.json())).not.toContain(tokenA);
+
+      const putB = await server.app.inject({
+        method: 'PUT',
+        url: '/api/settings',
+        payload: { mr: { upsertHost: { host: 'git.b.com', platform: 'gitlab', token: tokenB } } }
+      });
+      expect(putB.json().config.mr.hosts).toHaveLength(2);
+      expect(JSON.stringify(putB.json())).not.toContain(tokenB);
+
+      await server.app.inject({
+        method: 'PUT',
+        url: '/api/settings',
+        payload: { mr: { upsertHost: { host: 'git.a.com', clearToken: true } } }
+      });
+      const afterClear = await server.app.inject({ method: 'GET', url: '/api/settings' });
+      const stored = afterClear.json().config.mr.hosts as Array<{ host: string; token: string }>;
+      expect(stored.find((h) => h.host === 'git.a.com')?.token).toBe('');
+      expect(stored.find((h) => h.host === 'git.b.com')?.token).toBe('[REDACTED]');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('GET/PUT /api/settings 默认远程跟当前仓 remotes，开单方式即时保存', async () => {
+    const repos = (await server.app.inject({ method: 'GET', url: '/api/repos' })).json();
+    const id = repos.repos[0].id;
+    await git.addRemote('origin', 'https://github.com/acme/app.git');
+    await git.addRemote('company', 'https://git.b.com/acme/app.git');
+
+    const get = await server.app.inject({ method: 'GET', url: `/api/settings?repoId=${id}` });
+    expect(get.statusCode).toBe(200);
+    const mr = get.json().mr;
+    expect(mr.defaultRemote).toBe('origin');
+    expect(mr.remotes.map((r: { name: string }) => r.name).sort()).toEqual(['company', 'origin']);
+    expect(mr.current.host).toBe('github.com');
+    expect(mr.current.platform).toBe('github');
+    expect(mr.current.origin).toBe('https://github.com');
+    expect(mr.current.remote).toBe('origin');
+
+    const putRemote = await server.app.inject({
+      method: 'PUT',
+      url: `/api/settings?repoId=${id}`,
+      payload: { mr: { defaultRemote: 'company' } }
+    });
+    expect(putRemote.statusCode).toBe(200);
+    expect(putRemote.json().mr.defaultRemote).toBe('company');
+    expect(putRemote.json().mr.current.host).toBe('git.b.com');
+    expect(putRemote.json().mr.current.platform).toBe('gitlab');
+    expect(putRemote.json().mr.current.origin).toBe('https://git.b.com');
+
+    const putMethod = await server.app.inject({
+      method: 'PUT',
+      url: `/api/settings?repoId=${id}`,
+      payload: { mr: { method: 'cli' } }
+    });
+    expect(putMethod.json().mr.method).toBe('cli');
+    expect(putMethod.json().mr.defaultRemote).toBe('company');
+    expect(putMethod.json().mr.hosts).toEqual([
+      expect.objectContaining({ host: 'git.b.com', platform: 'gitlab', tokenSet: true })
+    ]);
+
+    const sampleB = await createSampleRepo();
+    const openB = await server.app.inject({
+      method: 'POST',
+      url: '/api/repos/open',
+      payload: { path: sampleB.dir }
+    });
+    expect(openB.statusCode).toBe(200);
+    const idB = openB.json().repo.id as number;
+    const getB = await server.app.inject({ method: 'GET', url: `/api/settings?repoId=${idB}` });
+    expect(getB.json().mr.method).toBe('browser');
+    const getA = await server.app.inject({ method: 'GET', url: `/api/settings?repoId=${id}` });
+    expect(getA.json().mr.method).toBe('cli');
   });
 
   it('GET /api/logs 返回操作日志', async () => {

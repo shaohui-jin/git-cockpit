@@ -238,7 +238,8 @@ export const GitMrCreateSchema = z.object({
   ...writeBase,
   ...mrIntoFrom,
   title: z.string().optional().describe('PR 标题；缺省 Merge <source> into <target>'),
-  body: z.string().optional().describe('PR 正文')
+  body: z.string().optional().describe('PR 正文'),
+  reviewers: z.array(z.string()).optional().describe('审核人/指派人用户名；GitLab 会解析成数字 id。Token 不在此传入')
 });
 export type GitMrCreateArgs = z.infer<typeof GitMrCreateSchema>;
 

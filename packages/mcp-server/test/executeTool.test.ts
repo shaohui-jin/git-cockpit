@@ -196,8 +196,8 @@ describe('git_mr_prepare / git_mr_create', () => {
     }
   });
 
-  it('GitHub 远程未配 Token 时 create 失败', async () => {
-    const runtime = createTestRuntime();
+  it('method=token 且未配 Token 时 create 失败', async () => {
+    const runtime = createTestRuntime({ mr: { method: 'token' } });
     try {
       const sample = await createSampleRepo();
       await sample.git.addRemote('origin', 'https://github.com/acme/app.git');
@@ -215,8 +215,30 @@ describe('git_mr_prepare / git_mr_create', () => {
     }
   });
 
+  it('auto 且未配 Token 时 dry-run 仍成功（回退浏览器或 CLI）', async () => {
+    const runtime = createTestRuntime();
+    try {
+      const sample = await createSampleRepo();
+      await sample.git.addRemote('origin', 'https://github.com/acme/app.git');
+      await runtime.repoManager.open(sample.dir);
+      const def = TOOL_DEF_MAP.get('git_mr_create')!;
+      const exec = await executeTool(
+        def,
+        { into: 'main', from: 'feature/x', dryRun: true },
+        { runtime, source: 'mcp' }
+      );
+      expect(exec.success).toBe(true);
+    } finally {
+      disposeTestRuntime(runtime);
+    }
+  });
+
   it('GitHub Token 创建 PR（mock fetch）', async () => {
-    const runtime = createTestRuntime({ mr: { githubToken: 'ghs_test' } });
+    const runtime = createTestRuntime({
+      mr: {
+        hosts: [{ host: 'github.com', platform: 'github', token: 'ghs_test', apiBaseUrl: '' }]
+      }
+    });
     const origFetch = globalThis.fetch;
     globalThis.fetch = (async (input, init) => {
       expect(String(input)).toBe('https://api.github.com/repos/acme/app/pulls');
@@ -237,6 +259,39 @@ describe('git_mr_prepare / git_mr_create', () => {
       );
       expect(exec.success).toBe(true);
       expect(exec.result).toMatchObject({ via: 'token', number: 3 });
+    } finally {
+      globalThis.fetch = origFetch;
+      disposeTestRuntime(runtime);
+    }
+  });
+
+  it('GitLab Token 创建 MR（mock fetch）', async () => {
+    const runtime = createTestRuntime({
+      mr: {
+        hosts: [{ host: 'gitlab.com', platform: 'gitlab', token: 'glpat_test', apiBaseUrl: '' }]
+      }
+    });
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = (async (input, init) => {
+      expect(String(input)).toBe('https://gitlab.com/api/v4/projects/acme%2Fapp/merge_requests');
+      expect(init?.method).toBe('POST');
+      return new Response(JSON.stringify({ web_url: 'https://gitlab.com/acme/app/-/merge_requests/2', iid: 2 }), {
+        status: 201
+      });
+    }) as typeof fetch;
+    try {
+      const sample = await createSampleRepo();
+      await sample.git.addRemote('origin', 'https://gitlab.com/acme/app.git');
+      await runtime.repoManager.open(sample.dir);
+      const def = TOOL_DEF_MAP.get('git_mr_create')!;
+      const exec = await executeTool(
+        def,
+        { into: 'main', from: 'feature/x', sourceBranch: 'feature/x', dryRun: false },
+        { runtime, source: 'mcp' }
+      );
+      expect(exec.success).toBe(true);
+      expect(exec.result).toMatchObject({ via: 'token' });
+      expect((exec.result as { url: string }).url).toContain('merge_requests/2');
     } finally {
       globalThis.fetch = origFetch;
       disposeTestRuntime(runtime);

@@ -36,8 +36,8 @@ let unsubscribe: (() => void) | null = null;
 
 onMounted(async () => {
   await repos.checkHealth();
-  await Promise.all([repos.load(), settings.load().catch(() => undefined)]);
-  await branches.load();
+  await repos.load();
+  await Promise.all([settings.load(repos.currentId).catch(() => undefined), branches.load()]);
   unsubscribe = subscribeEvents({
     onRepoChanged: () => bump(),
     onLog: () => bump(),
@@ -47,7 +47,13 @@ onMounted(async () => {
   });
 });
 
-watch(() => repos.currentId, () => void branches.load());
+watch(
+  () => repos.currentId,
+  () => {
+    void branches.load();
+    void settings.load(repos.currentId).catch(() => undefined);
+  }
+);
 watch(revision, () => void branches.load());
 
 onUnmounted(() => {

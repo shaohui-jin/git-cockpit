@@ -277,12 +277,66 @@ export interface LoggingConfig {
   redact: string[];
 }
 
-/** MR / PR：D-lite 只存 GitHub Token；不进工具参数 */
-export interface MrConfig {
-  githubToken: string;
+/** 开单方式：本机 gh/glab、Token、或只打开浏览器创建页。旧配置 `auto` 读盘时迁成 `browser` */
+export type MrMethod = 'cli' | 'token' | 'browser';
+
+/** 按 hostname 存的凭证：公司 A / B 的 GitLab 各一条，互不覆盖 */
+export interface MrHostProfile {
+  /** 小写 hostname，如 git.a.com、github.com */
+  host: string;
+  platform: 'github' | 'gitlab';
+  token: string;
+  /** 空则按惯例推断 API 根 */
+  apiBaseUrl: string;
 }
 
-export type MrPlatform = 'github' | 'other' | 'unknown';
+/** MR / PR：开单方式按仓库路径；Token / API 按域名。不进工具参数 */
+export interface MrConfig {
+  /** 仅作读盘兼容 / 最近一次写入；真正开单看 repoMethods */
+  method: MrMethod;
+  /** MCP 未传 remote 时的兜底远程名；UI 不展示，运行时优先从 into / listRemotes 推 */
+  defaultRemote: string;
+  hosts: MrHostProfile[];
+  /** 规范化仓库绝对路径 → 开单方式；没有记录则默认 browser */
+  repoMethods: Record<string, MrMethod>;
+}
+
+/** 读盘时可能仍带旧字段（含 `method: 'auto'`），normalizeMrConfig 会迁到 hosts / browser */
+export type MrConfigRaw = Omit<Partial<MrConfig>, 'method'> & {
+  method?: string;
+  githubToken?: string;
+  gitlabToken?: string;
+  apiBaseUrl?: string;
+  platform?: '' | 'github' | 'gitlab';
+  hosts?: MrHostProfile[];
+};
+
+export type MrPlatform = 'github' | 'gitlab' | 'unknown';
+
+export interface MrCandidate {
+  username: string;
+  name?: string;
+  role?: string;
+}
+
+export interface MrTokenStatus {
+  ok: boolean;
+  statusLabel: string;
+  titleStatus: string;
+  login?: string;
+  expiresMessage?: string;
+  error?: string;
+}
+
+export interface MrCliStatus {
+  name: 'gh' | 'glab';
+  found: boolean;
+  loggedIn: boolean;
+  error?: string;
+  installUrl: string;
+  /** 已登录且做过 API 校验时有值；不含 Token 明文 */
+  tokenStatus?: MrTokenStatus | null;
+}
 
 export interface PrepareMrResult {
   platform: MrPlatform;
@@ -292,16 +346,22 @@ export interface PrepareMrResult {
   targetBranch: string;
   title: string;
   createMrUrl: string | null;
+  cli: 'gh' | 'glab' | null;
+  cliError?: string;
+  cliInstallUrl?: string | null;
+  candidates: MrCandidate[];
+  messages: string[];
 }
 
 export interface CreateMrResult {
-  via: 'token' | 'browser';
+  via: 'token' | 'gh' | 'glab' | 'browser';
   url: string | null;
   number?: number;
   sourceBranch: string;
   targetBranch: string;
   title: string;
   messages: string[];
+  cliInstallUrl?: string | null;
 }
 
 /** 全局配置（对应 config.json） */
@@ -330,7 +390,12 @@ export const DEFAULT_CONFIG: GitCockpitConfig = {
     dryRunDefault: false
   },
   logging: { level: 'info', redact: ['password', 'token', 'authorization'] },
-  mr: { githubToken: '' }
+  mr: {
+    method: 'browser',
+    defaultRemote: 'origin',
+    hosts: [],
+    repoMethods: {}
+  }
 };
 
 /** Git 操作相关错误（携带用户友好信息） */

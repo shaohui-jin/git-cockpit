@@ -88,6 +88,23 @@ export function branchNameForMr(ref: string, remotes: string[] = ['origin']): st
 }
 
 /**
+ * 选开单用的远程名：显式参数 > into 前缀（origin/master → origin）> origin > 第一个 remote。
+ */
+export function pickRemoteName(into: string, remoteNames: string[], explicit?: string): string {
+  const named = explicit?.trim();
+  if (named) return named;
+  const names = [...remoteNames].map((r) => r.trim()).filter(Boolean).sort((a, b) => b.length - a.length);
+  const ref = into.trim();
+  if (ref) {
+    for (const name of names) {
+      if (ref === name || ref.startsWith(`${name}/`)) return name;
+    }
+  }
+  if (remoteNames.includes('origin')) return 'origin';
+  return remoteNames[0] ?? 'origin';
+}
+
+/**
  * 规范化后源/目标同名（如 master 与 origin/master）。
  * 此类同步请用户自行 push/pull，不建临时分支。
  */
