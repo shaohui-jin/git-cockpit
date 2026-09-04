@@ -144,6 +144,21 @@ describe('GitService 只读操作', () => {
     expect(Array.isArray(mainHead.parents)).toBe(true);
   });
 
+  it('getBranchGraph 返回 tip DAG（分支 tip + rev-list 祖先）', async () => {
+    const graph = await svc.getBranchGraph();
+    expect(graph.tips.some((t) => t.name === 'main' && !t.remote)).toBe(true);
+    expect(graph.tips.some((t) => t.name === 'feature/x' && !t.remote)).toBe(true);
+    expect(graph.nodes.length).toBeGreaterThan(0);
+    expect(graph.tips.every((t) => /^[0-9a-f]{40}$/i.test(t.sha))).toBe(true);
+  });
+
+  it('getReflog 返回 HEAD 记录', async () => {
+    const log = await svc.getReflog(20);
+    expect(log.length).toBeGreaterThan(0);
+    expect(log[0]!.hash).toMatch(/^[0-9a-f]{40}$/i);
+    expect(log[0]!.selector).toMatch(/HEAD@/);
+  });
+
   it('getShow 返回提交元信息与 diff', async () => {
     const logs = await svc.getLog({ maxCount: 1 });
     const detail = await svc.getShow(logs[0]!.hash);

@@ -119,6 +119,76 @@ export interface GraphData {
   head: string | null;
 }
 
+export interface BranchTip {
+  name: string;
+  sha: string;
+  upstream?: string;
+  remote: boolean;
+}
+
+export interface GraphCommitNode {
+  sha: string;
+  parents: string[];
+  message: string;
+  author: string;
+  time: number;
+}
+
+export interface BranchGraph {
+  repoRoot: string;
+  nodes: GraphCommitNode[];
+  tips: BranchTip[];
+  edges: Array<[string, string]>;
+  truncated: boolean;
+  maxNodes: number;
+}
+
+export interface ReflogEntry {
+  hash: string;
+  selector: string;
+  message: string;
+  date: string;
+}
+
+export interface BackupList {
+  branches: string[];
+  stashes: string[];
+}
+
+export type JobStatus = 'running' | 'ok' | 'error';
+
+export interface CloneJobSummary {
+  id: string;
+  kind: 'clone';
+  status: JobStatus;
+  url: string;
+  destDir: string;
+  error?: string;
+  startedAt: string;
+  finishedAt?: string;
+  repoId?: number;
+  logCount: number;
+  tail: string;
+}
+
+export interface CloneJobDetail extends Omit<CloneJobSummary, 'logCount' | 'tail'> {
+  logs: string[];
+}
+
+export interface JobProgressPayload {
+  id: string;
+  kind: 'clone';
+  status: JobStatus;
+  url: string;
+  destDir: string;
+  chunk?: string;
+  error?: string;
+  startedAt: string;
+  finishedAt?: string;
+  repoId?: number;
+  logCount: number;
+}
+
 export type RiskLevel = 'readonly' | 'write' | 'dangerous';
 
 export interface ToolSummary {
@@ -226,6 +296,7 @@ export interface SettingsData {
   permissions: PermissionsPayload;
   tools: ToolSummary[];
   mr: MrSettings;
+  git?: { allowedRepos: string[] };
 }
 
 export interface HealthInfo {
@@ -242,6 +313,20 @@ export interface ConflictFile {
   oursContent?: string | null;
   theirsContent?: string | null;
   baseContent?: string | null;
+}
+
+export interface BlameCommit {
+  sha: string;
+  shortSha: string;
+  author: string;
+  summary: string;
+}
+
+export interface ConflictBlameResult {
+  path: string;
+  into: string;
+  from: string;
+  hunks: Array<{ ours: BlameCommit[]; theirs: BlameCommit[] }>;
 }
 
 export type MergeOutcome = 'clean' | 'conflicts' | 'unrelated';

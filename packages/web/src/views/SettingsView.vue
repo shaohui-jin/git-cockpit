@@ -27,11 +27,13 @@ interface GitDraft {
   disabledTools: string[];
   requireApprovalFor: string[];
   dryRunDefault: boolean;
+  allowedReposText: string;
 }
 const gitDraft = reactive<GitDraft>({
   disabledTools: [],
   requireApprovalFor: [],
-  dryRunDefault: false
+  dryRunDefault: false,
+  allowedReposText: ''
 });
 const loaded = ref(false);
 const method = ref<MrMethod>('browser');
@@ -50,7 +52,8 @@ const gitDirty = computed(() => {
   return (
     JSON.stringify([...gitDraft.disabledTools].sort()) !== JSON.stringify([...p.disabledTools].sort()) ||
     JSON.stringify([...gitDraft.requireApprovalFor].sort()) !== JSON.stringify([...p.requireApprovalFor].sort()) ||
-    gitDraft.dryRunDefault !== p.dryRunDefault
+    gitDraft.dryRunDefault !== p.dryRunDefault ||
+    parseAllowedRepos(gitDraft.allowedReposText).join('\n') !== settings.allowedRepos.join('\n')
   );
 });
 
@@ -171,12 +174,20 @@ function cliTokenStatusClass(c: { tokenStatus?: { ok: boolean } | null } | undef
   return c.tokenStatus.ok ? 'ok' : 'bad';
 }
 
+function parseAllowedRepos(text: string): string[] {
+  return text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+}
+
 function syncGitDraft(): void {
   const p = settings.permissions;
   if (!p) return;
   gitDraft.disabledTools = [...p.disabledTools];
   gitDraft.requireApprovalFor = [...p.requireApprovalFor];
   gitDraft.dryRunDefault = p.dryRunDefault;
+  gitDraft.allowedReposText = settings.allowedRepos.join('\n');
   loaded.value = true;
 }
 
@@ -251,7 +262,8 @@ async function saveGit(): Promise<void> {
           disabledTools: [...gitDraft.disabledTools],
           requireApprovalFor: [...gitDraft.requireApprovalFor],
           dryRunDefault: gitDraft.dryRunDefault
-        }
+        },
+        git: { allowedRepos: parseAllowedRepos(gitDraft.allowedReposText) }
       },
       repoId()
     );
@@ -581,6 +593,15 @@ onMounted(async () => {
             <el-form-item label="写操作默认 dry-run 预览">
               <el-switch v-model="gitDraft.dryRunDefault" />
               <span class="form-tip">开启后所有写操作（MCP/CLI）默认只生成预览，不真正执行</span>
+            </el-form-item>
+            <el-form-item label="允许打开的仓库">
+              <el-input
+                v-model="gitDraft.allowedReposText"
+                type="textarea"
+                :rows="4"
+                placeholder="一行一个本地路径。留空 = 不限制"
+              />
+              <span class="form-tip">非空时，打开的仓库根路径必须等于其中一条，或位于其目录下。MCP 带 repoPath 同样校验。</span>
             </el-form-item>
           </el-form>
         </el-card>

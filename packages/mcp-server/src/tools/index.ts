@@ -5,6 +5,7 @@
 import {
   enrichPrepareMr,
   createPullOrMergeRequest,
+  BackupManager,
   type GitService
 } from '@shaohui_jin/git-cockpit-core';
 import * as S from './schemas.ts';
@@ -93,10 +94,33 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'git_graph',
-    description: '获取分支拓扑图数据（全部分支提交、父提交、引用装饰、HEAD 位置），供可视化渲染。',
+    description:
+      '获取全部分支的提交列表（hash/parent/subject/refs/HEAD），给需要线性历史的场景。状态页 G6 分支图请用 git_branch_graph（tip DAG）。',
     risk: 'readonly',
     schema: S.GitGraphSchema,
     handler: async (args: Args, ctx) => ctx.git.getGraph(args.maxCount as number | undefined)
+  },
+  {
+    name: 'git_branch_graph',
+    description:
+      '分支 tip DAG：for-each-ref + rev-list --parents。节点是各分支 tip，边是最近祖先 tip。与 Git Insight 画布同一口径。不改工作区。',
+    risk: 'readonly',
+    schema: S.GitBranchGraphSchema,
+    handler: async (args: Args, ctx) => ctx.git.getBranchGraph(args.maxNodes as number | undefined)
+  },
+  {
+    name: 'git_reflog',
+    description: '只读列出 git reflog（HEAD 移动记录）。',
+    risk: 'readonly',
+    schema: S.GitReflogSchema,
+    handler: async (args: Args, ctx) => ctx.git.getReflog(args.maxCount as number | undefined)
+  },
+  {
+    name: 'git_backup_list',
+    description: '列出高危操作前自动创建的 backup/pre-op-* 分支，以及说明含 git-cockpit backup 的 stash。',
+    risk: 'readonly',
+    schema: S.GitStatusSchema,
+    handler: async (_args: Args, ctx) => new BackupManager(ctx.git).listBackups()
   },
   {
     name: 'git_merge_preview',
@@ -127,6 +151,21 @@ export const TOOL_DEFS: ToolDef[] = [
         remote: args.remote as string | undefined,
         path: args.path as string | undefined,
         maxFiles: args.maxFiles as number | undefined
+      })
+  },
+  {
+    name: 'git_merge_blame',
+    description:
+      '对单个冲突文件两侧 tip 跑 git blame（不改工作区）。返回红块相关区间的作者/说明/时间，供选边参考。不是自动选边。into/from 同 git_merge_preview。',
+    risk: 'readonly',
+    schema: S.GitMergeBlameSchema,
+    handler: async (args: Args, ctx) =>
+      ctx.git.blameConflictFile({
+        into: args.into as string,
+        from: args.from as string,
+        path: args.path as string,
+        fetch: args.fetch as boolean | undefined,
+        remote: args.remote as string | undefined
       })
   },
   {

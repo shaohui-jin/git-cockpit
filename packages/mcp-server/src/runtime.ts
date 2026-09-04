@@ -44,7 +44,7 @@ export function createRuntime(options: RuntimeOptions = {}): Runtime {
   const auditLogger = new AuditLogger(db, config.logging);
   const permissions = new PermissionManager(config);
   const repoStore = new RepoStore(db);
-  const repoManager = new RepoManager({ repoStore, eventBus, config });
+  const repoManager = new RepoManager({ repoStore, eventBus, getConfig: () => configStore.get() });
 
   return {
     configStore,

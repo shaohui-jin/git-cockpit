@@ -19,6 +19,10 @@ import type {
   LogOptions,
   DiffOptions,
   GraphData,
+  BranchGraph,
+  BranchTip,
+  GraphCommitNode,
+  ReflogEntry,
   GitCommandResult,
   MergePreviewResult,
   MergeRehearsalResult,
@@ -43,6 +47,7 @@ import {
   pickRemoteName,
   type GitVersion
 } from './merge.ts';
+import { parseBlamePorcelain, parseNewSideRanges, type ConflictBlameResult } from './blame.ts';
 import { detectMrPlatform } from './mr.ts';
 import { crossPairs, MAX_SURVEY_PAIRS, parseTempBranches, runSurvey } from './survey.ts';
 import { suggestOrder, type ChainRunner } from './chain.ts';
@@ -476,7 +481,7 @@ export class GitService extends EventEmitter {
     }
   }
 
-  /** 分支拓扑图数据（全部分支的提交，含父提交与引用装饰） */
+  /** 提交列表（MCP `git_graph` / 历史旁路）。状态页分支图请用 `getBranchGraph`。 */
   async getGraph(maxCount = 500): Promise<GraphData> {
     const args = ['log', '--no-color', '--date=iso-strict', '--all', '-n', String(Math.max(1, maxCount)), `--pretty=format:${GIT_LOG_FORMAT}`];
     const output = await this.safeLogOutput(args);
@@ -500,6 +505,139 @@ export class GitService extends EventEmitter {
     }
 
     return { commits, head };
+  }
+
+  /**
+   * 分支 tip DAG（对齐 Git Insight）：for-each-ref 取 tip，rev-list --parents 从 tip 往回走。
+   * 前端只画 tip 节点，中间 commit 用来算最近祖先边。simple-git 没有这套高层 API，走 raw。
+   */
+  async getBranchGraph(maxNodes = 200): Promise<BranchGraph> {
+    const cap = Math.max(1, Math.min(2000, maxNodes));
+    const tipsOut = await this.run([
+      'for-each-ref',
+      '--format=%(refname)%00%(refname:short)%00%(objectname)%00%(upstream:short)',
+      'refs/heads',
+      'refs/remotes'
+    ]);
+    const tips: BranchTip[] = [];
+    for (const line of tipsOut.split('\n')) {
+      if (!line.trim()) continue;
+      const [refname, name, sha, upstream] = line.split('\0');
+      if (!name || !sha || !refname) continue;
+      if (refname.endsWith('/HEAD')) continue;
+      tips.push({
+        name,
+        sha,
+        upstream: upstream || undefined,
+        remote: refname.startsWith('refs/remotes/')
+      });
+    }
+
+    const tipShas = [...new Set(tips.map((t) => t.sha))];
+    if (tipShas.length === 0) {
+      return { repoRoot: this.repoPath, nodes: [], tips, edges: [], truncated: false, maxNodes: cap };
+    }
+
+    const rev = await this.runAllowFail(['rev-list', '--parents', `--max-count=${cap}`, ...tipShas]);
+    if (rev.code !== 0) {
+      throw new GitOperationError((rev.stderr || rev.stdout).trim() || 'rev-list 失败', 'GIT_GRAPH_FAILED');
+    }
+
+    const parentMap = new Map<string, string[]>();
+    for (const line of rev.stdout.split('\n')) {
+      if (!line.trim()) continue;
+      const parts = line.trim().split(' ');
+      const sha = parts[0];
+      if (!sha) continue;
+      parentMap.set(sha, parts.slice(1));
+    }
+    const shas = [...parentMap.keys()];
+    const meta = await this.loadGraphCommitMeta(shas);
+
+    const nodes: GraphCommitNode[] = [];
+    const edges: Array<[string, string]> = [];
+    for (const sha of shas) {
+      const parents = parentMap.get(sha) ?? [];
+      const base = meta.get(sha);
+      nodes.push({
+        sha,
+        parents,
+        message: base?.message ?? '',
+        author: base?.author ?? '',
+        time: base?.time ?? 0
+      });
+      for (const parent of parents) edges.push([sha, parent]);
+    }
+
+    return {
+      repoRoot: this.repoPath,
+      nodes,
+      tips,
+      edges,
+      truncated: shas.length >= cap,
+      maxNodes: cap
+    };
+  }
+
+  /** git reflog（只读）。空仓库或尚无 HEAD 时返回空列表。 */
+  async getReflog(maxCount = 50): Promise<ReflogEntry[]> {
+    const n = Math.max(1, Math.min(500, maxCount));
+    const r = await this.runAllowFail([
+      'reflog',
+      '--date=iso-strict',
+      '-n',
+      String(n),
+      '--pretty=format:%H%x00%gd%x00%gs%x00%ci'
+    ]);
+    if (r.code !== 0) return [];
+    const list: ReflogEntry[] = [];
+    for (const line of r.stdout.split('\n')) {
+      if (!line.trim()) continue;
+      const [hash, selector, message, date] = line.split('\0');
+      if (!hash) continue;
+      list.push({
+        hash,
+        selector: selector ?? '',
+        message: message ?? '',
+        date: date ?? ''
+      });
+    }
+    return list;
+  }
+
+  private async loadGraphCommitMeta(shas: string[]): Promise<Map<string, GraphCommitNode>> {
+    const map = new Map<string, GraphCommitNode>();
+    const chunkSize = 200;
+    for (let i = 0; i < shas.length; i += chunkSize) {
+      const chunk = shas.slice(i, i + chunkSize);
+      if (chunk.length === 0) continue;
+      const stdout = await this.run([
+        'log',
+        '--no-walk=unsorted',
+        '--pretty=format:%H%x00%P%x00%an%x00%at%x00%s%x00',
+        ...chunk
+      ]);
+      const parts = stdout.split('\0');
+      let j = 0;
+      while (j < parts.length) {
+        const sha = (parts[j] ?? '').trim();
+        if (!sha) {
+          j += 1;
+          continue;
+        }
+        if (j + 4 >= parts.length) break;
+        const parentsRaw = parts[j + 1] ?? '';
+        map.set(sha, {
+          sha,
+          parents: parentsRaw ? parentsRaw.split(' ').filter(Boolean) : [],
+          author: (parts[j + 2] ?? '').trim(),
+          time: Number(parts[j + 3] || 0),
+          message: (parts[j + 4] ?? '').replace(/\r?\n/g, ' ').trim()
+        });
+        j += 5;
+      }
+    }
+    return map;
   }
 
   // ---------------------------------------------------------------------------
@@ -1001,6 +1139,96 @@ export class GitService extends EventEmitter {
     if (r.code !== 0) return null;
     const sha = r.stdout.trim();
     return sha || null;
+  }
+
+  /**
+   * 对单个冲突文件两侧 tip 做 blame（不改工作区）。
+   * 按 `git diff -U0 base...tip` 的新侧行号溯源；增删对不齐时该侧可能为空。
+   */
+  async blameConflictFile(options: {
+    into: string;
+    from: string;
+    path: string;
+    fetch?: boolean;
+    remote?: string;
+  }): Promise<ConflictBlameResult> {
+    const into = options.into.trim();
+    const from = options.from.trim();
+    if (!into || !from) throw new GitOperationError('into / from 不能为空', 'INVALID_REF');
+    const filePath = this.validateRepoRelativePath(options.path).replace(/\\/g, '/');
+    if (options.fetch === true) {
+      await this.fetchQuiet(options.remote?.trim() || 'origin');
+    }
+    const intoSha = await this.ensureRev(into);
+    const fromSha = await this.ensureRev(from);
+    const base = (await this.tryMergeBase(intoSha, fromSha)) || EMPTY_TREE_SHA;
+    const hunks = await this.blameSides(intoSha, fromSha, base, filePath);
+    return { path: filePath, into, from, hunks };
+  }
+
+  private async fileExistsAt(rev: string, filePath: string): Promise<boolean> {
+    const r = await this.runAllowFail(['cat-file', '-e', `${rev}:${filePath}`]);
+    return r.code === 0;
+  }
+
+  private async diffNewSideRanges(base: string, tip: string, filePath: string): Promise<Array<[number, number]>> {
+    const r = await this.runAllowFail(['diff', '-U0', `${base}...${tip}`, '--', filePath]);
+    return parseNewSideRanges(r.stdout);
+  }
+
+  private async blameRange(rev: string, filePath: string, range: [number, number]) {
+    const [start, end] = range;
+    if (start <= 0 || end < start) return [];
+    const r = await this.runAllowFail([
+      'blame',
+      '-l',
+      '-w',
+      `-L${start},${end}`,
+      '--line-porcelain',
+      rev,
+      '--',
+      filePath
+    ]);
+    if (r.code !== 0) return [];
+    return parseBlamePorcelain(r.stdout);
+  }
+
+  private async blameSides(
+    intoSha: string,
+    fromSha: string,
+    base: string,
+    filePath: string
+  ): Promise<ConflictBlameResult['hunks']> {
+    const [intoExists, fromExists] = await Promise.all([
+      this.fileExistsAt(intoSha, filePath),
+      this.fileExistsAt(fromSha, filePath)
+    ]);
+    if (!intoExists && !fromExists) return [];
+
+    const [oursRanges, theirsRanges] = await Promise.all([
+      intoExists ? this.diffNewSideRanges(base, intoSha, filePath) : Promise.resolve([] as Array<[number, number]>),
+      fromExists ? this.diffNewSideRanges(base, fromSha, filePath) : Promise.resolve([] as Array<[number, number]>)
+    ]);
+    const ours = oursRanges.length > 0 ? oursRanges : intoExists ? ([[1, 1]] as Array<[number, number]>) : [];
+    const theirs = theirsRanges.length > 0 ? theirsRanges : fromExists ? ([[1, 1]] as Array<[number, number]>) : [];
+    const max = Math.max(ours.length, theirs.length, 1);
+    const hunks: ConflictBlameResult['hunks'] = [];
+    for (let i = 0; i < max; i++) {
+      const oursRange = ours[i] ?? ours[0] ?? ([0, 0] as [number, number]);
+      const theirsRange = theirs[i] ?? theirs[0] ?? ([0, 0] as [number, number]);
+      const [oursCommits, theirsCommits] = await Promise.all([
+        intoExists && oursRange[0] > 0 ? this.blameRange(intoSha, filePath, oursRange) : Promise.resolve([]),
+        fromExists && theirsRange[0] > 0 ? this.blameRange(fromSha, filePath, theirsRange) : Promise.resolve([])
+      ]);
+      hunks.push({
+        path: filePath,
+        oursRange,
+        theirsRange,
+        ours: oursCommits,
+        theirs: theirsCommits
+      });
+    }
+    return hunks;
   }
 
   /**
@@ -1696,4 +1924,4 @@ async function writeResolvedFiles(
   }
 }
 
-export type { DiffResult, FileStatus, DiffFileSummary, BranchInfo, TagInfo, RemoteInfo, RepoStatus, CommitInfo, GraphData };
+export type { DiffResult, FileStatus, DiffFileSummary, BranchInfo, TagInfo, RemoteInfo, RepoStatus, CommitInfo, GraphData, BranchGraph, BranchTip, GraphCommitNode, ReflogEntry };

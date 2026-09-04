@@ -5,6 +5,7 @@ import { useReposStore } from '@/stores/repos';
 import { useSettingsStore } from '@/stores/settings';
 import { useBranchesStore } from '@/stores/branches';
 import { useMergeSessionStore } from '@/stores/mergeSession';
+import { useJobsStore } from '@/stores/jobs';
 import { subscribeEvents } from '@/api/client';
 import { useRevision } from '@/composables/revision';
 
@@ -12,6 +13,7 @@ const repos = useReposStore();
 const settings = useSettingsStore();
 const branches = useBranchesStore();
 const mergeSession = useMergeSessionStore();
+const jobs = useJobsStore();
 const route = useRoute();
 const router = useRouter();
 const { bump, revision } = useRevision();
@@ -41,13 +43,17 @@ let unsubscribe: (() => void) | null = null;
 onMounted(async () => {
   await repos.checkHealth();
   await repos.load();
-  await Promise.all([settings.load(repos.currentId).catch(() => undefined), branches.load()]);
+  await Promise.all([settings.load(repos.currentId).catch(() => undefined), branches.load(), jobs.load()]);
   unsubscribe = subscribeEvents({
     onRepoChanged: (payload) => {
       bump();
       mergeSession.onRepoChanged(payload.repoPath);
     },
     onLog: () => bump(),
+    onJobProgress: (payload) => {
+      jobs.onProgress(payload);
+      if (payload.status === 'ok') void repos.load();
+    },
     onError: () => {
       // SSE 断开会由浏览器自动重连；这里仅静默
     }
@@ -85,6 +91,11 @@ onUnmounted(() => {
         <el-menu-item v-for="m in menu" :key="m.path" :index="m.path" @click="goMenu(m.path)">
           <span class="menu-icon">{{ m.icon }}</span>
           <span>{{ m.label }}</span>
+          <el-badge
+            v-if="m.path === '/repos' && jobs.runningCount"
+            :value="jobs.runningCount"
+            class="menu-badge"
+          />
         </el-menu-item>
       </el-menu>
 
@@ -152,6 +163,9 @@ onUnmounted(() => {
 .menu-icon {
   margin-right: 8px;
   color: var(--el-color-primary);
+}
+.menu-badge {
+  margin-left: auto;
 }
 .aside-footer {
   padding: var(--gc-gap) var(--gc-pad);

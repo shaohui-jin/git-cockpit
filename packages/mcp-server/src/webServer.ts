@@ -15,6 +15,7 @@ import fastifyStatic from '@fastify/static';
 import {
   GitOperationError,
   GitService,
+  BackupManager,
   PermissionManager,
   detectMrPlatform,
   findMrHost,
@@ -39,6 +40,7 @@ import { McpHttpHandler } from './mcpServer.ts';
 import { executeTool } from './tools/handlers.ts';
 import { TOOL_DEF_MAP, toolSummaries } from './tools/index.ts';
 import { registerApiDocs } from './openapi.ts';
+import { JobManager } from './jobs.ts';
 
 export interface WebServerHandle {
   app: FastifyInstance;
@@ -86,6 +88,7 @@ export async function createWebServer(
   }
 
   const mcpHttp = new McpHttpHandler(runtime);
+  const jobs = new JobManager(runtime.eventBus);
 
   // Health
   app.get('/api/health', async () => ({
@@ -94,6 +97,38 @@ export async function createWebServer(
     version: '0.1.6',
     uptimeMs: process.uptime() * 1000
   }));
+
+  app.get('/api/jobs', async () => ({
+    jobs: jobs.list().map((j) => jobs.summary(j))
+  }));
+
+  app.get<{ Params: { id: string } }>('/api/jobs/:id', async (req, reply) => {
+    const job = jobs.get(req.params.id);
+    if (!job) return reply.code(404).send({ error: '任务不存在' });
+    return { job };
+  });
+
+  app.post<{ Body: { url?: string; destDir?: string } }>('/api/jobs/clone', async (req, reply) => {
+    const url = req.body?.url?.trim();
+    const destDir = req.body?.destDir?.trim();
+    if (!url || !destDir) {
+      return reply.code(400).send({ error: '需要 url 与 destDir' } as never);
+    }
+    try {
+      const job = jobs.startClone({
+        url,
+        destDir,
+        allowedRepos: runtime.configStore.get().git.allowedRepos,
+        onSuccess: async (dest) => {
+          const handle = await runtime.repoManager.open(dest);
+          return handle.record.id;
+        }
+      });
+      return { job: jobs.summary(job) };
+    } catch (err) {
+      return reply.code(400).send({ error: toError(err) } as never);
+    }
+  });
 
   // ---------------------------------------------------------------------------
   // 仓库管理
@@ -230,6 +265,20 @@ export async function createWebServer(
     withRepo(req, reply, async ({ service }) => service.getGraph(req.query.maxCount ? Number(req.query.maxCount) : 500))
   );
 
+  app.get<{ Params: { id: string }; Querystring: Record<string, string | undefined> }>('/api/repos/:id/branch-graph', async (req, reply) =>
+    withRepo(req, reply, async ({ service }) =>
+      service.getBranchGraph(req.query.maxNodes ? Number(req.query.maxNodes) : 200)
+    )
+  );
+
+  app.get<{ Params: { id: string }; Querystring: Record<string, string | undefined> }>('/api/repos/:id/reflog', async (req, reply) =>
+    withRepo(req, reply, async ({ service }) => service.getReflog(req.query.maxCount ? Number(req.query.maxCount) : 50))
+  );
+
+  app.get<{ Params: { id: string } }>('/api/repos/:id/backups', async (req, reply) =>
+    withRepo(req, reply, async ({ service }) => new BackupManager(service).listBackups())
+  );
+
   app.get<{ Params: { id: string }; Querystring: { commit?: string; path?: string } }>('/api/repos/:id/file', async (req, reply) =>
     withRepo(req, reply, async ({ service }) => {
       if (!req.query.commit || !req.query.path) {
@@ -306,6 +355,9 @@ export async function createWebServer(
         requireApprovalFor: runtime.config.permissions.requireApprovalFor,
         dryRunDefault: runtime.config.permissions.dryRunDefault
       },
+      git: {
+        allowedRepos: runtime.config.git.allowedRepos
+      },
       mr: await mrClientView(runtime, Number.isInteger(repoId) ? repoId : undefined, {
         validateToken: req.query.validateToken === '1' || req.query.validateToken === 'true'
       }),
@@ -322,6 +374,7 @@ export async function createWebServer(
     Querystring: { repoId?: string };
     Body: {
       permissions?: { disabledTools?: string[]; requireApprovalFor?: string[]; dryRunDefault?: boolean };
+      git?: { allowedRepos?: string[] };
       mr?: {
         method?: 'cli' | 'token' | 'browser' | 'auto';
         defaultRemote?: string;
@@ -337,14 +390,20 @@ export async function createWebServer(
     };
   }>('/api/settings', async (req, reply) => {
     const patch = req.body ?? {};
-    if (patch.permissions === undefined && patch.mr === undefined) {
-      return reply.code(400).send({ error: '仅支持更新 permissions 或 mr 段' });
+    if (patch.permissions === undefined && patch.mr === undefined && patch.git === undefined) {
+      return reply.code(400).send({ error: '仅支持更新 permissions、git 或 mr 段' });
     }
     let pendingTokenStatus: MrTokenStatus | undefined;
     const repoIdForMr =
       req.query.repoId && Number.isInteger(Number(req.query.repoId)) ? Number(req.query.repoId) : undefined;
     if (patch.permissions !== undefined) {
       runtime.configStore.update({ permissions: patch.permissions });
+    }
+    if (patch.git !== undefined) {
+      const allowedRepos = Array.isArray(patch.git.allowedRepos)
+        ? patch.git.allowedRepos.map((p) => p.trim()).filter(Boolean)
+        : runtime.configStore.get().git.allowedRepos;
+      runtime.configStore.update({ git: { allowedRepos } });
     }
     if (patch.mr !== undefined) {
       const next = normalizeMrConfig(runtime.config.mr);
@@ -429,8 +488,12 @@ export async function createWebServer(
     const logListener = () => {
       raw.write('event: log\ndata: {}\n\n');
     };
+    const jobListener = (payload: unknown) => {
+      raw.write(`event: job-progress\ndata: ${JSON.stringify(payload)}\n\n`);
+    };
     runtime.eventBus.on('repo-changed', listener);
     runtime.eventBus.on('log', logListener);
+    runtime.eventBus.on('job-progress', jobListener);
 
     const keepAlive = setInterval(() => raw.write(': ping\n\n'), 15_000);
 
@@ -438,6 +501,7 @@ export async function createWebServer(
       clearInterval(keepAlive);
       runtime.eventBus.off('repo-changed', listener);
       runtime.eventBus.off('log', logListener);
+      runtime.eventBus.off('job-progress', jobListener);
     });
   });
 

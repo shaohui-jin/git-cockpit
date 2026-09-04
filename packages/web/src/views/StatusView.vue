@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import * as api from '@/api/client';
 import { useReposStore } from '@/stores/repos';
@@ -7,9 +7,11 @@ import { useToolAction } from '@/composables/useToolAction';
 import { useRevision } from '@/composables/revision';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import DiffViewer from '@/components/DiffViewer.vue';
+import CommitGraph from '@/components/CommitGraph.vue';
+import BranchTreeSelect from '@/components/BranchTreeSelect.vue';
 import { useBranchesStore } from '@/stores/branches';
 import type { BranchTreeNode } from '@/utils/branchTree';
-import type { BranchInfo, DiffResult, FileStatus, RepoStatus, StashInfo, ToolExecResult } from '@/api/types';
+import type { BackupList, BranchGraph, BranchInfo, DiffResult, FileStatus, ReflogEntry, RepoStatus, StashInfo, ToolExecResult } from '@/api/types';
 
 const repos = useReposStore();
 const branchStore = useBranchesStore();
@@ -20,6 +22,19 @@ const status = ref<RepoStatus | null>(null);
 const stashes = ref<StashInfo[]>([]);
 const loading = ref(false);
 const loadError = ref('');
+const contentMode = ref<'workspace' | 'graph'>('workspace');
+const graph = ref<BranchGraph | null>(null);
+const graphLoading = ref(false);
+const graphError = ref('');
+const backups = ref<BackupList>({ branches: [], stashes: [] });
+const reflog = ref<ReflogEntry[]>([]);
+const historyTab = ref<'stash' | 'backup' | 'reflog'>('stash');
+const branchMenu = reactive<{ visible: boolean; x: number; y: number; node: BranchTreeNode | null }>({
+  visible: false,
+  x: 0,
+  y: 0,
+  node: null
+});
 
 /** 文件差异抽屉（文件 diff 或 stash diff 共用） */
 const drawer = reactive<{ visible: boolean; title: string; diff: DiffResult | null; patch: string; loading: boolean }>({
@@ -41,6 +56,13 @@ const stashMessage = ref('');
 const stashIncludeUntracked = ref(false);
 const resetVisible = ref(false);
 const resetTarget = ref('');
+const mergeVisible = ref(false);
+const mergeBranch = ref('');
+const tagVisible = ref(false);
+const tagName = ref('');
+const tagMessage = ref('');
+const rebaseVisible = ref(false);
+const rebaseOnto = ref('');
 
 /** 更改文件勾选集合：既用于行内选择，也作为 stash 的选择文件来源 */
 const checkedFiles = reactive<Set<string>>(new Set());
@@ -55,6 +77,10 @@ const currentBranch = computed(() => status.value?.currentShort ?? status.value?
 const ahead = computed(() => status.value?.ahead ?? 0);
 const behind = computed(() => status.value?.behind ?? 0);
 const branchPanes = computed(() => branchStore.panes);
+const graphRemotes = computed(() => branchStore.remotes.map((r) => r.name));
+const graphDefaultRemote = computed(() =>
+  graphRemotes.value.includes('origin') ? 'origin' : (graphRemotes.value[0] ?? 'origin')
+);
 
 /** 各标签页文件列表（untracked 转成 FileStatus 统一渲染） */
 const tabLists = computed(() => {
@@ -128,8 +154,39 @@ async function loadStashes(): Promise<void> {
   }
 }
 
+async function loadGraph(): Promise<void> {
+  const id = repoId();
+  if (id === null) return;
+  graphLoading.value = true;
+  graphError.value = '';
+  try {
+    graph.value = await api.getBranchGraph(id, 200);
+  } catch (err) {
+    graphError.value = err instanceof Error ? err.message : String(err);
+    graph.value = null;
+  } finally {
+    graphLoading.value = false;
+  }
+}
+
+async function loadBackupsAndReflog(): Promise<void> {
+  const id = repoId();
+  if (id === null) return;
+  try {
+    const [b, r] = await Promise.all([api.listBackups(id), api.getReflog(id, 40)]);
+    backups.value = b;
+    reflog.value = r;
+  } catch {
+    /* 备份/reflog 失败不阻塞状态页 */
+  }
+}
+
 async function refresh(): Promise<void> {
-  await Promise.all([loadStatus(), loadBranches(), loadStashes()]);
+  if (contentMode.value === 'graph') {
+    await Promise.all([loadStatus(), loadBranches(), loadGraph()]);
+    return;
+  }
+  await Promise.all([loadStatus(), loadBranches(), loadStashes(), loadBackupsAndReflog()]);
 }
 
 /** 通用写流程：dry-run 预览 → ConfirmDialog → 真实执行 → 刷新 */
@@ -289,6 +346,88 @@ function pull(): void {
 function push(): void {
   void run('git_push');
 }
+function onBranchCommand(cmd: string | number | object, n: BranchTreeNode): void {
+  const c = String(cmd);
+  if (c === 'pull') pull();
+  else if (c === 'push') push();
+  else if (c === 'checkout') checkoutNode(n);
+  else if (c === 'delete') deleteBranch(n, false);
+  else if (c === 'delete-force') deleteBranch(n, true);
+}
+
+const branchMenuCanDelete = computed(
+  () => Boolean(branchMenu.node?.branch && !branchMenu.node.branch.current && !branchMenu.node.remote)
+);
+let branchMenuOpenedAt = 0;
+
+function closeBranchMenu(): void {
+  branchMenu.visible = false;
+  branchMenu.node = null;
+}
+
+function openBranchMenu(ev: MouseEvent, n: BranchTreeNode): void {
+  ev.preventDefault();
+  ev.stopPropagation();
+  const w = 100;
+  const items = n.branch?.current ? 2 : n.remote ? 1 : 3;
+  const h = items * 32 + 8;
+  let x = ev.clientX;
+  let y = ev.clientY;
+  if (x + w > window.innerWidth) x = Math.max(4, window.innerWidth - w - 4);
+  if (y + h > window.innerHeight) y = Math.max(4, window.innerHeight - h - 4);
+  branchMenu.node = n;
+  branchMenu.x = x;
+  branchMenu.y = y;
+  branchMenu.visible = true;
+  branchMenuOpenedAt = Date.now();
+}
+
+function runBranchMenu(cmd: string): void {
+  const n = branchMenu.node;
+  closeBranchMenu();
+  if (n) onBranchCommand(cmd, n);
+}
+
+function onWinClick(ev: MouseEvent): void {
+  if (!branchMenu.visible || ev.button !== 0) return;
+  if (Date.now() - branchMenuOpenedAt < 80) return;
+  const el = ev.target;
+  if (el instanceof Element && el.closest('.gc-branch-menu')) return;
+  closeBranchMenu();
+}
+
+function onWinContext(ev: MouseEvent): void {
+  if (!branchMenu.visible) return;
+  const el = ev.target;
+  if (el instanceof Element && el.closest('.branch-node')) return;
+  closeBranchMenu();
+}
+function deleteBranch(n: BranchTreeNode, force: boolean): void {
+  if (!n.branch || n.branch.current || n.remote) return;
+  const name = n.branch.name;
+  if (force) {
+    ElMessageBox.confirm(
+      `强制删除本地分支 ${name}？（不检查是否已合并；高风险，执行前会备份）`,
+      '强制删除分支',
+      { type: 'warning', confirmButtonText: '继续', cancelButtonText: '取消' }
+    )
+      .then(() => void run('git_branch_delete_force', { name }))
+      .catch(() => undefined);
+    return;
+  }
+  void run('git_branch_delete', { name });
+}
+function checkoutBackup(name: string): void {
+  void run('git_checkout', { branch: name });
+}
+function applyBackupStash(ref: string): void {
+  const m = /stash@\{(\d+)\}/.exec(ref);
+  if (!m) return;
+  void run('git_stash_apply', { index: Number(m[1]) });
+}
+function checkoutReflog(hash: string): void {
+  void run('git_checkout', { branch: hash });
+}
 
 /** 参数对话框确认 */
 function confirmCommit(): void {
@@ -315,6 +454,36 @@ function confirmReset(): void {
   resetTarget.value = '';
   void run('git_reset_hard', { target });
 }
+function confirmWorkspaceMerge(): void {
+  const branch = mergeBranch.value.trim();
+  if (!branch) {
+    ElMessage.warning('请选择要合入当前分支的来源');
+    return;
+  }
+  mergeVisible.value = false;
+  void run('git_merge', { branch });
+}
+function confirmTag(): void {
+  const name = tagName.value.trim();
+  if (!name) {
+    ElMessage.warning('请输入标签名');
+    return;
+  }
+  tagVisible.value = false;
+  const message = tagMessage.value.trim();
+  void run('git_tag_create', message ? { name, message } : { name });
+  tagName.value = '';
+  tagMessage.value = '';
+}
+function confirmRebase(): void {
+  const branch = rebaseOnto.value.trim();
+  if (!branch) {
+    ElMessage.warning('请选择变基目标');
+    return;
+  }
+  rebaseVisible.value = false;
+  void run('git_rebase', { branch });
+}
 
 function statusLetter(f: FileStatus): string {
   if (f.untracked) return '?';
@@ -340,14 +509,27 @@ watch(repoId, () => {
   drawer.patch = '';
   drawer.visible = false;
   checkedFiles.clear();
+  closeBranchMenu();
   void refresh();
 });
 watch(revision, () => {
   void refresh();
 });
+watch(contentMode, (mode) => {
+  closeBranchMenu();
+  if (mode === 'graph') void loadGraph();
+});
 
 onMounted(() => {
   void refresh();
+  window.addEventListener('click', onWinClick, true);
+  window.addEventListener('contextmenu', onWinContext, true);
+  window.addEventListener('scroll', closeBranchMenu, true);
+});
+onUnmounted(() => {
+  window.removeEventListener('click', onWinClick, true);
+  window.removeEventListener('contextmenu', onWinContext, true);
+  window.removeEventListener('scroll', closeBranchMenu, true);
 });
 </script>
 
@@ -365,7 +547,13 @@ onMounted(() => {
         <el-tag v-else-if="status" type="warning" effect="plain" size="small">{{ totalFiles }} 处更改</el-tag>
         <span class="repo-path mono">{{ currentPath }}</span>
       </div>
-      <el-button :loading="loading" @click="refresh">刷新</el-button>
+      <div class="head-actions">
+        <el-radio-group v-model="contentMode" size="small">
+          <el-radio-button value="workspace">工作区</el-radio-button>
+          <el-radio-button value="graph">分支图</el-radio-button>
+        </el-radio-group>
+        <el-button :loading="loading || graphLoading" @click="refresh">刷新</el-button>
+      </div>
     </div>
 
     <el-alert v-if="loadError" :title="loadError" type="error" :closable="false" show-icon class="mb" />
@@ -396,23 +584,17 @@ onMounted(() => {
               class="branch-tree"
             >
               <template #default="{ data }">
-                <span v-if="!data.branch" class="tree-dir">{{ data.label }}</span>
+                <span v-if="!data.branch" class="tree-dir" :title="data.fullName || data.label">{{ data.label }}</span>
                 <div
                   v-else
                   class="branch-node"
                   :class="{ current: data.branch?.current, remote: data.remote }"
-                  :title="data.fullName"
+                  :title="`${data.fullName}（右键操作）`"
                   @dblclick="data.branch?.current || checkoutNode(data)"
+                  @contextmenu="openBranchMenu($event, data)"
                 >
                   <span class="node-name">{{ data.label }}</span>
                   <span v-if="!data.remote" class="node-sync" :class="{ clean: !syncText(data.branch) && data.branch?.upstream }">{{ syncText(data.branch) }}</span>
-                  <span class="node-actions">
-                    <template v-if="data.branch?.current">
-                      <el-button size="small" text type="success" @click.stop="pull">拉取</el-button>
-                      <el-button size="small" text type="primary" @click.stop="push">推送</el-button>
-                    </template>
-                    <el-button v-else size="small" text type="primary" @click.stop="checkoutNode(data)">切换</el-button>
-                  </span>
                 </div>
               </template>
             </el-tree>
@@ -422,8 +604,18 @@ onMounted(() => {
         </div>
       </el-card>
 
-      <!-- 右：状态内容（垂直弹性布局） -->
+      <!-- 右：状态内容 或 分支图 -->
       <div class="status-content">
+        <CommitGraph
+          v-if="contentMode === 'graph'"
+          :data="graph"
+          :loading="graphLoading"
+          :error="graphError"
+          :default-remote="graphDefaultRemote"
+          :remotes="graphRemotes"
+        />
+
+        <template v-else>
         <!-- 工具栏 -->
         <el-card shadow="never" class="toolbar-card">
           <div class="toolbar">
@@ -437,8 +629,18 @@ onMounted(() => {
               <el-tooltip content="Shelve Silently：使用默认说明，一键暂存全部更改" placement="top">
                 <el-button plain @click="silentStash">静默 Stash</el-button>
               </el-tooltip>
+              <el-tooltip content="把选中分支合并进当前检出分支（会改工作区）。预演请走左侧「合并」页。" placement="top">
+                <el-button plain @click="mergeVisible = true">工作区合并</el-button>
+              </el-tooltip>
+              <el-button plain @click="tagVisible = true">打标签</el-button>
               <el-button type="danger" plain @click="resetVisible = true">硬重置</el-button>
               <el-button type="danger" plain @click="run('git_clean')">清理未跟踪</el-button>
+              <el-tooltip content="把当前分支变基到所选目标（高风险，改历史）" placement="top">
+                <el-button type="danger" plain @click="rebaseVisible = true">变基</el-button>
+              </el-tooltip>
+              <el-tooltip content="--force-with-lease 推送当前分支（高风险）" placement="top">
+                <el-button type="danger" plain @click="run('git_push_force')">强制推送</el-button>
+              </el-tooltip>
             </div>
           </div>
         </el-card>
@@ -490,35 +692,101 @@ onMounted(() => {
           </el-tabs>
         </el-card>
 
-        <!-- 暂存列表 -->
-        <el-card shadow="never" class="stash-card">
+        <el-card shadow="never" class="history-card">
           <template #header>
             <div class="card-head">
-              <span class="card-title">暂存列表 Stash（{{ stashes.length }}）</span>
+              <span class="card-title">记录 Records</span>
               <div class="card-actions">
-                <el-button size="small" text @click="loadStashes">刷新</el-button>
+                <el-button size="small" text @click="loadStashes(); loadBackupsAndReflog()">刷新</el-button>
               </div>
             </div>
           </template>
-          <div v-if="stashes.length === 0" class="file-empty">没有暂存的更改</div>
-          <div v-else class="stash-list mono">
-            <div v-for="s in stashes" :key="s.ref" class="stash-row">
-              <div class="stash-main">
-                <span class="stash-ref">{{ s.ref }}</span>
-                <span class="stash-msg" :title="s.message">{{ firstLine(s.message) || '（无说明）' }}</span>
-                <span v-if="s.date" class="stash-date">{{ formatDate(s.date) }}</span>
+          <el-tabs v-model="historyTab" class="history-tabs">
+            <el-tab-pane name="stash">
+              <template #label>Stash（{{ stashes.length }}）</template>
+              <div v-if="stashes.length === 0" class="file-empty">没有暂存的更改</div>
+              <div v-else class="stash-list mono">
+                <div v-for="s in stashes" :key="s.ref" class="stash-row">
+                  <div class="stash-main">
+                    <span class="stash-ref">{{ s.ref }}</span>
+                    <span class="stash-msg" :title="s.message">{{ firstLine(s.message) || '（无说明）' }}</span>
+                    <span v-if="s.date" class="stash-date">{{ formatDate(s.date) }}</span>
+                  </div>
+                  <div class="stash-actions">
+                    <el-button size="small" text type="primary" @click="showStashDiff(s)">差异</el-button>
+                    <el-button size="small" text type="success" @click="applyStash(s)">应用</el-button>
+                    <el-button size="small" text type="warning" @click="popStash(s)">恢复</el-button>
+                    <el-button size="small" text type="danger" @click="dropStash(s)">删除</el-button>
+                  </div>
+                </div>
               </div>
-              <div class="stash-actions">
-                <el-button size="small" text type="primary" @click="showStashDiff(s)">差异</el-button>
-                <el-button size="small" text type="success" @click="applyStash(s)">应用</el-button>
-                <el-button size="small" text type="warning" @click="popStash(s)">恢复</el-button>
-                <el-button size="small" text type="danger" @click="dropStash(s)">删除</el-button>
+            </el-tab-pane>
+            <el-tab-pane name="backup">
+              <template #label>备份（{{ backups.branches.length + backups.stashes.length }}）</template>
+              <div v-if="!backups.branches.length && !backups.stashes.length" class="file-empty">
+                高危操作前会自动建 backup/pre-op-* 分支；工作区不干净时还会 stash
               </div>
-            </div>
-          </div>
+              <div v-else class="stash-list mono">
+                <div v-for="b in backups.branches" :key="'b-' + b" class="stash-row">
+                  <div class="stash-main">
+                    <span class="stash-ref">{{ b }}</span>
+                    <span class="stash-msg">备份分支</span>
+                  </div>
+                  <div class="stash-actions">
+                    <el-button size="small" text type="primary" @click="checkoutBackup(b)">检出</el-button>
+                  </div>
+                </div>
+                <div v-for="s in backups.stashes" :key="'s-' + s" class="stash-row">
+                  <div class="stash-main">
+                    <span class="stash-ref">{{ s }}</span>
+                    <span class="stash-msg">备份 stash</span>
+                  </div>
+                  <div class="stash-actions">
+                    <el-button size="small" text type="success" @click="applyBackupStash(s)">应用</el-button>
+                  </div>
+                </div>
+              </div>
+            </el-tab-pane>
+            <el-tab-pane name="reflog">
+              <template #label>Reflog（{{ reflog.length }}）</template>
+              <div v-if="reflog.length === 0" class="file-empty">没有 reflog 记录</div>
+              <div v-else class="stash-list mono">
+                <div v-for="e in reflog" :key="e.selector + e.hash" class="stash-row">
+                  <div class="stash-main">
+                    <span class="stash-ref">{{ e.hash.slice(0, 7) }}</span>
+                    <span class="stash-msg" :title="e.message">{{ e.selector }} · {{ firstLine(e.message) }}</span>
+                    <span v-if="e.date" class="stash-date">{{ formatDate(e.date) }}</span>
+                  </div>
+                  <div class="stash-actions">
+                    <el-button size="small" text type="primary" @click="checkoutReflog(e.hash)">检出</el-button>
+                  </div>
+                </div>
+              </div>
+            </el-tab-pane>
+          </el-tabs>
         </el-card>
+        </template>
       </div>
     </div>
+
+    <Teleport to="body">
+      <ul
+        v-if="branchMenu.visible && branchMenu.node"
+        class="el-dropdown-menu gc-branch-menu"
+        :style="{ left: branchMenu.x + 'px', top: branchMenu.y + 'px' }"
+        @click.stop
+      >
+        <template v-if="branchMenu.node.branch?.current">
+          <li class="el-dropdown-menu__item" @click="runBranchMenu('pull')">拉取</li>
+          <li class="el-dropdown-menu__item" @click="runBranchMenu('push')">推送</li>
+        </template>
+        <li v-else class="el-dropdown-menu__item" @click="runBranchMenu('checkout')">切换</li>
+        <template v-if="branchMenuCanDelete">
+          <li class="el-dropdown-menu__item el-dropdown-menu__item--divided" @click="runBranchMenu('delete')">删除</li>
+          <li class="el-dropdown-menu__item gc-danger" @click="runBranchMenu('delete-force')">强制删除</li>
+        </template>
+      </ul>
+    </Teleport>
 
     <!-- 写操作确认对话框 -->
     <ConfirmDialog v-model:visible="confirmVisible" :tool="pending?.tool ?? ''" :preview="pending?.preview ?? null" @confirm="onConfirmed" @cancel="cancel" />
@@ -624,6 +892,53 @@ onMounted(() => {
         <el-button type="danger" @click="confirmReset">下一步（dry-run 预览）</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="mergeVisible" title="工作区合并" width="480px" @closed="mergeBranch = ''">
+      <el-alert
+        class="mb"
+        title="会把所选分支合并进当前检出分支，可能产生冲突。只想预演、不改工作区请用左侧「合并」页。"
+        type="warning"
+        :closable="false"
+        show-icon
+      />
+      <el-form label-width="100px">
+        <el-form-item label="来源分支">
+          <BranchTreeSelect v-model="mergeBranch" placeholder="选择要合进来的分支" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="mergeVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmWorkspaceMerge">下一步（dry-run 预览）</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="tagVisible" title="打标签" width="480px">
+      <el-form label-width="100px">
+        <el-form-item label="标签名">
+          <el-input v-model="tagName" placeholder="v1.0.0" />
+        </el-form-item>
+        <el-form-item label="说明（可选）">
+          <el-input v-model="tagMessage" placeholder="填写则创建附注标签" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="tagVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmTag">下一步（dry-run 预览）</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="rebaseVisible" title="变基（高风险）" width="480px" @closed="rebaseOnto = ''">
+      <el-alert title="将把当前分支变基到所选目标，可能改写历史；执行前会自动备份" type="error" :closable="false" show-icon class="mb" />
+      <el-form label-width="100px">
+        <el-form-item label="变基到">
+          <BranchTreeSelect v-model="rebaseOnto" placeholder="选择目标分支" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="rebaseVisible = false">取消</el-button>
+        <el-button type="danger" @click="confirmRebase">下一步（dry-run 预览）</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -657,6 +972,12 @@ onMounted(() => {
   align-items: center;
   gap: var(--gc-gap);
   flex: none;
+}
+.head-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--gc-gap);
 }
 .head-branch {
   flex: 1;
@@ -747,7 +1068,7 @@ onMounted(() => {
   --el-tree-node-hover-bg-color: var(--el-fill-color-extra-light);
 }
 .branch-tree :deep(.el-tree-node__content) {
-  height: 28px;
+  height: var(--gc-control);
   padding-right: 4px;
 }
 .branch-tree :deep(.el-tree-node__expand-icon) {
@@ -760,7 +1081,7 @@ onMounted(() => {
   min-width: 0;
 }
 .tree-dir {
-  font-size: 12px;
+  font-size: var(--gc-text);
   font-weight: 600;
   color: var(--el-text-color-regular);
   overflow: hidden;
@@ -773,11 +1094,14 @@ onMounted(() => {
   color: var(--el-text-color-secondary);
 }
 .branch-node {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  border-radius: 6px;
+  gap: var(--gc-gap);
+  height: var(--gc-control);
+  padding: 0 8px;
+  border-radius: var(--gc-radius);
   cursor: pointer;
   user-select: none;
 }
@@ -792,7 +1116,8 @@ onMounted(() => {
 }
 .node-name {
   flex: 1;
-  font-size: 12px;
+  min-width: 0;
+  font-size: var(--gc-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -810,19 +1135,12 @@ onMounted(() => {
 .node-sync.clean {
   color: var(--el-text-color-disabled);
 }
-.node-actions {
-  flex: none;
-  visibility: hidden;
-  display: flex;
-}
-.branch-node:hover .node-actions {
-  visibility: visible;
-}
 
 /* 右：垂直弹性布局 */
 .status-content {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: var(--gc-gap);
@@ -852,7 +1170,7 @@ onMounted(() => {
 /* 更改卡片：弹性占位，Tab 内容内部滚动 */
 .changes-card {
   flex: 1 1 0;
-  min-height: 160px;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
@@ -982,22 +1300,42 @@ onMounted(() => {
   word-break: break-all;
 }
 
-/* Stash 列表卡片 */
-.stash-card {
+/* 记录：stash / 备份 / reflog 合一块，与更改对半铺满 */
+.history-card {
   flex: 1 1 0;
-  min-height: 140px;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
-.stash-card :deep(.el-card__header) {
+.history-card :deep(.el-card__header) {
   padding: 8px 12px;
 }
-.stash-card :deep(.el-card__body) {
+.history-card :deep(.el-card__body) {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 4px 12px 8px;
+  padding: 0 12px 8px;
+}
+.history-tabs {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.history-tabs :deep(.el-tabs__header) {
+  margin: 0;
+  flex: none;
+}
+.history-tabs :deep(.el-tabs__content) {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.history-tabs :deep(.el-tab-pane) {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 .stash-list {
   flex: 1;

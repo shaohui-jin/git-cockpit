@@ -3,13 +3,26 @@ import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { useReposStore } from '@/stores/repos';
+import { useJobsStore } from '@/stores/jobs';
+import * as api from '@/api/client';
 import type { OpenedRepo } from '@/api/types';
 
 const repos = useReposStore();
+const jobs = useJobsStore();
 const router = useRouter();
 
 const newPath = ref('');
 const opening = ref(false);
+const cloneVisible = ref(false);
+const cloneUrl = ref('');
+const cloneDest = ref('');
+const cloning = ref(false);
+const jobDrawer = ref(false);
+const activeJobId = ref<string | null>(null);
+const jobDetailLoading = ref(false);
+
+const activeJob = computed(() => jobs.jobs.find((j) => j.id === activeJobId.value) ?? null);
+const jobLogText = computed(() => (activeJob.value?.logs ?? []).join(''));
 
 /** 路径树节点：叶子带 repo（完整路径），非叶子为按路径分隔符拆出的目录 */
 interface PathTreeNode {
@@ -140,7 +153,52 @@ function enterNode(n: PathTreeNode): void {
   if (n.repo) void openStatus(n.repo.id);
 }
 
-onMounted(() => repos.load());
+async function startClone(): Promise<void> {
+  const url = cloneUrl.value.trim();
+  const dest = cloneDest.value.trim();
+  if (!url || !dest) {
+    ElMessage.warning('请填写项目地址和保存路径');
+    return;
+  }
+  cloning.value = true;
+  try {
+    const { job } = await api.startClone(url, dest);
+    ElMessage.success('已提交克隆任务，可在下方查看日志');
+    cloneVisible.value = false;
+    cloneUrl.value = '';
+    cloneDest.value = '';
+    await jobs.load();
+    await openJob(job.id);
+  } catch (err) {
+    ElMessage.error(err instanceof Error ? err.message : String(err));
+  } finally {
+    cloning.value = false;
+  }
+}
+
+async function openJob(id: string): Promise<void> {
+  activeJobId.value = id;
+  jobDrawer.value = true;
+  jobDetailLoading.value = true;
+  try {
+    await jobs.loadDetail(id);
+  } catch (err) {
+    ElMessage.error(err instanceof Error ? err.message : String(err));
+  } finally {
+    jobDetailLoading.value = false;
+  }
+}
+
+function jobTag(status: string): 'success' | 'danger' | 'warning' {
+  if (status === 'ok') return 'success';
+  if (status === 'error') return 'danger';
+  return 'warning';
+}
+
+onMounted(() => {
+  void repos.load();
+  void jobs.load();
+});
 </script>
 
 <template>
@@ -157,6 +215,25 @@ onMounted(() => repos.load());
           @keyup.enter="openRepo"
         />
         <el-button type="primary" :loading="opening" @click="openRepo">打开</el-button>
+        <el-button @click="cloneVisible = true">克隆到本地</el-button>
+      </div>
+    </el-card>
+
+    <el-card shadow="never" class="open-card">
+      <template #header>
+        <div class="list-header">
+          <span>后台任务{{ jobs.runningCount ? `（进行中 ${jobs.runningCount}）` : '' }}</span>
+          <el-button text type="primary" :loading="jobs.loading" @click="jobs.load()">刷新</el-button>
+        </div>
+      </template>
+      <el-empty v-if="!jobs.jobs.length" description="没有克隆任务。点「克隆到本地」提交后会出现在这里。" :image-size="48" />
+      <div v-else class="job-list">
+        <div v-for="j in jobs.jobs" :key="j.id" class="job-row" @click="openJob(j.id)">
+          <el-tag :type="jobTag(j.status)" size="small" effect="plain">{{ j.status }}</el-tag>
+          <span class="job-url mono" :title="j.url">{{ j.url }}</span>
+          <span class="job-dest mono" :title="j.destDir">→ {{ j.destDir }}</span>
+          <el-button size="small" text type="primary" @click.stop="openJob(j.id)">日志</el-button>
+        </div>
       </div>
     </el-card>
 
@@ -200,6 +277,42 @@ onMounted(() => repos.load());
         </el-tree>
       </div>
     </el-card>
+
+    <el-dialog v-model="cloneVisible" title="克隆到本地" width="560px">
+      <el-alert
+        class="mb"
+        title="提交后由后台 spawn git clone，不占用当前仓库的 Git 队列。地址不要带 token。完成后会自动加入最近打开列表。"
+        type="info"
+        :closable="false"
+        show-icon
+      />
+      <el-form label-width="100px">
+        <el-form-item label="项目地址">
+          <el-input v-model="cloneUrl" placeholder="https://github.com/org/repo.git 或 git@host:org/repo.git" />
+        </el-form-item>
+        <el-form-item label="保存到">
+          <el-input v-model="cloneDest" placeholder="本地空目录的绝对路径，例如 D:\_myproject\repo" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="cloneVisible = false">取消</el-button>
+        <el-button type="primary" :loading="cloning" @click="startClone">开始克隆</el-button>
+      </template>
+    </el-dialog>
+
+    <el-drawer v-model="jobDrawer" size="48%" destroy-on-close>
+      <template #header>
+        <span v-if="activeJob">克隆日志 · {{ activeJob.status }}</span>
+        <span v-else>克隆日志</span>
+      </template>
+      <div v-loading="jobDetailLoading">
+        <template v-if="activeJob">
+          <div class="job-meta mono">{{ activeJob.url }} → {{ activeJob.destDir }}</div>
+          <el-alert v-if="activeJob.error" :title="activeJob.error" type="error" :closable="false" show-icon class="mb" />
+          <pre class="job-log">{{ jobLogText || '（等待输出）' }}</pre>
+        </template>
+      </div>
+    </el-drawer>
   </div>
 </template>
 
@@ -218,6 +331,59 @@ onMounted(() => repos.load());
 }
 .open-row .el-input {
   flex: 1;
+}
+.mb {
+  margin-bottom: var(--gc-gap);
+}
+.job-list {
+  display: flex;
+  flex-direction: column;
+}
+.job-row {
+  display: flex;
+  align-items: center;
+  gap: var(--gc-gap);
+  height: var(--gc-line);
+  padding: 0 4px;
+  cursor: pointer;
+  border-radius: var(--gc-radius);
+}
+.job-row:hover {
+  background: var(--el-fill-color-light);
+}
+.job-url,
+.job-dest {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--gc-text);
+}
+.job-url {
+  flex: 1;
+  min-width: 0;
+}
+.job-dest {
+  flex: 1;
+  min-width: 0;
+  color: var(--el-text-color-secondary);
+}
+.job-meta {
+  margin-bottom: var(--gc-gap);
+  font-size: var(--gc-text);
+  color: var(--el-text-color-secondary);
+  word-break: break-all;
+}
+.job-log {
+  margin: 0;
+  max-height: calc(100vh - 180px);
+  overflow: auto;
+  padding: var(--gc-pad);
+  background: var(--el-fill-color-light);
+  border-radius: var(--gc-radius);
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 .list-header {
   display: flex;

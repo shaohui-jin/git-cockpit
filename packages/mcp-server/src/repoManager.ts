@@ -8,6 +8,7 @@
 import { EventEmitter } from 'node:events';
 import * as path from 'node:path';
 import {
+  assertRepoAllowed,
   GitService,
   RepoNotFoundError,
   RepoStore
@@ -22,7 +23,7 @@ export interface RepoHandle {
 export interface RepoManagerOptions {
   repoStore: RepoStore;
   eventBus: EventEmitter;
-  config: GitCockpitConfig;
+  getConfig: () => GitCockpitConfig;
 }
 
 export class RepoManager {
@@ -69,6 +70,7 @@ export class RepoManager {
   /** 打开仓库：校验并记录；重复打开返回既有实例 */
   async open(repoPath: string): Promise<RepoHandle> {
     const service = await GitService.open(repoPath);
+    assertRepoAllowed(service.repoPath, this.options.getConfig().git.allowedRepos);
     const root = service.repoPath;
     const key = normalizePath(root);
     const existingId = this.pathToId.get(key);
@@ -104,7 +106,10 @@ export class RepoManager {
       const record = this.options.repoStore.getById(id);
       if (record) {
         const service = this.idToService.get(id);
-        if (service) return { service, record };
+        if (service) {
+          assertRepoAllowed(service.repoPath, this.options.getConfig().git.allowedRepos);
+          return { service, record };
+        }
       }
     }
     throw new RepoNotFoundError(`仓库未打开: ${repoPath}。请先打开仓库（POST /api/repos/open）。`);
@@ -134,9 +139,12 @@ export class RepoManager {
     let service = this.idToService.get(record.id);
     if (!service) {
       service = await GitService.open(record.path);
+      assertRepoAllowed(service.repoPath, this.options.getConfig().git.allowedRepos);
       this.pathToId.set(normalizePath(service.repoPath), record.id);
       this.idToService.set(record.id, service);
       this.attach(service);
+    } else {
+      assertRepoAllowed(service.repoPath, this.options.getConfig().git.allowedRepos);
     }
     return { service, record };
   }

@@ -1,0 +1,23 @@
+---
+description: 在本仓库用 Git Cockpit MCP 做 git 操作时遵守工具约定
+alwaysApply: true
+---
+
+# Git Cockpit MCP
+
+本仓库的 git 事实走 **Git Cockpit MCP**（`user-git-cockpit`），不要另起一套终端 git 来代替预演/落盘/开 MR。
+
+## 什么时候调 MCP
+
+- 查看工作区、暂存、提交、推送、stash、分支：`git_status` / `git_add` / `git_commit` / `git_push` 等。
+- 问「合不合得进去」、冲突内容、选边落盘：`git_merge_preview` / `git_merge_rehearse` / `git_merge_blame` / `git_apply_resolve`。
+- 多分支扫描、合入顺序：`git_merge_survey` / `git_merge_order`。
+- 开 PR/MR：`git_mr_prepare` / `git_mr_create`（Token 不进工具参数，在网页设置里）。
+
+写操作先 `dry_run=true`。高风险工具默认禁用。
+
+## 硬规则
+
+- `into` = 合入目标 / 线上 / ours；`from` = 我的分支 / theirs。
+- 预演只用 merge-tree 工具，**禁止**用 `git_merge` 或工作区 merge 冒充预演。
+- 落盘用 `git_apply_resolve`（独立 worktree）。冲突行作者用 `git_merge_blame`，不是自动选边。

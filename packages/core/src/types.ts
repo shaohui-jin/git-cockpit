@@ -174,6 +174,44 @@ export interface GraphData {
   head: string | null;
 }
 
+/** 分支 tip（for-each-ref），状态页 G6 图画这个而不是每个 commit */
+export interface BranchTip {
+  name: string;
+  sha: string;
+  upstream?: string;
+  remote: boolean;
+}
+
+/** rev-list 图上的提交节点（中间 commit 不画，只用来算 tip 祖先边） */
+export interface GraphCommitNode {
+  sha: string;
+  parents: string[];
+  message: string;
+  author: string;
+  time: number;
+}
+
+/**
+ * 分支 tip DAG：节点是各分支 tip，边是「最近的祖先 tip」。
+ * 与 `GraphData`（git log 提交列表）不同，供状态页 G6 使用。
+ */
+export interface BranchGraph {
+  repoRoot: string;
+  nodes: GraphCommitNode[];
+  tips: BranchTip[];
+  edges: Array<[string, string]>;
+  truncated: boolean;
+  maxNodes: number;
+}
+
+export interface ReflogEntry {
+  hash: string;
+  /** 如 HEAD@{0} */
+  selector: string;
+  message: string;
+  date: string;
+}
+
 /** `git` 命令允许非零退出时的捕获结果（如 merge-tree 冲突 = 1） */
 export interface GitCommandResult {
   stdout: string;

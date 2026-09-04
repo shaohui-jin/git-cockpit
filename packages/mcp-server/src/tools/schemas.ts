@@ -79,6 +79,18 @@ export const GitGraphSchema = z.object({
 });
 export type GitGraphArgs = z.infer<typeof GitGraphSchema>;
 
+export const GitBranchGraphSchema = z.object({
+  ...readonlyBase,
+  maxNodes: z.number().int().min(1).max(2000).optional().describe('rev-list 最多枚举的提交数，缺省 200')
+});
+export type GitBranchGraphArgs = z.infer<typeof GitBranchGraphSchema>;
+
+export const GitReflogSchema = z.object({
+  ...readonlyBase,
+  maxCount: z.number().int().min(1).max(500).optional().describe('最多返回条数，缺省 50')
+});
+export type GitReflogArgs = z.infer<typeof GitReflogSchema>;
+
 const mergeIntoFrom = {
   into: z.string().min(1).describe('合入目标（线上 / ours / 预演左侧）。例如 origin/main'),
   from: z.string().min(1).describe('我的分支（theirs / 预演右侧）。例如 feature/x'),
@@ -99,6 +111,16 @@ export const GitMergeRehearseSchema = z.object({
   maxFiles: z.number().int().min(1).max(100).optional().describe('最多生成冲突正文的文件数，缺省 20')
 });
 export type GitMergeRehearseArgs = z.infer<typeof GitMergeRehearseSchema>;
+
+export const GitMergeBlameSchema = z.object({
+  ...readonlyBase,
+  into: z.string().min(1).describe('合入目标（线上 / ours）'),
+  from: z.string().min(1).describe('我的分支（theirs）'),
+  path: z.string().min(1).describe('要溯源的冲突文件路径'),
+  fetch: z.boolean().optional().describe('是否先非交互 fetch。缺省 false（预演之后按需拉）'),
+  remote: z.string().optional().describe('fetch 使用的远程名，缺省 origin')
+});
+export type GitMergeBlameArgs = z.infer<typeof GitMergeBlameSchema>;
 
 export const GitMergeSurveySchema = z.object({
   ...readonlyBase,

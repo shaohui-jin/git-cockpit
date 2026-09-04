@@ -196,6 +196,7 @@ describe('git_merge_survey / git_merge_order', () => {
 
       const orderDef = TOOL_DEF_MAP.get('git_merge_order')!;
       expect(TOOL_RISK_LEVELS['git_merge_order']).toBe('readonly');
+      expect(TOOL_RISK_LEVELS['git_merge_blame']).toBe('readonly');
       const order = await executeTool(
         orderDef,
         { into: 'main', branches: ['feature/x', 'main'], fetch: false },

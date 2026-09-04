@@ -205,6 +205,41 @@ describe('Web API', () => {
     });
   });
 
+  it('GET/PUT /api/settings 可更新 allowedRepos，名单外仓库拒绝打开', async () => {
+    const get = await server.app.inject({ method: 'GET', url: '/api/settings' });
+    expect(get.statusCode).toBe(200);
+    expect(get.json().git.allowedRepos).toEqual([]);
+
+    const blocked = await server.app.inject({
+      method: 'PUT',
+      url: '/api/settings',
+      payload: { git: { allowedRepos: [path.resolve('/__not_allowed__')] } }
+    });
+    expect(blocked.statusCode).toBe(200);
+
+    const denied = await server.app.inject({
+      method: 'POST',
+      url: '/api/repos/open',
+      payload: { path: repoDir }
+    });
+    expect(denied.statusCode).toBe(400);
+    const deniedBody = denied.json() as { error?: { message?: string } | string };
+    const deniedMsg = typeof deniedBody.error === 'string' ? deniedBody.error : deniedBody.error?.message ?? '';
+    expect(deniedMsg).toMatch(/allowedRepos|白名单/);
+
+    await server.app.inject({
+      method: 'PUT',
+      url: '/api/settings',
+      payload: { git: { allowedRepos: [] } }
+    });
+    const allowed = await server.app.inject({
+      method: 'POST',
+      url: '/api/repos/open',
+      payload: { path: repoDir }
+    });
+    expect(allowed.statusCode).toBe(200);
+  });
+
   it('PUT /api/settings 无效 Token 不落盘', async () => {
     const before = await server.app.inject({ method: 'GET', url: '/api/settings' });
     expect(before.json().mr.hosts).toEqual([]);

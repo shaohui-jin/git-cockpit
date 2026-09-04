@@ -1,6 +1,6 @@
 {
   "name": "@shaohui_jin/git-cockpit-core",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "type": "module",
   "description": "Git Cockpit 共享核心逻辑：GitService、权限、备份、日志",
   "main": "./dist/index.js",

@@ -32,6 +32,7 @@ export function createMcpServer(runtime: Runtime): McpServer {
         '4. 未指定 repoPath 时使用最近打开的仓库；',
         '5. 合并预演用 git_merge_preview / git_merge_rehearse（merge-tree，不改工作区），',
         '   into=合入目标/线上，from=我的分支；禁止用 git_merge 做预演。',
+        '   冲突行作者用 git_merge_blame（按文件、只读）。',
         '   多分支扫描用 git_merge_survey；建议合入顺序用 git_merge_order。',
         '6. 落盘用 git_apply_resolve（独立 worktree，主区不切换）；冲突时把选边后的 files 一并传入。',
         '7. 开 PR/MR 用 git_mr_prepare / git_mr_create。方式与 Token 在设置 MR 配置（不进工具参数）：本机 gh·glab / Token / 浏览器页。找不到 CLI 时结果含官方安装地址。'

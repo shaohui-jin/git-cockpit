@@ -7,6 +7,7 @@
    - 行高：var(--gc-line) 32px（菜单 / 表格行）
    - 内边距：var(--gc-pad) 12px（卡片等上限）
    - 间距：var(--gc-gap) 8px（组件与组件间隙）
+   - 浮层阴影：var(--gc-shadow-menu)（右键 / 下拉，与页面底拉开）
 
    依赖：element-plus/theme-chalk/dark/css-vars.css（main.ts 已引入）+ html.dark
    ========================================================================== */
@@ -20,6 +21,13 @@
   --gc-pad: 12px;
   --gc-gap: 8px;
   --gc-radius: 6px;
+  --gc-ctx-menu: 100px;
+  --gc-shadow-menu:
+    0 8px 24px color-mix(in srgb, #102028 14%, transparent),
+    0 0 0 1px var(--el-border-color-lighter);
+
+  /* Element 浮层默认吃 --el-box-shadow-light，与 --gc-shadow-menu 对齐 */
+  --el-box-shadow-light: var(--gc-shadow-menu);
 
   /* 合并选边：绿新增 / 蓝修改 / 红冲突（透明叠在现有底上） */
   --gc-merge-add: color-mix(in srgb, var(--el-color-success) 16%, transparent);
@@ -73,6 +81,10 @@ html.dark {
   --el-text-color-secondary: #8b94a6;
   --el-text-color-placeholder: #5d6676;
   --el-text-color-disabled: #4a5261;
+  --gc-shadow-menu:
+    0 10px 28px color-mix(in srgb, #000 58%, transparent),
+    0 0 0 1px var(--el-border-color);
+  --el-box-shadow-light: var(--gc-shadow-menu);
 }
 
 html.dark body {
@@ -128,6 +140,14 @@ body,
 .el-table .el-table__body td.el-table__cell,
 .el-table .el-table__header th.el-table__cell {
   height: var(--gc-line);
+  padding: 0;
+}
+.el-table .el-table__body td.el-table__cell .cell {
+  height: var(--gc-line);
+  line-height: var(--gc-line);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .el-table .el-table__header th.el-table__cell {
   font-weight: 600;
@@ -197,11 +217,37 @@ body,
   padding: 0 var(--gc-pad) var(--gc-pad);
 }
 
-/* ---- 下拉菜单：紧凑行高 ---- */
+/* ---- 下拉 / 右键菜单：行高 --gc-line，字号 --gc-text；阴影走 --gc-shadow-menu ---- */
+.el-dropdown-menu {
+  padding: 4px 0;
+  background: var(--el-bg-color-overlay);
+  border: none;
+  border-radius: var(--gc-radius);
+  box-shadow: var(--gc-shadow-menu);
+}
 .el-dropdown-menu__item {
   font-size: var(--gc-text);
-  line-height: 28px;
+  height: var(--gc-line);
+  line-height: var(--gc-line);
   padding: 0 var(--gc-pad);
+}
+.el-dropdown-menu__item.gc-danger {
+  color: var(--el-color-danger);
+}
+.el-dropdown-menu__item.gc-danger:not(.is-disabled):hover,
+.el-dropdown-menu__item.gc-danger:not(.is-disabled):focus {
+  color: var(--el-color-danger);
+  background-color: color-mix(in srgb, var(--el-color-danger) 14%, transparent);
+}
+.gc-branch-menu {
+  position: fixed;
+  z-index: 4000;
+  width: var(--gc-ctx-menu);
+  min-width: var(--gc-ctx-menu);
+  max-width: var(--gc-ctx-menu);
+  box-sizing: border-box;
+  margin: 0;
+  list-style: none;
 }
 
 /* ---- Select / TreeSelect 下拉：宽度锁成触发器，长 option 省略 ----

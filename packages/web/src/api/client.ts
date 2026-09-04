@@ -3,15 +3,21 @@
  * 统一处理：JSON 序列化、错误体解析、403/400/401 等状态的语义化。
  */
 import type {
+  BranchGraph,
   BranchInfo,
+  BackupList,
+  CloneJobDetail,
+  CloneJobSummary,
   CommitInfo,
   DiffResult,
   GraphData,
   HealthInfo,
+  JobProgressPayload,
   LogEntry,
   MrSettings,
   OpenedRepo,
   PermissionsPayload,
+  ReflogEntry,
   RemoteInfo,
   RepoStatus,
   SettingsData,
@@ -154,6 +160,30 @@ export function getGraph(id: number, maxCount = 500): Promise<GraphData> {
   return request('GET', `/api/repos/${id}/graph?maxCount=${maxCount}`);
 }
 
+export function getBranchGraph(id: number, maxNodes = 200): Promise<BranchGraph> {
+  return request('GET', `/api/repos/${id}/branch-graph?maxNodes=${maxNodes}`);
+}
+
+export function getReflog(id: number, maxCount = 50): Promise<ReflogEntry[]> {
+  return request('GET', `/api/repos/${id}/reflog?maxCount=${maxCount}`);
+}
+
+export function listBackups(id: number): Promise<BackupList> {
+  return request('GET', `/api/repos/${id}/backups`);
+}
+
+export function listJobs(): Promise<{ jobs: CloneJobSummary[] }> {
+  return request('GET', '/api/jobs');
+}
+
+export function getJob(id: string): Promise<{ job: CloneJobDetail }> {
+  return request('GET', `/api/jobs/${encodeURIComponent(id)}`);
+}
+
+export function startClone(url: string, destDir: string): Promise<{ job: CloneJobSummary }> {
+  return request('POST', '/api/jobs/clone', { url, destDir });
+}
+
 export function getFileContent(id: number, commit: string, path: string): Promise<{ content: string; truncated: boolean }> {
   return request('GET', `/api/repos/${id}/file?commit=${encodeURIComponent(commit)}&path=${encodeURIComponent(path)}`);
 }
@@ -190,6 +220,7 @@ export function getSettings(repoId?: number | null, opts?: { validateToken?: boo
 export function updateSettings(
   body: {
     permissions?: Partial<PermissionsPayload>;
+    git?: { allowedRepos?: string[] };
     mr?: {
       method?: MrSettings['method'];
       defaultRemote?: string;
@@ -216,11 +247,15 @@ export function getHealth(): Promise<HealthInfo> {
 export function subscribeEvents(handlers: {
   onRepoChanged?: (payload: { repoPath: string; command: string[]; at: string }) => void;
   onLog?: () => void;
+  onJobProgress?: (payload: JobProgressPayload) => void;
   onError?: (err: Event) => void;
 }): () => void {
   const es = new EventSource('/api/events');
   if (handlers.onRepoChanged) es.addEventListener('repo-changed', (e) => handlers.onRepoChanged?.(JSON.parse((e as MessageEvent).data)));
   if (handlers.onLog) es.addEventListener('log', () => handlers.onLog?.());
+  if (handlers.onJobProgress) {
+    es.addEventListener('job-progress', (e) => handlers.onJobProgress?.(JSON.parse((e as MessageEvent).data)));
+  }
   if (handlers.onError) es.onerror = (e) => handlers.onError?.(e);
   return () => es.close();
 }

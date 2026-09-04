@@ -481,6 +481,9 @@ watch([pairInto, pairFrom], () => {
           v-if="preview.outcome === 'conflicts' && preview.conflictFiles.length"
           ref="resolvePanel"
           :files="preview.conflictFiles"
+          :repo-id="repoId()"
+          :into="pairInto"
+          :from="pairFrom"
           @progress="resolvePending = $event.pending"
         />
         <el-empty v-else-if="preview.clean" description="没有冲突文件" />

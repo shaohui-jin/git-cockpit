@@ -72,7 +72,7 @@ onMounted(() => {
 
     <el-card shadow="never">
       <el-table :data="logs.logs" v-loading="logs.loading" size="default">
-        <el-table-column label="时间" width="180">
+        <el-table-column label="时间" width="150">
           <template #default="{ row }">{{ formatTime(row.timestamp) }}</template>
         </el-table-column>
         <el-table-column label="来源" width="90">
@@ -80,34 +80,34 @@ onMounted(() => {
             <el-tag :type="sourceTag(row.source)" size="small" effect="plain">{{ row.source.toUpperCase() }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="工具" width="200">
+        <el-table-column label="工具" width="260" show-overflow-tooltip>
           <template #default="{ row }">
-            <div class="tool-cell">
+            <span class="tool-cell">
               <el-tag :type="tagType(row.tool)" size="small" effect="dark">{{ row.tool }}</el-tag>
-              <el-tag v-if="row.dryRun" size="small" type="info" effect="plain" class="dry-tag">dry-run</el-tag>
-            </div>
+              <el-tag v-if="row.dryRun" size="small" type="info" effect="plain">dry-run</el-tag>
+            </span>
           </template>
         </el-table-column>
-        <el-table-column label="仓库" min-width="200">
+        <el-table-column label="仓库" min-width="200" show-overflow-tooltip>
           <template #default="{ row }">
             <span class="mono repo-path">{{ row.repoPath ?? '—' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="参数（脱敏）" min-width="180">
+        <el-table-column label="参数（脱敏）" min-width="180" show-overflow-tooltip>
           <template #default="{ row }">
-            <span class="mono params" :title="parseParams(row.params)">{{ parseParams(row.params) || '—' }}</span>
+            <span class="mono params">{{ parseParams(row.params) || '—' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="结果" min-width="150">
+        <el-table-column label="结果" min-width="150" show-overflow-tooltip>
           <template #default="{ row }">
-            <template v-if="row.error">
-              <el-tag type="danger" size="small" effect="plain" class="result-tag">失败</el-tag>
-              <div class="err-text" :title="row.error">{{ row.error }}</div>
-            </template>
-            <template v-else>
-              <el-tag type="success" size="small" effect="plain" class="result-tag">成功</el-tag>
-              <div class="ok-text" :title="row.result">{{ row.result }}</div>
-            </template>
+            <span v-if="row.error" class="result-line">
+              <el-tag type="danger" size="small" effect="plain">失败</el-tag>
+              {{ row.error }}
+            </span>
+            <span v-else class="result-line">
+              <el-tag type="success" size="small" effect="plain">成功</el-tag>
+              {{ row.result }}
+            </span>
           </template>
         </el-table-column>
         <el-table-column label="耗时" width="90">
@@ -144,41 +144,14 @@ onMounted(() => {
   color: var(--el-text-color-secondary);
 }
 .tool-cell {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
+  vertical-align: middle;
 }
-.dry-tag {
-  font-size: 11px;
-}
-.repo-path {
+.repo-path,
+.params,
+.result-line {
   font-size: 12px;
-  word-break: break-all;
-}
-.params {
-  font-size: 12px;
-  max-width: 260px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.err-text {
-  font-size: 12px;
-  color: var(--el-color-danger);
-  max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ok-text {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-  max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.result-tag {
-  margin-right: 6px;
 }
 </style>

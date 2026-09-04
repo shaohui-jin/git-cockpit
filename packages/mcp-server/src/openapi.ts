@@ -22,14 +22,20 @@ const REST_META: Record<string, { summary: string; tags: string[] }> = {
   'get /api/repos/{id}/branches': { summary: '分支列表', tags: ['只读'] },
   'get /api/repos/{id}/tags': { summary: '标签列表', tags: ['只读'] },
   'get /api/repos/{id}/remotes': { summary: '远程列表', tags: ['只读'] },
-  'get /api/repos/{id}/graph': { summary: '提交图数据', tags: ['只读'] },
+  'get /api/repos/{id}/graph': { summary: '提交列表图数据（git log）', tags: ['只读'] },
+  'get /api/repos/{id}/branch-graph': { summary: '分支 tip DAG（状态页 G6）', tags: ['只读'] },
   'get /api/repos/{id}/file': { summary: '读取某提交中的文件', tags: ['只读'] },
   'get /api/repos/{id}/stashes': { summary: 'stash 列表', tags: ['只读'] },
+  'get /api/repos/{id}/backups': { summary: '高危操作备份分支 / stash', tags: ['只读'] },
+  'get /api/repos/{id}/reflog': { summary: 'reflog', tags: ['只读'] },
+  'get /api/jobs': { summary: '后台任务列表（克隆等）', tags: ['仓库'] },
+  'get /api/jobs/{id}': { summary: '后台任务详情与日志', tags: ['仓库'] },
+  'post /api/jobs/clone': { summary: '后台克隆远程仓库', tags: ['仓库'] },
   'get /api/tools': { summary: '工具注册表（含风险与是否启用）', tags: ['系统'] },
   'get /api/logs': { summary: '操作审计日志', tags: ['系统'] },
   'get /api/settings': { summary: '配置与权限', tags: ['设置'] },
   'put /api/settings': { summary: '更新权限或 MR 配置（Token 明文不回读，保存前校验）', tags: ['设置'] },
-  'get /api/events': { summary: 'SSE：仓库变化与日志', tags: ['系统'] }
+  'get /api/events': { summary: 'SSE：仓库变化、日志、后台任务进度', tags: ['系统'] }
 };
 
 type OpenApiDoc = {

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
-import type { ConflictFile } from '@/api/types';
+import type { ConflictBlameResult, ConflictFile } from '@/api/types';
+import * as api from '@/api/client';
 import {
   applyHunkActions,
   buildChangeHunks,
@@ -13,6 +14,9 @@ import {
 
 const props = defineProps<{
   files: ConflictFile[];
+  repoId: number | null;
+  into: string;
+  from: string;
 }>();
 
 const activePath = ref('');
@@ -20,6 +24,9 @@ const activeHunkId = ref<string | null>(null);
 const autoOnlyExpanded = ref(false);
 const hunksByPath = ref<Record<string, ChangeHunk[]>>({});
 const scrollRootRef = ref<HTMLElement | null>(null);
+const blame = ref<ConflictBlameResult | null>(null);
+const blameLoading = ref(false);
+const blameError = ref('');
 
 function initFromFiles(files: ConflictFile[]): void {
   const next: Record<string, ChangeHunk[]> = {};
@@ -190,6 +197,61 @@ const emit = defineEmits<{
 
 watch(allStats, (s) => emit('progress', s), { immediate: true });
 
+function formatBlameSide(commits: { author: string; summary: string }[]): string {
+  if (!commits.length) return '（无溯源）';
+  const seen = new Set<string>();
+  const parts: string[] = [];
+  for (const c of commits) {
+    const key = `${c.author}\0${c.summary}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    parts.push(`${c.author} · ${c.summary}`);
+    if (parts.length >= 3) break;
+  }
+  return parts.join('；');
+}
+
+const blameOurs = computed(() => formatBlameSide(blame.value?.hunks.flatMap((h) => h.ours) ?? []));
+const blameTheirs = computed(() => formatBlameSide(blame.value?.hunks.flatMap((h) => h.theirs) ?? []));
+
+async function loadBlame(filePath: string): Promise<void> {
+  const id = props.repoId;
+  if (id == null || !filePath || !props.into || !props.from) {
+    blame.value = null;
+    blameError.value = '';
+    return;
+  }
+  blameLoading.value = true;
+  blameError.value = '';
+  try {
+    const exec = await api.runTool(id, 'git_merge_blame', {
+      into: props.into,
+      from: props.from,
+      path: filePath,
+      fetch: false
+    });
+    if (!exec.success || !exec.result || typeof exec.result !== 'object') {
+      blame.value = null;
+      blameError.value = exec.error?.message ?? '溯源失败';
+      return;
+    }
+    blame.value = exec.result as ConflictBlameResult;
+  } catch (err) {
+    blame.value = null;
+    blameError.value = err instanceof Error ? err.message : String(err);
+  } finally {
+    blameLoading.value = false;
+  }
+}
+
+watch(
+  () => [activePath.value, props.into, props.from, props.repoId] as const,
+  ([filePath]) => {
+    void loadBlame(filePath);
+  },
+  { immediate: true }
+);
+
 defineExpose({ buildFiles });
 </script>
 
@@ -278,6 +340,14 @@ defineExpose({ buildFiles });
             <div />
             <div>我的分支</div>
           </header>
+          <div v-if="blameLoading || blameError || blame" class="blame-bar">
+            <span v-if="blameLoading" class="muted">正在溯源作者…</span>
+            <span v-else-if="blameError" class="blame-err">{{ blameError }}</span>
+            <template v-else>
+              <span class="blame-side">线上：{{ blameOurs }}</span>
+              <span class="blame-side">我的：{{ blameTheirs }}</span>
+            </template>
+          </div>
           <div v-if="hunks.length === 0" class="empty">没有可展示的变更</div>
           <div
             v-for="h in hunks"
@@ -496,6 +566,22 @@ defineExpose({ buildFiles });
   display: flex;
   align-items: center;
   padding: 0 var(--gc-pad);
+}
+.blame-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gc-gap);
+  padding: 4px var(--gc-pad);
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  background: var(--el-fill-color-lighter);
+  font-size: var(--gc-text);
+  color: var(--el-text-color-secondary);
+}
+.blame-side {
+  min-width: 0;
+}
+.blame-err {
+  color: var(--el-color-warning);
 }
 .empty {
   padding: var(--gc-pad);

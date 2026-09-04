@@ -129,20 +129,14 @@ onMounted(() => void refresh());
             <span class="mono hash">{{ row.shortHash }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="信息" min-width="300">
+        <el-table-column label="信息" min-width="300" show-overflow-tooltip>
           <template #default="{ row }">
-            <div class="subject">{{ row.subject }}</div>
-            <div v-if="row.refs" class="refs">
-              <el-tag v-for="r in row.refs.split(',').map((s: string) => s.trim()).filter(Boolean)" :key="r" size="small" effect="plain" class="ref-tag">
-                {{ r.startsWith('tag: ') ? r : (r.includes('/') && !r.startsWith('HEAD') ? r.split('/').pop() : r) }}
-              </el-tag>
-            </div>
+            <span class="subject" :title="row.refs ? `${row.subject}  ·  ${row.refs}` : row.subject">{{ row.subject }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="作者" width="170">
+        <el-table-column label="作者" width="170" show-overflow-tooltip>
           <template #default="{ row }">
-            <div>{{ row.authorName }}</div>
-            <div class="sub">{{ row.authorEmail }}</div>
+            <span :title="`${row.authorName} <${row.authorEmail}>`">{{ row.authorName }}</span>
           </template>
         </el-table-column>
         <el-table-column label="时间" width="180">
@@ -207,17 +201,6 @@ onMounted(() => void refresh());
 }
 .subject {
   font-weight: 500;
-}
-.sub {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-.refs {
-  margin-top: 2px;
-}
-.ref-tag {
-  margin-right: 4px;
-  font-size: 11px;
 }
 .commit-head {
   margin-bottom: 4px;

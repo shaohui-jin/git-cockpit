@@ -40,10 +40,13 @@ export class BackupManager {
     return { stashRef, branch, timestamp };
   }
 
-  /** 列出所有备份分支 */
+  /** 列出备份分支，以及说明里带 git-cockpit backup 的 stash */
   async listBackups(): Promise<{ branches: string[]; stashes: string[] }> {
     const { branches } = await this.git.listBranches();
-    const backups = branches.filter((b) => b.name.includes('backup/pre-op-')).map((b) => b.name);
-    return { branches: backups, stashes: [] };
+    const backups = branches.filter((b) => !b.remote && b.name.includes('backup/pre-op-')).map((b) => b.name);
+    const stashes = (await this.git.listStashes())
+      .filter((s) => /git-cockpit backup/i.test(s.message))
+      .map((s) => s.ref);
+    return { branches: backups, stashes };
   }
 }

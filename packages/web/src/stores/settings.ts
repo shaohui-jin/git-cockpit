@@ -6,6 +6,7 @@ interface State {
   permissions: PermissionsPayload | null;
   tools: ToolSummary[];
   mr: MrSettings | null;
+  allowedRepos: string[];
   loading: boolean;
   saving: boolean;
   error: string | null;
@@ -130,6 +131,7 @@ export const useSettingsStore = defineStore('settings', {
     permissions: null,
     tools: [],
     mr: null,
+    allowedRepos: [],
     loading: false,
     saving: false,
     error: null
@@ -145,6 +147,7 @@ export const useSettingsStore = defineStore('settings', {
         ]);
         this.permissions = data.permissions;
         this.tools = data.tools;
+        this.allowedRepos = data.git?.allowedRepos ?? [];
         this.mr = attachRepoRemotes(normalizeMr(data.mr), remotes);
       } catch (err) {
         this.error = err instanceof Error ? err.message : String(err);
@@ -160,6 +163,9 @@ export const useSettingsStore = defineStore('settings', {
         const res = await api.updateSettings(body, repoId);
         if (body.permissions && this.permissions) {
           this.permissions = { ...this.permissions, ...body.permissions };
+        }
+        if (body.git?.allowedRepos) {
+          this.allowedRepos = body.git.allowedRepos;
         }
         if (res.mr) {
           const incoming = normalizeMr(res.mr);
