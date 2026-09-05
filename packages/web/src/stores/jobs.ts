@@ -19,6 +19,18 @@ function upsert(list: JobRow[], row: JobRow): JobRow[] {
   return next.sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1));
 }
 
+function appendLogChunk(logs: string[], chunk: string): void {
+  const lines = chunk.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+  if (!lines.length) return;
+  const last = logs[logs.length - 1] ?? '';
+  if (logs.length > 0 && !last.endsWith('\n') && chunk[0] !== '\n') {
+    logs[logs.length - 1] = last + lines[0];
+    logs.push(...lines.slice(1));
+  } else {
+    logs.push(...lines);
+  }
+}
+
 export const useJobsStore = defineStore('jobs', {
   state: (): State => ({
     jobs: [],
@@ -59,7 +71,7 @@ export const useJobsStore = defineStore('jobs', {
     onProgress(p: JobProgressPayload): void {
       const cur = this.jobs.find((j) => j.id === p.id);
       const logs = cur?.logs ? cur.logs.slice() : [];
-      if (p.chunk) logs.push(p.chunk);
+      if (p.chunk) appendLogChunk(logs, p.chunk);
       const status: JobStatus = p.status;
       this.jobs = upsert(this.jobs, {
         id: p.id,
@@ -72,9 +84,12 @@ export const useJobsStore = defineStore('jobs', {
         finishedAt: p.finishedAt,
         repoId: p.repoId,
         logCount: p.logCount,
-        tail: logs.slice(-3).join(''),
+        tail: logs.slice(-3).join('\n'),
         logs
       });
+      if (status === 'ok' || status === 'error') {
+        void this.loadDetail(p.id).catch(() => undefined);
+      }
     }
   }
 });

@@ -2,7 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { DatabaseSync } from 'node:sqlite';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { AuditLogger, DEFAULT_CONFIG, RepoStore, openDatabase } from '../src/index.ts';
+import { AuditLogger, DEFAULT_CONFIG, JobStore, RepoStore, openDatabase } from '../src/index.ts';
 import { cleanupTmp, makeTmpDir } from './helpers.ts';
 
 describe('AuditLogger（SQLite）', () => {
@@ -134,6 +134,89 @@ describe('RepoStore（SQLite）', () => {
     const r = store.open('/repo/x');
     store.remove(r.id);
     expect(store.getById(r.id)).toBeNull();
+    expect(store.list()).toHaveLength(0);
+  });
+});
+
+describe('JobStore（SQLite）', () => {
+  let dir: string;
+  let db: DatabaseSync;
+  let store: JobStore;
+
+  beforeEach(() => {
+    cleanupTmp();
+    dir = makeTmpDir('job-');
+    db = openDatabase(dir);
+    store = new JobStore(db);
+  });
+
+  afterAll(() => cleanupTmp());
+
+  it('upsert 后按 started_at 倒序列出', () => {
+    store.upsert({
+      id: 'clone-old',
+      kind: 'clone',
+      status: 'ok',
+      url: 'https://example.com/a.git',
+      destDir: '/a',
+      logs: ['done'],
+      startedAt: '2026-01-01T00:00:00.000Z',
+      finishedAt: '2026-01-01T00:01:00.000Z'
+    });
+    store.upsert({
+      id: 'clone-new',
+      kind: 'clone',
+      status: 'error',
+      url: 'https://example.com/b.git',
+      destDir: '/b',
+      logs: ['fail'],
+      error: 'boom',
+      startedAt: '2026-01-02T00:00:00.000Z',
+      finishedAt: '2026-01-02T00:01:00.000Z'
+    });
+    const list = store.list();
+    expect(list.map((j) => j.id)).toEqual(['clone-new', 'clone-old']);
+    expect(store.get('clone-new')?.error).toBe('boom');
+    expect(store.get('clone-new')?.logs).toEqual(['fail']);
+  });
+
+  it('同 id 覆盖写入', () => {
+    store.upsert({
+      id: 'clone-1',
+      kind: 'clone',
+      status: 'running',
+      url: 'https://example.com/a.git',
+      destDir: '/a',
+      logs: ['start'],
+      startedAt: '2026-01-01T00:00:00.000Z'
+    });
+    store.upsert({
+      id: 'clone-1',
+      kind: 'clone',
+      status: 'ok',
+      url: 'https://example.com/a.git',
+      destDir: '/a',
+      logs: ['start', 'done'],
+      startedAt: '2026-01-01T00:00:00.000Z',
+      finishedAt: '2026-01-01T00:02:00.000Z',
+      repoId: 7
+    });
+    expect(store.list()).toHaveLength(1);
+    expect(store.get('clone-1')).toMatchObject({ status: 'ok', repoId: 7, logs: ['start', 'done'] });
+  });
+
+  it('remove 删除任务', () => {
+    store.upsert({
+      id: 'clone-1',
+      kind: 'clone',
+      status: 'ok',
+      url: 'https://example.com/a.git',
+      destDir: '/a',
+      logs: [],
+      startedAt: '2026-01-01T00:00:00.000Z'
+    });
+    store.remove('clone-1');
+    expect(store.get('clone-1')).toBeNull();
     expect(store.list()).toHaveLength(0);
   });
 });

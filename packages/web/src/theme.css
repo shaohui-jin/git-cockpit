@@ -201,8 +201,26 @@ body,
   padding: var(--gc-gap) var(--gc-pad) var(--gc-pad);
 }
 .el-drawer__header {
-  padding: var(--gc-pad) var(--gc-pad) 0;
+  padding: 0 var(--gc-pad);
   margin-bottom: 0;
+  height: var(--gc-line);
+  min-height: var(--gc-line);
+  box-sizing: border-box;
+  align-items: center;
+}
+.el-drawer__title {
+  font-size: var(--gc-text);
+  line-height: var(--gc-line);
+  font-weight: 500;
+  color: var(--el-text-color-primary);
+}
+.el-drawer__close-btn {
+  margin: 0;
+  height: var(--gc-line);
+  width: var(--gc-line);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .el-drawer__body {
   padding: var(--gc-gap) var(--gc-pad);
@@ -339,12 +357,12 @@ body,
   border-radius: var(--gc-radius);
 }
 
-/* 文件头：高度收敛到 --gc-line 档位 */
+/* 文件头：对齐 --gc-line / --gc-pad */
 .d2h-file-header {
-  height: 30px;
+  height: var(--gc-line);
   padding: 0 var(--gc-pad);
   font-family: inherit;
-  line-height: 30px;
+  line-height: var(--gc-line);
 }
 
 .d2h-file-name-wrapper {
@@ -364,33 +382,51 @@ body,
   flex: none;
 }
 
-/* ── diff2html 单栏 line-by-line：锁定行高，行号对齐 ── */
+/* ── diff2html 单栏 line-by-line：行号回到表格单元格，与 +/- 同一行着色 ── */
 
-/* 代码表 */
 .d2h-diff-table {
   border-collapse: collapse !important;
   font-family: var(--el-font-family-mono, monospace);
   font-size: var(--gc-text);
 }
 
-/* 每一行：行高锁死 20px，禁止换行撑高 */
-.d2h-code-line,
-.d2h-code-side-line {
-  line-height: 20px !important;
-  height: 20px !important;
-  white-space: pre !important;
-  box-sizing: border-box !important;
-  padding: 0 !important;
-  margin: 0 !important;
+.d2h-diff-tbody > tr > td {
   vertical-align: top !important;
-  border: 0 !important;
+  height: 20px !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
 }
 
-/* 行号列：60px 宽，内部 line-num1 / line-num2 各占 50% 并排 */
+.d2h-diff-tbody > tr > td.d2h-code-linenumber {
+  overflow: visible !important;
+}
+
+.d2h-code-line,
+.d2h-code-side-line {
+  display: block !important;
+  width: auto !important;
+  max-width: none !important;
+  line-height: 20px !important;
+  height: 20px !important;
+  white-space: nowrap !important;
+  box-sizing: border-box !important;
+  padding: 0 8px 0 4px !important;
+  margin: 0 !important;
+  vertical-align: top !important;
+  border: 0 !important;
+  overflow: hidden !important;
+}
+
 .d2h-code-linenumber {
-  width: 60px !important;
-  min-width: 60px !important;
-  max-width: 60px !important;
+  position: relative !important;
+  display: table-cell !important;
+  top: auto !important;
+  left: auto !important;
+  float: none !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
   line-height: 20px !important;
   height: 20px !important;
   box-sizing: border-box !important;
@@ -398,20 +434,29 @@ body,
   margin: 0 !important;
   vertical-align: top !important;
   border: 0 !important;
+  white-space: nowrap !important;
+  overflow: visible !important;
+  font-size: 0;
 }
 
 .line-num1,
 .line-num2 {
   display: inline-block !important;
-  width: 50% !important;
-  text-align: center !important;
+  float: none !important;
+  width: 4.5em !important;
+  min-width: 4.5em !important;
+  max-width: none !important;
+  box-sizing: border-box !important;
+  padding: 0 4px !important;
+  text-align: right !important;
   font-size: 11px !important;
   line-height: 20px !important;
   height: 20px !important;
   vertical-align: top !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
 }
 
-/* 代码单元格：内容可见，不撑高 */
 .d2h-code-line-ctn,
 .d2h-code-side-line-ctn {
   white-space: pre !important;
@@ -423,11 +468,41 @@ body,
   border: 0 !important;
 }
 
-/* hunk 行（@@ ...）压一档 */
+.d2h-code-line-prefix {
+  display: inline-block !important;
+  width: 1.2em;
+  height: 20px !important;
+  line-height: 20px !important;
+  vertical-align: top !important;
+  white-space: pre !important;
+}
+
 .d2h-info {
-  line-height: 20px;
+  height: 20px !important;
+  line-height: 20px !important;
+  padding: 0 !important;
   font-size: 11px;
-  position: relative;
+  box-sizing: border-box !important;
+}
+
+.d2h-info .d2h-code-line {
+  padding: 0 8px !important;
+}
+
+.d2h-dark-color-scheme .d2h-file-diff .d2h-code-linenumber.d2h-ins {
+  background-color: var(--d2h-dark-ins-bg-color) !important;
+}
+.d2h-dark-color-scheme .d2h-file-diff .d2h-code-linenumber.d2h-del {
+  background-color: var(--d2h-dark-del-bg-color) !important;
+}
+.d2h-dark-color-scheme .d2h-file-diff .d2h-code-linenumber.d2h-ins.d2h-change {
+  background-color: rgba(46, 160, 67, 0.25) !important;
+}
+.d2h-dark-color-scheme .d2h-file-diff .d2h-code-linenumber.d2h-del.d2h-change {
+  background-color: rgba(210, 153, 34, 0.2) !important;
+}
+.d2h-dark-color-scheme .d2h-file-diff .d2h-code-linenumber.d2h-info {
+  background-color: var(--d2h-dark-info-bg-color) !important;
 }
 
 /* 文件头 CHANGED/ADDED 标签：对齐 --gc 设计令牌 */
@@ -470,9 +545,6 @@ body,
   color: var(--el-text-color-primary);
 }
 
-.d2h-code-linenumber {
-    position: relative;
-}
 /* ---- 滚动条：暗色下更收敛 ---- */
 ::-webkit-scrollbar {
   width: 8px;

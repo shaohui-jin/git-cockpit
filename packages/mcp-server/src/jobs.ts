@@ -1,21 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import type { EventEmitter } from 'node:events';
-import { assertCloneDest, assertSafeCloneUrl, spawnClone } from '@shaohui_jin/git-cockpit-core';
+import { assertCloneDest, assertSafeCloneUrl, JobStore, spawnClone, type CloneJob } from '@shaohui_jin/git-cockpit-core';
 
-export type JobStatus = 'running' | 'ok' | 'error';
-
-export interface CloneJob {
-  id: string;
-  kind: 'clone';
-  status: JobStatus;
-  url: string;
-  destDir: string;
-  logs: string[];
-  error?: string;
-  startedAt: string;
-  finishedAt?: string;
-  repoId?: number;
-}
+export type JobStatus = CloneJob['status'];
+export type { CloneJob };
 
 export interface JobProgressPayload {
   id: string;
@@ -33,9 +21,21 @@ export interface JobProgressPayload {
 
 const MAX_JOBS = 30;
 const MAX_LOG_LINES = 800;
+const INTERRUPT_MESSAGE = '服务重启，任务中断';
 
 function splitLines(text: string): string[] {
   return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+}
+
+export function appendPendingChunk(buf: Map<string, string>, jobId: string, chunk?: string): void {
+  if (!chunk) return;
+  buf.set(jobId, (buf.get(jobId) ?? '') + chunk);
+}
+
+export function takePendingChunk(buf: Map<string, string>, jobId: string): string | undefined {
+  const text = buf.get(jobId) ?? '';
+  buf.delete(jobId);
+  return text.length ? text : undefined;
 }
 
 export class JobManager {
@@ -43,8 +43,14 @@ export class JobManager {
   private lastEmit = 0;
   private pending: CloneJob | null = null;
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly pendingChunks = new Map<string, string>();
 
-  constructor(private readonly eventBus: EventEmitter) {}
+  constructor(
+    private readonly eventBus: EventEmitter,
+    private readonly store: JobStore
+  ) {
+    this.restore();
+  }
 
   list(): CloneJob[] {
     return [...this.jobs.values()].sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1));
@@ -93,10 +99,44 @@ export class JobManager {
       startedAt: new Date().toISOString()
     };
     this.jobs.set(job.id, job);
+    this.persist(job);
     this.prune();
     this.emit(job);
     void this.runClone(job, opts.onSuccess);
     return job;
+  }
+
+  private restore(): void {
+    const saved = this.store.list();
+    for (const job of saved) {
+      if (job.status === 'running') {
+        job.status = 'error';
+        job.error = INTERRUPT_MESSAGE;
+        job.finishedAt = new Date().toISOString();
+        job.logs.push(INTERRUPT_MESSAGE);
+        while (job.logs.length > MAX_LOG_LINES) job.logs.shift();
+        this.persist(job);
+      }
+      this.jobs.set(job.id, job);
+    }
+    this.prune();
+  }
+
+  private persist(job: CloneJob): void {
+    try {
+      this.store.upsert(job);
+    } catch {
+      /* 落盘失败不打断克隆 */
+    }
+  }
+
+  private remove(id: string): void {
+    this.jobs.delete(id);
+    try {
+      this.store.remove(id);
+    } catch {
+      /* ignore */
+    }
   }
 
   private async runClone(job: CloneJob, onSuccess?: (destDir: string) => Promise<number | void>): Promise<void> {
@@ -133,6 +173,7 @@ export class JobManager {
   }
 
   private emit(job: CloneJob, force = false, chunk?: string): void {
+    appendPendingChunk(this.pendingChunks, job.id, chunk);
     const now = Date.now();
     if (!force && now - this.lastEmit < 200) {
       this.pending = job;
@@ -148,13 +189,14 @@ export class JobManager {
       clearTimeout(this.flushTimer);
       this.flushTimer = null;
     }
+    this.persist(job);
     const payload: JobProgressPayload = {
       id: job.id,
       kind: job.kind,
       status: job.status,
       url: job.url,
       destDir: job.destDir,
-      chunk,
+      chunk: takePendingChunk(this.pendingChunks, job.id),
       error: job.error,
       startedAt: job.startedAt,
       finishedAt: job.finishedAt,
@@ -168,7 +210,7 @@ export class JobManager {
     const all = this.list();
     if (all.length <= MAX_JOBS) return;
     for (const j of all.slice(MAX_JOBS)) {
-      if (j.status !== 'running') this.jobs.delete(j.id);
+      if (j.status !== 'running') this.remove(j.id);
     }
   }
 }

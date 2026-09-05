@@ -9,7 +9,8 @@ import {
   AuditLogger,
   PermissionManager,
   RepoStore,
-  openDatabase
+  openDatabase,
+  trustSystemCa
 } from '@shaohui_jin/git-cockpit-core';
 import type { GitCockpitConfig } from '@shaohui_jin/git-cockpit-core';
 import { ConfigStore } from './config.ts';
@@ -35,6 +36,7 @@ export interface Runtime {
 
 /** 创建运行时（唯一后端共享）；须在进程生命周期内调用一次 */
 export function createRuntime(options: RuntimeOptions = {}): Runtime {
+  trustSystemCa();
   const configStore = new ConfigStore(options.dataDir ?? '~/.git-cockpit', options.configOverrides);
   const config = configStore.get();
   const db = options.db ?? openDatabase(config.storage.dataDir);

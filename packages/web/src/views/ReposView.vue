@@ -22,7 +22,9 @@ const activeJobId = ref<string | null>(null);
 const jobDetailLoading = ref(false);
 
 const activeJob = computed(() => jobs.jobs.find((j) => j.id === activeJobId.value) ?? null);
-const jobLogText = computed(() => (activeJob.value?.logs ?? []).join(''));
+const jobLogText = computed(() =>
+  (activeJob.value?.logs ?? []).join('\n').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+);
 
 /** 路径树节点：叶子带 repo（完整路径），非叶子为按路径分隔符拆出的目录 */
 interface PathTreeNode {

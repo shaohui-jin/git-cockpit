@@ -2,6 +2,7 @@
  * Token 格式校验 + GitHub/GitLab API 探测。明文不进 GET 响应，只回掩码与校验摘要。
  */
 import { gitlabApiRoot, parseGithubRepo } from './mr.ts';
+import { describeFetchError, trustSystemCa } from './trustSystemCa.ts';
 import type { MrTokenStatus } from './types.ts';
 
 export type { MrTokenStatus };
@@ -127,6 +128,7 @@ export async function validateMrToken(options: {
   skipFormat?: boolean;
 }): Promise<MrTokenStatus> {
   const token = options.token.trim();
+  trustSystemCa();
   if (options.platform === 'github') {
     if (!options.skipFormat) {
       const format = validateGithubTokenFormat(token);
@@ -160,7 +162,7 @@ export async function validateMrToken(options: {
       if (expired) return fail('已过期', 'Token 已过期', { login: user.login, expiresMessage: expiryMessage(expiresAt, 'github') });
       return okStatus({ login: user.login, expiresMessage: expiryMessage(expiresAt, 'github') });
     } catch (err) {
-      return fail('无效', `无法连接 GitHub API：${err instanceof Error ? err.message : String(err)}`);
+      return fail('无效', `无法连接 GitHub API：${describeFetchError(err)}`);
     }
   }
 
@@ -205,6 +207,6 @@ export async function validateMrToken(options: {
     }
     return okStatus({ login: user.username, expiresMessage: expiryMessage(expiresAt, 'gitlab') });
   } catch (err) {
-    return fail('无效', `无法连接 GitLab API：${err instanceof Error ? err.message : String(err)}`);
+    return fail('无效', `无法连接 GitLab API：${describeFetchError(err)}`);
   }
 }

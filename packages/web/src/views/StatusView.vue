@@ -11,6 +11,7 @@ import CommitGraph from '@/components/CommitGraph.vue';
 import BranchTreeSelect from '@/components/BranchTreeSelect.vue';
 import { useBranchesStore } from '@/stores/branches';
 import type { BranchTreeNode } from '@/utils/branchTree';
+import { buildChangeTree, treeFilePaths, type ChangeTreeNode } from '@/utils/changeTree';
 import type { BackupList, BranchGraph, BranchInfo, DiffResult, FileStatus, ReflogEntry, RepoStatus, StashInfo, ToolExecResult } from '@/api/types';
 
 const repos = useReposStore();
@@ -116,6 +117,13 @@ const tabs = computed(() => [
 
 const activeList = computed<FileStatus[]>(() => tabLists.value[activeTab.value] ?? []);
 const totalFiles = computed(() => tabLists.value.all.length);
+
+const tabTrees = computed(() => ({
+  unstaged: buildChangeTree(tabLists.value.unstaged),
+  staged: buildChangeTree(tabLists.value.staged),
+  untracked: buildChangeTree(tabLists.value.untracked),
+  all: buildChangeTree(tabLists.value.all)
+}));
 
 function syncText(b?: BranchInfo): string {
   if (!b || b.remote || !b.upstream) return '';
@@ -281,6 +289,26 @@ function clearChecked(): void {
 }
 function checkAllCurrentTab(): void {
   for (const f of activeList.value) checkedFiles.add(f.path);
+}
+
+function folderChecked(node: ChangeTreeNode): boolean {
+  const paths = treeFilePaths(node);
+  return paths.length > 0 && paths.every((p) => checkedFiles.has(p));
+}
+
+function folderIndeterminate(node: ChangeTreeNode): boolean {
+  const paths = treeFilePaths(node);
+  const n = paths.filter((p) => checkedFiles.has(p)).length;
+  return n > 0 && n < paths.length;
+}
+
+function toggleFolder(node: ChangeTreeNode): void {
+  const paths = treeFilePaths(node);
+  if (paths.every((p) => checkedFiles.has(p))) {
+    for (const p of paths) checkedFiles.delete(p);
+  } else {
+    for (const p of paths) checkedFiles.add(p);
+  }
 }
 function checkAllCandidates(): void {
   for (const p of stashCandidates.value) checkedFiles.add(p);
@@ -676,18 +704,38 @@ onUnmounted(() => {
               </template>
               <div class="tab-hint">「{{ t.hint }}」</div>
               <div v-if="t.count === 0" class="file-empty">没有{{ t.label }}的文件</div>
-              <div v-else class="file-list">
-                <div v-for="f in tabLists[t.key]" :key="t.key + f.path" class="file-row">
-                  <el-checkbox :model-value="isChecked(f.path)" @change="toggleChecked(f.path)" />
-                  <span class="file-status" :class="statusClass(f)">{{ statusLetter(f) }}</span>
-                  <span class="file-path mono" :title="f.path">{{ f.path }}</span>
-                  <el-button size="small" text type="primary" @click="showDiff(f)">查看差异</el-button>
-                  <el-button v-if="f.conflicted" size="small" text type="warning" @click="stageFile(f)">标记已解决(git add)</el-button>
-                  <el-button v-else size="small" text :type="f.staged ? 'warning' : 'success'" @click="rowAction(f)">
-                    {{ f.staged ? '取消暂存' : '暂存' }}
-                  </el-button>
-                </div>
-              </div>
+              <el-tree
+                v-else
+                :data="tabTrees[t.key]"
+                :props="{ label: 'label', children: 'children' }"
+                node-key="key"
+                default-expand-all
+                :indent="12"
+                class="change-tree"
+              >
+                <template #default="{ data }">
+                  <div v-if="data.file" class="change-file">
+                    <el-checkbox :model-value="isChecked(data.file.path)" @click.stop @change="toggleChecked(data.file.path)" />
+                    <span class="file-status" :class="statusClass(data.file)">{{ statusLetter(data.file) }}</span>
+                    <span class="file-path mono" :title="data.file.path">{{ data.label }}</span>
+                    <el-button size="small" text type="primary" @click.stop="showDiff(data.file)">查看差异</el-button>
+                    <el-button v-if="data.file.conflicted" size="small" text type="warning" @click.stop="stageFile(data.file)">标记已解决(git add)</el-button>
+                    <el-button v-else size="small" text :type="data.file.staged ? 'warning' : 'success'" @click.stop="rowAction(data.file)">
+                      {{ data.file.staged ? '取消暂存' : '暂存' }}
+                    </el-button>
+                  </div>
+                  <div v-else class="change-dir">
+                    <el-checkbox
+                      :model-value="folderChecked(data)"
+                      :indeterminate="folderIndeterminate(data)"
+                      @click.stop
+                      @change="toggleFolder(data)"
+                    />
+                    <span class="dir-name" :title="data.fullPath">{{ data.label }}</span>
+                    <span class="dir-count">{{ data.fileCount }}</span>
+                  </div>
+                </template>
+              </el-tree>
             </el-tab-pane>
           </el-tabs>
         </el-card>
@@ -1242,14 +1290,53 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   color: var(--el-text-color-secondary);
-  font-size: 13px;
-  padding: 20px 0;
+  font-size: var(--gc-text);
+  padding: var(--gc-pad) 0;
 }
-.file-list {
+.change-tree {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 4px 2px 8px;
+  background: transparent;
+  --el-tree-node-hover-bg-color: var(--el-fill-color-extra-light);
+}
+.change-tree :deep(.el-tree-node__content) {
+  height: var(--gc-line);
+  padding-right: var(--gc-pad);
+}
+.change-tree :deep(.el-tree-node__expand-icon) {
+  font-size: 11px;
+  flex: none;
+  padding: 0 2px;
+}
+.change-tree :deep(.el-tree-node__expand-icon.is-leaf) {
+  visibility: hidden;
+}
+.change-file,
+.change-dir {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--gc-gap);
+  height: var(--gc-line);
+}
+.change-file :deep(.el-button + .el-button) {
+  margin-left: 0;
+}
+.dir-name {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--gc-text);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dir-count {
+  flex: none;
+  font-size: var(--gc-text);
+  color: var(--el-text-color-secondary);
 }
 .file-list.compact {
   flex: none;
@@ -1260,7 +1347,8 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: var(--gc-gap);
-  padding: 4px;
+  height: var(--gc-line);
+  padding: 0 var(--gc-pad);
   border-bottom: 1px solid var(--el-border-color-lighter);
 }
 .file-row :deep(.el-button + .el-button) {
@@ -1295,9 +1383,12 @@ onUnmounted(() => {
 }
 .file-path {
   flex: 1;
-  font-size: 12px;
+  min-width: 0;
+  font-size: var(--gc-text);
   font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
-  word-break: break-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 记录：stash / 备份 / reflog 合一块，与更改对半铺满 */
@@ -1404,8 +1495,10 @@ onUnmounted(() => {
 /* 差异抽屉 */
 .diff-summary {
   display: flex;
+  align-items: center;
   gap: var(--gc-gap);
-  font-size: 12px;
+  height: var(--gc-line);
+  font-size: var(--gc-text);
   margin-bottom: var(--gc-gap);
 }
 .diff-summary .add {

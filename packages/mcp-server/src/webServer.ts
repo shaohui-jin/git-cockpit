@@ -31,7 +31,8 @@ import {
   toHttpsRemoteUrl,
   upsertMrHost,
   maskToken,
-  validateMrToken
+  validateMrToken,
+  JobStore
 } from '@shaohui_jin/git-cockpit-core';
 import type { MrCliStatus, MrTokenStatus, OpenedRepo } from '@shaohui_jin/git-cockpit-core';
 import { disposeRuntime } from './runtime.ts';
@@ -88,7 +89,7 @@ export async function createWebServer(
   }
 
   const mcpHttp = new McpHttpHandler(runtime);
-  const jobs = new JobManager(runtime.eventBus);
+  const jobs = new JobManager(runtime.eventBus, new JobStore(runtime.db));
 
   // Health
   app.get('/api/health', async () => ({

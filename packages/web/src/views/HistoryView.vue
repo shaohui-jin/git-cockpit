@@ -27,6 +27,7 @@ const maxCount = ref(50);
 const showVisible = ref(false);
 const showCommit = ref<CommitInfo | null>(null);
 const showDiff = ref<DiffResult | null>(null);
+const bodyOpen = ref(false);
 
 const currentBranch = computed(() => branchStore.current?.name ?? '');
 
@@ -66,8 +67,8 @@ async function openCommit(c: CommitInfo): Promise<void> {
     // 先请求成功再展开抽屉：COMMIT_NOT_FOUND 等错误直接 message 提示并拦截展开
     const { diff } = await api.getShow(id, c.hash);
     showCommit.value = c;
-    console.log(diff);
-    showDiff.value = diff
+    showDiff.value = diff;
+    bodyOpen.value = false;
     showVisible.value = true;
   } catch (err) {
     if (err instanceof api.ApiError && err.code === 'COMMIT_NOT_FOUND') {
@@ -147,28 +148,40 @@ onMounted(() => void refresh());
     </el-card>
 
     <el-drawer v-model="showVisible" size="60%" destroy-on-close>
-      <template v-if="showCommit">
-        <div class="commit-head">
-          <div class="mono commit-hash">{{ showCommit.hash }}</div>
-          <h3 class="commit-subject">{{ showCommit.subject }}</h3>
-          <div class="commit-meta">
-            <span>{{ showCommit.authorName }} &lt;{{ showCommit.authorEmail }}&gt;</span>
-            <span>{{ formatDate(showCommit.authorDate) }}</span>
-            <span v-if="showCommit.refs">refs: {{ showCommit.refs }}</span>
-          </div>
-          <pre v-if="showCommit.body" class="commit-body">{{ showCommit.body }}</pre>
+      <template #header>
+        <div v-if="showCommit" class="commit-title">
+          <span class="commit-subject" :title="showCommit.subject">{{ showCommit.subject }}</span>
+          <span class="commit-hash mono" :title="showCommit.hash">{{ showCommit.shortHash }}</span>
         </div>
-        <el-divider />
-        <div class="diff-wrap">
-          <template v-if="showDiff">
-            <div class="diff-summary">
-              <span>{{ showDiff.files.length }} 个文件</span>
-              <span class="add">+{{ showDiff.insertions }}</span>
-              <span class="del">-{{ showDiff.deletions }}</span>
-              <span v-if="showDiff.truncated" class="warn">（已截断）</span>
-            </div>
-            <DiffViewer :patch="showDiff.rawPatch" />
+      </template>
+      <template v-if="showCommit">
+        <div class="commit-meta">
+          <span class="commit-meta-item" :title="`${showCommit.authorName} <${showCommit.authorEmail}>`">{{ showCommit.authorName }}</span>
+          <span class="sep">·</span>
+          <span class="commit-meta-item">{{ formatDate(showCommit.authorDate) }}</span>
+          <template v-if="showCommit.refs">
+            <span class="sep">·</span>
+            <span class="commit-meta-item refs" :title="showCommit.refs">{{ showCommit.refs }}</span>
           </template>
+          <template v-if="showDiff">
+            <span class="sep">·</span>
+            <span class="commit-meta-item">{{ showDiff.files.length }} 个文件</span>
+            <span class="add">+{{ showDiff.insertions }}</span>
+            <span class="del">-{{ showDiff.deletions }}</span>
+            <span v-if="showDiff.truncated" class="warn">已截断</span>
+          </template>
+        </div>
+        <button
+          v-if="showCommit.body"
+          type="button"
+          class="commit-body-toggle"
+          @click="bodyOpen = !bodyOpen"
+        >
+          {{ bodyOpen ? '收起说明' : '展开说明' }}
+        </button>
+        <pre v-if="bodyOpen && showCommit.body" class="commit-body">{{ showCommit.body }}</pre>
+        <div class="diff-wrap">
+          <DiffViewer v-if="showDiff" :patch="showDiff.rawPatch" />
           <el-empty v-else description="无差异" :image-size="60" />
         </div>
       </template>
@@ -197,54 +210,93 @@ onMounted(() => void refresh());
   width: 110px;
 }
 .hash {
-  font-size: 12px;
+  font-size: var(--gc-text);
 }
 .subject {
   font-weight: 500;
 }
-.commit-head {
-  margin-bottom: 4px;
-}
-.commit-hash {
-  font-size: 13px;
-  color: var(--el-color-primary);
-  word-break: break-all;
+.commit-title {
+  display: flex;
+  align-items: center;
+  gap: var(--gc-gap);
+  min-width: 0;
+  flex: 1;
+  height: var(--gc-line);
+  padding-right: var(--gc-gap);
 }
 .commit-subject {
-  margin: var(--gc-gap) 0 6px;
-  font-size: 14px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--gc-text);
+  font-weight: 500;
+  color: var(--el-text-color-primary);
+}
+.commit-hash {
+  flex: none;
+  font-size: var(--gc-text);
+  color: var(--el-color-primary);
 }
 .commit-meta {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: 12.5px;
+  align-items: center;
+  gap: var(--gc-gap);
+  height: var(--gc-line);
+  margin-bottom: var(--gc-gap);
+  font-size: var(--gc-text);
   color: var(--el-text-color-secondary);
+  min-width: 0;
+  overflow: hidden;
+}
+.commit-meta-item {
+  flex: none;
+  white-space: nowrap;
+}
+.commit-meta .refs {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.commit-meta .sep {
+  flex: none;
+  color: var(--el-text-color-placeholder);
+}
+.commit-meta .add {
+  flex: none;
+  color: var(--el-color-success);
+}
+.commit-meta .del {
+  flex: none;
+  color: var(--el-color-danger);
+}
+.commit-meta .warn {
+  flex: none;
+  color: var(--el-color-warning);
+}
+.commit-body-toggle {
+  display: block;
+  height: var(--gc-line);
+  margin: 0 0 var(--gc-gap);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--el-color-primary);
+  font: inherit;
+  font-size: var(--gc-text);
+  cursor: pointer;
 }
 .commit-body {
-  margin: 10px 0 0;
-  padding: 10px 12px;
+  margin: 0 0 var(--gc-gap);
+  padding: var(--gc-gap) var(--gc-pad);
   background: var(--el-fill-color-light);
-  border-radius: 6px;
+  border-radius: var(--gc-radius);
   white-space: pre-wrap;
-  font-size: 13px;
+  font-size: var(--gc-text);
 }
 .diff-wrap {
   min-height: 200px;
-}
-.diff-summary {
-  display: flex;
-  gap: var(--gc-gap);
-  font-size: 12px;
-  margin-bottom: var(--gc-gap);
-}
-.diff-summary .add {
-  color: var(--el-color-success);
-}
-.diff-summary .del {
-  color: var(--el-color-danger);
-}
-.diff-summary .warn {
-  color: var(--el-color-warning);
 }
 </style>

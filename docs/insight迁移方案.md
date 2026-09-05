@@ -1,6 +1,6 @@
 # Git Insight → Git Cockpit：迁移与未实现功能方案
 
-> **日期**：2026-09-04  
+> **日期**：2026-09-05  
 > **对照**：`D:\_myproject\git-insight` 与本仓库 core + mcp-server + web  
 > **已拍板**：不做 Cursor 扩展；Git 能力用本仓库 `GitService` / simple-git 重写，不引进 insight-core；Insight「Git 配置」在此改名为 **MR 配置**（方式 A 本机 gh/glab、B Token、C 浏览器页，**不做 Insight 原方式 B 下载 CLI**）；**不配置 LLM、不做网页 AI 选边**；Cockpit **不内置对话或选边模型**，只提供工具给外部 Agent 调用。Insight 后期全部下架。  
 > **硬约束（执行栈，必须遵守）**：仓库里的 git 事实一律走 **现有 `GitService` / simple-git**。simple-git 有高层 API 用高层；没有的用现有 `raw` / `runAllowFail`。禁止再按 Insight 自研 `runGit` 另装一套命令封装。只有 git/simple-git **确实做不到** 的事（SSH remote → https 网页/API、GitHub/GitLab REST、gh/glab CLI）才允许手写，且不得与已有方法重复。详见 **§5.0**。  
@@ -25,6 +25,9 @@
 | 备份 / reflog UI（「记录」卡片） | ✅ v2.8 | 4.2 / 6.6 |
 | 后台克隆任务（`POST /api/jobs/clone` + SSE `job-progress`） | ✅ v2.8 | 4.2 / 6.8 |
 | 历史/日志 `--gc-line` 单行；浮层 `--gc-shadow-menu` | ✅ v2.8 | 4.2 |
+| 克隆任务 `clone_jobs` 落盘、重启中断、SSE 攒 chunk、日志按行 | ✅ v2.9 | 4.2 / 6.8 / 9 |
+| Node fetch 合并系统 CA（Token 校验 / 开 PR） | ✅ v2.9 | 4.2 |
+| DiffViewer 行号对齐、长文件折叠；历史抽屉标题；更改路径树 | ✅ v2.9 | 4.2 |
 
 ---
 

@@ -2,6 +2,7 @@
  * 开 PR/MR：不是 git 操作。remote 的 ssh→https 复用 merge.ts 的 toHttpsRemoteUrl。
  * Token REST 与本机 gh/glab（PATH）在此；禁止下载 CLI。
  */
+import { describeFetchError, trustSystemCa } from './trustSystemCa.ts';
 import { GitOperationError } from './types.ts';
 import type {
   CreateMrResult,
@@ -286,6 +287,7 @@ export async function createGithubPullRequest(options: {
   if (!token) {
     throw new GitOperationError('未配置 GitHub Token（设置 → MR 配置）', 'NO_TOKEN');
   }
+  trustSystemCa();
   const headers = uaHeaders(token, 'github');
   let json: {
     html_url?: string;
@@ -315,7 +317,7 @@ export async function createGithubPullRequest(options: {
   } catch (err) {
     if (err instanceof GitOperationError) throw err;
     throw new GitOperationError(
-      `GitHub 创建 PR 请求失败：${err instanceof Error ? err.message : String(err)}`,
+      `GitHub 创建 PR 请求失败：${describeFetchError(err)}`,
       'CREATE_MR_FAILED'
     );
   }
@@ -389,6 +391,7 @@ export async function createGitlabMergeRequest(options: {
   if (!token) {
     throw new GitOperationError('未配置 GitLab Token（设置 → MR 配置）', 'NO_TOKEN');
   }
+  trustSystemCa();
   const warnings: string[] = [];
   const reviewers = [...new Set((options.reviewers ?? []).map((r) => r.trim()).filter(Boolean))];
   let userIds: number[] = [];
@@ -422,7 +425,7 @@ export async function createGitlabMergeRequest(options: {
   } catch (err) {
     if (err instanceof GitOperationError) throw err;
     throw new GitOperationError(
-      `GitLab 创建 MR 请求失败：${err instanceof Error ? err.message : String(err)}`,
+      `GitLab 创建 MR 请求失败：${describeFetchError(err)}`,
       'CREATE_MR_FAILED'
     );
   }

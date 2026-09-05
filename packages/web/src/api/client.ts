@@ -27,6 +27,17 @@ import type {
   ToolSummary
 } from './types';
 
+/** 后端 DiffResult 把 +/- 放在 stats 里，前端类型是平铺字段 */
+type DiffPayload = DiffResult & { stats?: { insertions?: number; deletions?: number } };
+
+function normalizeDiff(d: DiffPayload): DiffResult {
+  return {
+    ...d,
+    insertions: d.insertions ?? d.stats?.insertions ?? 0,
+    deletions: d.deletions ?? d.stats?.deletions ?? 0
+  };
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -133,11 +144,14 @@ export function getDiff(
   if (opts.path) q.set('path', opts.path);
   if (opts.staged) q.set('staged', 'true');
   const qs = q.toString();
-  return request('GET', `/api/repos/${id}/diff${qs ? `?${qs}` : ''}`);
+  return request<DiffPayload>('GET', `/api/repos/${id}/diff${qs ? `?${qs}` : ''}`).then(normalizeDiff);
 }
 
 export function getShow(id: number, commit: string): Promise<{ commit: CommitInfo; diff: DiffResult }> {
-  return request('GET', `/api/repos/${id}/show/${encodeURIComponent(commit)}`);
+  return request<{ commit: CommitInfo; diff: DiffPayload }>(
+    'GET',
+    `/api/repos/${id}/show/${encodeURIComponent(commit)}`
+  ).then((r) => ({ ...r, diff: normalizeDiff(r.diff) }));
 }
 
 export function listBranches(id: number): Promise<{ branches: BranchInfo[]; current: string | null }> {

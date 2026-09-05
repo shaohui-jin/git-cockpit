@@ -52,5 +52,19 @@ function migrate(db: DatabaseSync): void {
       added_at TEXT NOT NULL,
       last_opened_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS clone_jobs (
+      id TEXT PRIMARY KEY,
+      kind TEXT NOT NULL DEFAULT 'clone',
+      status TEXT NOT NULL,
+      url TEXT NOT NULL,
+      dest_dir TEXT NOT NULL,
+      logs TEXT NOT NULL,
+      error TEXT,
+      started_at TEXT NOT NULL,
+      finished_at TEXT,
+      repo_id INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_clone_jobs_started ON clone_jobs(started_at DESC);
   `);
 }

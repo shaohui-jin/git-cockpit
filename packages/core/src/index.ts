@@ -7,6 +7,7 @@ export { assertSafeCloneUrl, assertCloneDest, spawnClone } from './clone.ts';
 export * from './backup.ts';
 export * from './auditLogger.ts';
 export * from './repoStore.ts';
+export * from './jobStore.ts';
 export * from './db.ts';
 export {
   branchNameForMr,
@@ -45,4 +46,5 @@ export {
   upsertMrHost
 } from './mr.ts';
 export { maskToken, validateMrToken, validateGithubTokenFormat, validateGitlabTokenFormat } from './mrToken.ts';
+export { trustSystemCa, describeFetchError } from './trustSystemCa.ts';
 export { crossPairs, clearMergeSurveyCache, MAX_SURVEY_PAIRS, parseTempBranches } from './survey.ts';
