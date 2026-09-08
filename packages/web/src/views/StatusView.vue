@@ -1,21 +1,37 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import * as api from '@/api/client';
 import { useReposStore } from '@/stores/repos';
+import { useMergeSessionStore } from '@/stores/mergeSession';
 import { useToolAction } from '@/composables/useToolAction';
 import { useRevision } from '@/composables/revision';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import DiffViewer from '@/components/DiffViewer.vue';
 import CommitGraph from '@/components/CommitGraph.vue';
 import BranchTreeSelect from '@/components/BranchTreeSelect.vue';
+import ConflictResolvePanel from '@/components/ConflictResolvePanel.vue';
 import { useBranchesStore } from '@/stores/branches';
 import type { BranchTreeNode } from '@/utils/branchTree';
 import { buildChangeTree, treeFilePaths, type ChangeTreeNode } from '@/utils/changeTree';
-import type { BackupList, BranchGraph, BranchInfo, DiffResult, FileStatus, ReflogEntry, RepoStatus, StashInfo, ToolExecResult } from '@/api/types';
+import type {
+  BackupList,
+  BranchGraph,
+  BranchInfo,
+  DiffResult,
+  FileStatus,
+  ReflogEntry,
+  RepoStatus,
+  StashInfo,
+  ToolExecResult,
+  WorkspaceConflicts
+} from '@/api/types';
 
 const repos = useReposStore();
 const branchStore = useBranchesStore();
+const mergeSession = useMergeSessionStore();
+const router = useRouter();
 const { revision } = useRevision();
 const repoId = (): number | null => repos.currentId;
 
@@ -27,6 +43,12 @@ const contentMode = ref<'workspace' | 'graph'>('workspace');
 const graph = ref<BranchGraph | null>(null);
 const graphLoading = ref(false);
 const graphError = ref('');
+const lineageInto = ref('');
+const lineageFrom = ref('');
+const workspaceConflicts = ref<WorkspaceConflicts | null>(null);
+const workspacePanel = ref<{ buildFiles: () => Array<{ path: string; resolvedContent: string }> } | null>(
+  null
+);
 const backups = ref<BackupList>({ branches: [], stashes: [] });
 const reflog = ref<ReflogEntry[]>([]);
 const historyTab = ref<'stash' | 'backup' | 'reflog'>('stash');
@@ -140,6 +162,7 @@ async function loadStatus(): Promise<void> {
   loadError.value = '';
   try {
     status.value = await api.getStatus(id);
+    await loadWorkspaceConflicts();
   } catch (err) {
     loadError.value = err instanceof Error ? err.message : String(err);
     status.value = null;
@@ -162,19 +185,86 @@ async function loadStashes(): Promise<void> {
   }
 }
 
+async function loadWorkspaceConflicts(): Promise<void> {
+  const id = repoId();
+  const op = status.value?.operation;
+  if (id === null || !op || op === 'none') {
+    workspaceConflicts.value = null;
+    return;
+  }
+  try {
+    workspaceConflicts.value = await api.getWorkspaceConflicts(id);
+  } catch {
+    workspaceConflicts.value = null;
+  }
+}
+
 async function loadGraph(): Promise<void> {
   const id = repoId();
   if (id === null) return;
   graphLoading.value = true;
   graphError.value = '';
   try {
-    graph.value = await api.getBranchGraph(id, 200);
+    const into = lineageInto.value.trim();
+    const from = lineageFrom.value.trim();
+    graph.value = await api.getBranchGraph(id, {
+      maxNodes: 200,
+      into: graph.value?.lineage && into && from ? into : undefined,
+      from: graph.value?.lineage && into && from ? from : undefined
+    });
   } catch (err) {
     graphError.value = err instanceof Error ? err.message : String(err);
     graph.value = null;
   } finally {
     graphLoading.value = false;
   }
+}
+
+async function compareLineage(): Promise<void> {
+  const id = repoId();
+  const into = lineageInto.value.trim();
+  const from = lineageFrom.value.trim();
+  if (id === null || !into || !from) {
+    ElMessage.warning('请选择合入目标与我的分支');
+    return;
+  }
+  graphLoading.value = true;
+  graphError.value = '';
+  try {
+    graph.value = await api.getBranchGraph(id, { maxNodes: 200, into, from });
+    if (graph.value.lineage && !graph.value.lineage.mergeBase) {
+      ElMessage.warning('两条分支没有共同祖先，无法画分叉图');
+    }
+  } catch (err) {
+    graphError.value = err instanceof Error ? err.message : String(err);
+    graph.value = null;
+  } finally {
+    graphLoading.value = false;
+  }
+}
+
+async function clearLineage(): Promise<void> {
+  lineageInto.value = '';
+  lineageFrom.value = '';
+  const id = repoId();
+  if (id === null) return;
+  graphLoading.value = true;
+  try {
+    graph.value = await api.getBranchGraph(id, { maxNodes: 200 });
+  } catch (err) {
+    graphError.value = err instanceof Error ? err.message : String(err);
+  } finally {
+    graphLoading.value = false;
+  }
+}
+
+function goMergePreview(): void {
+  const L = graph.value?.lineage;
+  if (!L) return;
+  mergeSession.pairInto = L.into;
+  mergeSession.pairFrom = L.from;
+  mergeSession.mode = 'pair';
+  void router.push('/merge');
 }
 
 async function loadBackupsAndReflog(): Promise<void> {
@@ -371,8 +461,25 @@ function checkoutNode(n: BranchTreeNode): void {
 function pull(): void {
   void run('git_pull');
 }
+function fetchRemote(): void {
+  void run('git_fetch');
+}
 function push(): void {
   void run('git_push');
+}
+
+function workspaceContinue(): void {
+  const op = status.value?.operation;
+  if (op !== 'merge' && op !== 'rebase') return;
+  const files = workspacePanel.value?.buildFiles() ?? [];
+  const tool = op === 'merge' ? 'git_merge_continue' : 'git_rebase_continue';
+  void run(tool, files.length ? { files } : {});
+}
+
+function workspaceAbort(): void {
+  const op = status.value?.operation;
+  if (op !== 'merge' && op !== 'rebase') return;
+  void run(op === 'merge' ? 'git_merge_abort' : 'git_rebase_abort');
 }
 function onBranchCommand(cmd: string | number | object, n: BranchTreeNode): void {
   const c = String(cmd);
@@ -634,14 +741,32 @@ onUnmounted(() => {
 
       <!-- 右：状态内容 或 分支图 -->
       <div class="status-content">
-        <CommitGraph
-          v-if="contentMode === 'graph'"
-          :data="graph"
-          :loading="graphLoading"
-          :error="graphError"
-          :default-remote="graphDefaultRemote"
-          :remotes="graphRemotes"
-        />
+        <div v-if="contentMode === 'graph'" class="graph-pane">
+          <div class="lineage-bar">
+            <span class="field-label">合入目标</span>
+            <BranchTreeSelect v-model="lineageInto" remote-first placeholder="选择线上目标" />
+            <span class="field-label">我的分支</span>
+            <BranchTreeSelect v-model="lineageFrom" placeholder="选择我的分支" />
+            <el-button type="primary" :disabled="!lineageInto || !lineageFrom" :loading="graphLoading" @click="compareLineage">对比</el-button>
+            <el-button :disabled="!graph?.lineage" @click="clearLineage">清除</el-button>
+            <el-button v-if="graph?.lineage?.mergeBase" text type="primary" @click="goMergePreview">去合并预演</el-button>
+          </div>
+          <p v-if="graph?.lineage" class="lineage-meta">
+            <template v-if="graph.lineage.mergeBase">
+              merge-base {{ graph.lineage.mergeBase.slice(0, 7) }}
+              · {{ graph.lineage.into }} 独有 {{ graph.lineage.intoOnlyCount }}
+              · {{ graph.lineage.from }} 独有 {{ graph.lineage.fromOnlyCount }}
+            </template>
+            <template v-else>两条分支没有共同祖先</template>
+          </p>
+          <CommitGraph
+            :data="graph"
+            :loading="graphLoading"
+            :error="graphError"
+            :default-remote="graphDefaultRemote"
+            :remotes="graphRemotes"
+          />
+        </div>
 
         <template v-else>
         <!-- 工具栏 -->
@@ -660,6 +785,9 @@ onUnmounted(() => {
               <el-tooltip content="把选中分支合并进当前检出分支（会改工作区）。预演请走左侧「合并」页。" placement="top">
                 <el-button plain @click="mergeVisible = true">工作区合并</el-button>
               </el-tooltip>
+              <el-tooltip content="git fetch --prune，更新远程跟踪分支，不改工作区" placement="top">
+                <el-button plain @click="fetchRemote">Fetch</el-button>
+              </el-tooltip>
               <el-button plain @click="tagVisible = true">打标签</el-button>
               <el-button type="danger" plain @click="resetVisible = true">硬重置</el-button>
               <el-button type="danger" plain @click="run('git_clean')">清理未跟踪</el-button>
@@ -674,11 +802,42 @@ onUnmounted(() => {
         </el-card>
 
         <el-alert
-          v-if="status?.conflicted.length"
+          v-if="status?.operation && status.operation !== 'none'"
+          :title="status.operation === 'merge' ? '工作区 merge 进行中' : '工作区 rebase 进行中'"
+          :description="
+            (status.conflicted.length ? `还有 ${status.conflicted.length} 个冲突文件。` : '冲突已处理，可以继续。') +
+            ' 选边写回当前工作区后点继续；或中止这次操作。不是左侧「合并」页的 merge-tree 预演。'
+          "
+          type="error"
+          :closable="false"
+          show-icon
+          class="mb"
+        >
+          <template #default>
+            <div class="ws-conflict-actions">
+              <el-button type="primary" size="small" @click="workspaceContinue">完成选边并继续</el-button>
+              <el-button type="danger" plain size="small" @click="workspaceAbort">中止</el-button>
+            </div>
+          </template>
+        </el-alert>
+        <el-alert
+          v-else-if="status?.conflicted.length"
           title="存在合并冲突，请先解决冲突（修改文件后重新 git add 并提交）"
           type="error"
           :closable="false"
           show-icon
+          class="mb"
+        />
+
+        <ConflictResolvePanel
+          v-if="workspaceConflicts && workspaceConflicts.operation !== 'none' && workspaceConflicts.files.length"
+          ref="workspacePanel"
+          :files="workspaceConflicts.files"
+          :repo-id="repoId()"
+          :into="workspaceConflicts.into"
+          :from="workspaceConflicts.from"
+          :left-label="workspaceConflicts.oursLabel"
+          :right-label="workspaceConflicts.theirsLabel"
           class="mb"
         />
 
@@ -1191,6 +1350,36 @@ onUnmounted(() => {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  gap: var(--gc-gap);
+}
+.graph-pane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gc-gap);
+}
+.lineage-bar {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gc-gap);
+  min-height: var(--gc-line);
+}
+.lineage-bar .field-label {
+  color: var(--el-text-color-secondary);
+  white-space: nowrap;
+}
+.lineage-meta {
+  flex: none;
+  margin: 0;
+  color: var(--el-text-color-secondary);
+  line-height: var(--gc-control);
+}
+.ws-conflict-actions {
+  margin-top: var(--gc-gap);
+  display: flex;
   gap: var(--gc-gap);
 }
 .toolbar-card {

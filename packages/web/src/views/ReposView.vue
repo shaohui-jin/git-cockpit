@@ -20,6 +20,7 @@ const cloning = ref(false);
 const jobDrawer = ref(false);
 const activeJobId = ref<string | null>(null);
 const jobDetailLoading = ref(false);
+const cancellingId = ref<string | null>(null);
 
 const activeJob = computed(() => jobs.jobs.find((j) => j.id === activeJobId.value) ?? null);
 const jobLogText = computed(() =>
@@ -191,6 +192,18 @@ async function openJob(id: string): Promise<void> {
   }
 }
 
+async function cancelJob(id: string): Promise<void> {
+  cancellingId.value = id;
+  try {
+    await jobs.cancel(id);
+    ElMessage.success('已请求取消');
+  } catch (err) {
+    ElMessage.error(err instanceof Error ? err.message : String(err));
+  } finally {
+    cancellingId.value = null;
+  }
+}
+
 function jobTag(status: string): 'success' | 'danger' | 'warning' {
   if (status === 'ok') return 'success';
   if (status === 'error') return 'danger';
@@ -234,6 +247,14 @@ onMounted(() => {
           <el-tag :type="jobTag(j.status)" size="small" effect="plain">{{ j.status }}</el-tag>
           <span class="job-url mono" :title="j.url">{{ j.url }}</span>
           <span class="job-dest mono" :title="j.destDir">→ {{ j.destDir }}</span>
+          <el-button
+            v-if="j.status === 'running'"
+            size="small"
+            text
+            type="danger"
+            :loading="cancellingId === j.id"
+            @click.stop="cancelJob(j.id)"
+          >取消</el-button>
           <el-button size="small" text type="primary" @click.stop="openJob(j.id)">日志</el-button>
         </div>
       </div>
@@ -304,8 +325,17 @@ onMounted(() => {
 
     <el-drawer v-model="jobDrawer" size="48%" destroy-on-close>
       <template #header>
-        <span v-if="activeJob">克隆日志 · {{ activeJob.status }}</span>
-        <span v-else>克隆日志</span>
+        <div class="drawer-head">
+          <span v-if="activeJob">克隆日志 · {{ activeJob.status }}</span>
+          <span v-else>克隆日志</span>
+          <el-button
+            v-if="activeJob?.status === 'running'"
+            type="danger"
+            plain
+            :loading="cancellingId === activeJob.id"
+            @click="cancelJob(activeJob.id)"
+          >取消</el-button>
+        </div>
       </template>
       <div v-loading="jobDetailLoading">
         <template v-if="activeJob">
@@ -322,6 +352,13 @@ onMounted(() => {
 .page-title {
   margin: 0 0 var(--gc-gap);
   font-size: 14px;
+}
+.drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gc-gap);
+  width: 100%;
 }
 .open-card,
 .list-card {

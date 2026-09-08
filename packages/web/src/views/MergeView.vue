@@ -144,18 +144,12 @@ async function runPreview(): Promise<void> {
   applyResult.value = null;
   prResult.value = null;
   try {
-    const exec = await api.runTool(id, 'git_merge_rehearse', {
+    preview.value = await api.mergeRehearse(id, {
       into: pairInto.value,
       from: pairFrom.value,
       fetch: fetchRemote.value,
-      maxFiles: 80,
-      dryRun: false
+      maxFiles: 80
     });
-    if (!exec.success) {
-      loadError.value = exec.error?.message ?? '预演失败';
-      return;
-    }
-    preview.value = exec.result as MergePreviewResult;
     resolvePending.value = preview.value.outcome === 'conflicts' ? preview.value.conflictFiles.length : 0;
   } catch (err) {
     loadError.value = err instanceof Error ? err.message : String(err);
@@ -255,14 +249,11 @@ async function onConfirmed(): Promise<void> {
     const id = repoId();
     if (id != null) {
       try {
-        const prepExec = await api.runTool(id, 'git_mr_prepare', {
+        mrPrep.value = await api.mrPrepare(id, {
           into: pairInto.value,
           from: pairFrom.value,
           sourceBranch: applyResult.value.tempBranch
         });
-        if (prepExec.success && prepExec.result && typeof prepExec.result === 'object') {
-          mrPrep.value = prepExec.result as PrepareMrResult;
-        }
       } catch {
         mrPrep.value = null;
       }

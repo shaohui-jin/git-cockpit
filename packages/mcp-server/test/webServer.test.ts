@@ -85,6 +85,20 @@ describe('Web API', () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.current).toBe('main');
+    expect(body.operation).toBe('none');
+  });
+
+  it('GET /api/repos/:id/merge/preview 走只读 GET', async () => {
+    const repos = (await server.app.inject({ method: 'GET', url: '/api/repos' })).json();
+    const id = repos.repos[0].id;
+    const res = await server.app.inject({
+      method: 'GET',
+      url: `/api/repos/${id}/merge/preview?into=main&from=feature/x&fetch=false`
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.clean).toBe(true);
+    expect(body.outcome).toBe('clean');
   });
 
   it('GET /api/repos/:id/log', async () => {
@@ -372,6 +386,8 @@ describe('Web API', () => {
     expect(getB.json().mr.method).toBe('browser');
     const getA = await server.app.inject({ method: 'GET', url: `/api/settings?repoId=${id}` });
     expect(getA.json().mr.method).toBe('cli');
+
+    await server.app.inject({ method: 'DELETE', url: `/api/repos/${idB}` });
   });
 
   it('GET /api/logs 返回操作日志', async () => {
@@ -385,30 +401,31 @@ describe('Web API', () => {
   });
 
   it('SSE 端点可连接并推送 repo-changed 事件', async () => {
-    // 建立 SSE 连接（使用类 fetch 流不可行，改用 Node http；此处仅验证首行响应）
-    const repos = (await server.app.inject({ method: 'GET', url: '/api/repos' })).json();
-    const id = repos.repos[0].id;
-    // 触发一次写操作事件后，通过 eventBus 验证通知被广播
+    const repos = (await server.app.inject({ method: 'GET', url: '/api/repos' })).json() as {
+      repos: Array<{ id: number; path: string }>;
+    };
+    const samePath = (a: string, b: string) =>
+      path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
+    const id = repos.repos.find((r) => samePath(r.path, repoDir))?.id ?? repos.repos[0]?.id;
+    expect(id).toBeDefined();
     const events: unknown[] = [];
     const listener = (payload: unknown) => events.push(payload);
     runtime.eventBus.on('repo-changed', listener);
 
-    // 制造可 stash 的更改（否则 stash 无内容不触发 changed 事件）
     fs.writeFileSync(path.join(repoDir, 'a.txt'), 'sse-modified\n', 'utf8');
 
-    await server.app.inject({
+    const stash = await server.app.inject({
       method: 'POST',
       url: `/api/repos/${id}/tools/git_stash`,
-      payload: { params: { message: 'sse-event-test' } }
-    }).then(async (r) => {
-      // stash 成功后回滚：pop 回来，避免污染仓库状态
-      expect(r.statusCode).toBe(200);
-      await server.app.inject({
-        method: 'POST',
-        url: `/api/repos/${id}/tools/git_stash_pop`,
-        payload: { params: { index: 0 } }
-      });
+      payload: { params: { message: 'sse-event-test', dryRun: false } }
     });
+    expect(stash.statusCode).toBe(200);
+    const pop = await server.app.inject({
+      method: 'POST',
+      url: `/api/repos/${id}/tools/git_stash_pop`,
+      payload: { params: { index: 0, dryRun: false } }
+    });
+    expect(pop.statusCode).toBe(200);
 
     runtime.eventBus.off('repo-changed', listener);
     expect(events.length).toBeGreaterThanOrEqual(2);
@@ -416,12 +433,17 @@ describe('Web API', () => {
   });
 
   it('DELETE /api/repos/:id 关闭仓库', async () => {
-    const repos = (await server.app.inject({ method: 'GET', url: '/api/repos' })).json();
-    const id = repos.repos[0].id;
+    const repos = (await server.app.inject({ method: 'GET', url: '/api/repos' })).json() as {
+      repos: Array<{ id: number; path: string }>;
+    };
+    const samePath = (a: string, b: string) =>
+      path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
+    const id = repos.repos.find((r) => samePath(r.path, repoDir))?.id ?? repos.repos[0]?.id;
+    expect(id).toBeDefined();
     const res = await server.app.inject({ method: 'DELETE', url: `/api/repos/${id}` });
     expect(res.statusCode).toBe(200);
     const after = await server.app.inject({ method: 'GET', url: '/api/repos' });
-    expect(after.json().repos.length).toBe(0);
+    expect(after.json().repos.map((r: { path: string }) => r.path)).not.toContain(repoDir);
   });
 });
 

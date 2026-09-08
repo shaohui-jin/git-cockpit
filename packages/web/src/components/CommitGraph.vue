@@ -400,7 +400,12 @@ watch(searchQuery, () => {
       </div>
 
       <div class="path-hint">
-        {{ selectedHint || '点击分支高亮到根源的链路 · 点击空白恢复 · 连线：较近 tip 祖先 → 子分支 · Ctrl+F 搜索' }}
+        {{
+          selectedHint ||
+          (data?.lineage?.mergeBase
+            ? '三节点：分叉点 / 合入目标 / 我的分支'
+            : '点击分支高亮到根源的链路 · 点击空白恢复 · 连线：较近 tip 祖先 → 子分支 · Ctrl+F 搜索')
+        }}
       </div>
     </div>
   </div>

@@ -11,10 +11,11 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { Runtime } from './runtime.ts';
+import { version } from '../package.json';
 import { executeTool, formatResultForMcp } from './tools/handlers.ts';
 import { TOOL_DEFS } from './tools/index.ts';
 
-export const MCP_SERVER_INFO = { name: 'git-cockpit-mcp-server', version: '0.1.0' } as const;
+export const MCP_SERVER_INFO = { name: 'git-cockpit-mcp-server', version } as const;
 
 /** 创建一个已注册全部工具的 McpServer（一个传输对应一个实例） */
 export function createMcpServer(runtime: Runtime): McpServer {
@@ -25,8 +26,8 @@ export function createMcpServer(runtime: Runtime): McpServer {
       instructions: [
         'Git Cockpit MCP Server：可视化的 Git 操作工具。',
         '使用规则：',
-        '1. 先调用 git_status 查看工作区状态；',
-        '2. 写操作（git_add/git_commit/git_push 等）默认可执行，但请先使用 dry_run=true 预览影响范围；',
+        '1. 先调用 git_status 查看工作区状态（含 operation=merge/rebase 时走工作区收尾，不要用预演工具冒充）；',
+        '2. 写操作（git_add/git_commit/git_fetch/git_push 等）默认可执行，但请先使用 dry_run=true 预览影响范围；',
         '3. 高风险工具（git_reset_hard/git_clean/git_push_force/git_branch_delete_force/git_rebase）默认禁用，',
         '   需管理员在配置中开启；执行时系统会自动备份当前状态；',
         '4. 未指定 repoPath 时使用最近打开的仓库；',
@@ -35,7 +36,9 @@ export function createMcpServer(runtime: Runtime): McpServer {
         '   冲突行作者用 git_merge_blame（按文件、只读）。',
         '   多分支扫描用 git_merge_survey；建议合入顺序用 git_merge_order。',
         '6. 落盘用 git_apply_resolve（独立 worktree，主区不切换）；冲突时把选边后的 files 一并传入。',
-        '7. 开 PR/MR 用 git_mr_prepare / git_mr_create。方式与 Token 在设置 MR 配置（不进工具参数）：本机 gh·glab / Token / 浏览器页。找不到 CLI 时结果含官方安装地址。'
+        '7. 工作区已经冲突：git_merge_continue / git_rebase_continue（可带 files）或 abort；不是 apply_resolve。',
+        '8. 更新远程跟踪分支用 git_fetch。两分支分叉对比用 git_branch_graph 并传 into/from。',
+        '9. 开 PR/MR 用 git_mr_prepare / git_mr_create。方式与 Token 在设置 MR 配置（不进工具参数）：本机 gh·glab / Token / 浏览器页。找不到 CLI 时结果含官方安装地址。'
       ].join('\n')
     }
   );

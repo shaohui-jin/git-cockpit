@@ -81,7 +81,9 @@ export type GitGraphArgs = z.infer<typeof GitGraphSchema>;
 
 export const GitBranchGraphSchema = z.object({
   ...readonlyBase,
-  maxNodes: z.number().int().min(1).max(2000).optional().describe('rev-list 最多枚举的提交数，缺省 200')
+  maxNodes: z.number().int().min(1).max(2000).optional().describe('rev-list 最多枚举的提交数，缺省 200'),
+  into: z.string().optional().describe('合入目标（线上 / ours）。与 from 一起时返回 lineage'),
+  from: z.string().optional().describe('我的分支（theirs）。与 into 一起时返回 lineage')
 });
 export type GitBranchGraphArgs = z.infer<typeof GitBranchGraphSchema>;
 
@@ -189,6 +191,40 @@ export const GitPullSchema = z.object({
   branch: z.string().optional().describe('远端分支名')
 });
 export type GitPullArgs = z.infer<typeof GitPullSchema>;
+
+export const GitFetchSchema = z.object({
+  ...writeBase,
+  remote: z.string().optional().describe('远程名（缺省 origin）')
+});
+export type GitFetchArgs = z.infer<typeof GitFetchSchema>;
+
+const continueFiles = z
+  .array(
+    z.object({
+      path: z.string().describe('仓库内相对路径'),
+      resolvedContent: z.string().describe('该文件解决后的完整内容')
+    })
+  )
+  .optional()
+  .describe('已解决冲突的文件；写入工作区并 git add 后再 continue。已在编辑器解决并可为空');
+
+export const GitMergeAbortSchema = z.object({ ...writeBase });
+export type GitMergeAbortArgs = z.infer<typeof GitMergeAbortSchema>;
+
+export const GitMergeContinueSchema = z.object({
+  ...writeBase,
+  files: continueFiles
+});
+export type GitMergeContinueArgs = z.infer<typeof GitMergeContinueSchema>;
+
+export const GitRebaseAbortSchema = z.object({ ...writeBase });
+export type GitRebaseAbortArgs = z.infer<typeof GitRebaseAbortSchema>;
+
+export const GitRebaseContinueSchema = z.object({
+  ...writeBase,
+  files: continueFiles
+});
+export type GitRebaseContinueArgs = z.infer<typeof GitRebaseContinueSchema>;
 
 export const GitPushSchema = z.object({
   ...writeBase,

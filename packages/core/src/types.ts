@@ -49,7 +49,12 @@ export interface RepoStatus {
   /** 全部文件（合并列表） */
   files: FileStatus[];
   isClean: boolean;
+  /** 工作区是否处于 merge / rebase（不含 cherry-pick） */
+  operation: WorkspaceOperation;
 }
+
+/** 当前工作区进行中的 git 操作；cherry-pick / revert 本期不处理 */
+export type WorkspaceOperation = 'none' | 'merge' | 'rebase';
 
 /** 一次提交的信息 */
 export interface CommitInfo {
@@ -191,9 +196,28 @@ export interface GraphCommitNode {
   time: number;
 }
 
+/** 两分支分叉：merge-base + 两侧独有提交数（对比时画三节点 Y 图） */
+export interface BranchLineage {
+  into: string;
+  from: string;
+  intoSha: string;
+  fromSha: string;
+  /** 空字符串表示无关历史、算不出共同祖先 */
+  mergeBase: string;
+  fromOnlyCount: number;
+  intoOnlyCount: number;
+  branchedFrom?: {
+    sha: string;
+    author: string;
+    message: string;
+    time: number;
+  };
+}
+
 /**
  * 分支 tip DAG：节点是各分支 tip，边是「最近的祖先 tip」。
  * 与 `GraphData`（git log 提交列表）不同，供状态页 G6 使用。
+ * 带 into/from 时附 `lineage`，画布可切成三节点对比图。
  */
 export interface BranchGraph {
   repoRoot: string;
@@ -202,6 +226,7 @@ export interface BranchGraph {
   edges: Array<[string, string]>;
   truncated: boolean;
   maxNodes: number;
+  lineage?: BranchLineage;
 }
 
 export interface ReflogEntry {
@@ -361,6 +386,10 @@ export interface ServerConfig {
 }
 
 export interface GitConfig {
+  /**
+   * 预留字段，目前不生效。每仓 GitService 内部队列永远串行（保护 index）；
+   * 跨仓本就可并行。不要把它理解成「同仓并发写」。
+   */
   maxConcurrentOperations: number;
   backupOnDangerousOps: boolean;
   allowedRepos: string[];

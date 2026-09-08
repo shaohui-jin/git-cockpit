@@ -9,9 +9,11 @@ alwaysApply: true
 
 ## 什么时候调 MCP
 
-- 查看工作区、暂存、提交、推送、stash、分支：`git_status` / `git_add` / `git_commit` / `git_push` 等。
+- 日常状态、暂存、提交、抓取、推送、stash、分支：`git_status` / `git_add` / `git_commit` / `git_fetch` / `git_pull` / `git_push` 等。
 - 问「合不合得进去」、冲突内容、选边落盘：`git_merge_preview` / `git_merge_rehearse` / `git_merge_blame` / `git_apply_resolve`。
 - 多分支扫描、合入顺序：`git_merge_survey` / `git_merge_order`。
+- 两分支分叉（merge-base / 独有提交数）：`git_branch_graph` 并传 `into` 与 `from`。
+- 工作区已经在 merge/rebase 冲突里：先 `git_status` 看 `operation`，再 `git_merge_continue` / `git_rebase_continue`（可带 `files`）或 abort。不要用预演工具冒充收尾。
 - 开 PR/MR：`git_mr_prepare` / `git_mr_create`（Token 不进工具参数，在网页设置里）。
 
 写操作先 `dry_run=true`。高风险工具默认禁用。
@@ -21,3 +23,4 @@ alwaysApply: true
 - `into` = 合入目标 / 线上 / ours；`from` = 我的分支 / theirs。
 - 预演只用 merge-tree 工具，**禁止**用 `git_merge` 或工作区 merge 冒充预演。
 - 落盘用 `git_apply_resolve`（独立 worktree）。冲突行作者用 `git_merge_blame`，不是自动选边。
+- 工作区 continue/abort 只结束已经开始的 merge/rebase，**禁止**用 `git_apply_resolve` 收尾工作区冲突。

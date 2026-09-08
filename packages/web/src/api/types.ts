@@ -22,6 +22,7 @@ export interface RepoStatus {
   conflicted: string[];
   files: FileStatus[];
   isClean: boolean;
+  operation?: 'none' | 'merge' | 'rebase';
 }
 
 export interface OpenedRepo {
@@ -134,6 +135,17 @@ export interface GraphCommitNode {
   time: number;
 }
 
+export interface BranchLineage {
+  into: string;
+  from: string;
+  intoSha: string;
+  fromSha: string;
+  mergeBase: string;
+  fromOnlyCount: number;
+  intoOnlyCount: number;
+  branchedFrom?: { sha: string; author: string; message: string; time: number };
+}
+
 export interface BranchGraph {
   repoRoot: string;
   nodes: GraphCommitNode[];
@@ -141,6 +153,7 @@ export interface BranchGraph {
   edges: Array<[string, string]>;
   truncated: boolean;
   maxNodes: number;
+  lineage?: BranchLineage;
 }
 
 export interface ReflogEntry {
@@ -313,6 +326,15 @@ export interface ConflictFile {
   oursContent?: string | null;
   theirsContent?: string | null;
   baseContent?: string | null;
+}
+
+export interface WorkspaceConflicts {
+  operation: 'none' | 'merge' | 'rebase';
+  into: string;
+  from: string;
+  oursLabel: string;
+  theirsLabel: string;
+  files: ConflictFile[];
 }
 
 export interface BlameCommit {

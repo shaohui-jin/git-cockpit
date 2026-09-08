@@ -24,7 +24,13 @@ import type {
   StashInfo,
   TagInfo,
   ToolExecResult,
-  ToolSummary
+  ToolSummary,
+  WorkspaceConflicts,
+  MergePreviewResult,
+  MergeSurveyResult,
+  SuggestOrderResult,
+  PrepareMrResult,
+  ConflictBlameResult
 } from './types';
 
 /** 后端 DiffResult 把 +/- 放在 stats 里，前端类型是平铺字段 */
@@ -174,8 +180,95 @@ export function getGraph(id: number, maxCount = 500): Promise<GraphData> {
   return request('GET', `/api/repos/${id}/graph?maxCount=${maxCount}`);
 }
 
-export function getBranchGraph(id: number, maxNodes = 200): Promise<BranchGraph> {
-  return request('GET', `/api/repos/${id}/branch-graph?maxNodes=${maxNodes}`);
+export function getBranchGraph(
+  id: number,
+  opts: { maxNodes?: number; into?: string; from?: string } = {}
+): Promise<BranchGraph> {
+  const q = new URLSearchParams();
+  q.set('maxNodes', String(opts.maxNodes ?? 200));
+  if (opts.into) q.set('into', opts.into);
+  if (opts.from) q.set('from', opts.from);
+  return request('GET', `/api/repos/${id}/branch-graph?${q.toString()}`);
+}
+
+export function getWorkspaceConflicts(id: number): Promise<WorkspaceConflicts> {
+  return request('GET', `/api/repos/${id}/workspace-conflicts`);
+}
+
+export function mergePreview(
+  id: number,
+  opts: { into: string; from: string; fetch?: boolean; remote?: string; path?: string }
+): Promise<MergePreviewResult> {
+  const q = new URLSearchParams();
+  q.set('into', opts.into);
+  q.set('from', opts.from);
+  if (opts.fetch !== undefined) q.set('fetch', opts.fetch ? 'true' : 'false');
+  if (opts.remote) q.set('remote', opts.remote);
+  if (opts.path) q.set('path', opts.path);
+  return request('GET', `/api/repos/${id}/merge/preview?${q.toString()}`);
+}
+
+export function mergeRehearse(
+  id: number,
+  opts: { into: string; from: string; fetch?: boolean; remote?: string; path?: string; maxFiles?: number }
+): Promise<MergePreviewResult> {
+  const q = new URLSearchParams();
+  q.set('into', opts.into);
+  q.set('from', opts.from);
+  if (opts.fetch !== undefined) q.set('fetch', opts.fetch ? 'true' : 'false');
+  if (opts.remote) q.set('remote', opts.remote);
+  if (opts.path) q.set('path', opts.path);
+  if (opts.maxFiles) q.set('maxFiles', String(opts.maxFiles));
+  return request('GET', `/api/repos/${id}/merge/rehearse?${q.toString()}`);
+}
+
+export function mergeBlame(
+  id: number,
+  opts: { into: string; from: string; path: string; fetch?: boolean; remote?: string }
+): Promise<ConflictBlameResult> {
+  const q = new URLSearchParams();
+  q.set('into', opts.into);
+  q.set('from', opts.from);
+  q.set('path', opts.path);
+  if (opts.fetch !== undefined) q.set('fetch', opts.fetch ? 'true' : 'false');
+  if (opts.remote) q.set('remote', opts.remote);
+  return request('GET', `/api/repos/${id}/merge/blame?${q.toString()}`);
+}
+
+export function mergeSurvey(
+  id: number,
+  opts: { intos: string[]; froms: string[]; fetch?: boolean; remote?: string }
+): Promise<MergeSurveyResult> {
+  const q = new URLSearchParams();
+  for (const x of opts.intos) q.append('intos', x);
+  for (const x of opts.froms) q.append('froms', x);
+  if (opts.fetch !== undefined) q.set('fetch', opts.fetch ? 'true' : 'false');
+  if (opts.remote) q.set('remote', opts.remote);
+  return request('GET', `/api/repos/${id}/merge/survey?${q.toString()}`);
+}
+
+export function mergeOrder(
+  id: number,
+  opts: { into: string; branches: string[]; fetch?: boolean; remote?: string }
+): Promise<SuggestOrderResult> {
+  const q = new URLSearchParams();
+  q.set('into', opts.into);
+  for (const b of opts.branches) q.append('branches', b);
+  if (opts.fetch !== undefined) q.set('fetch', opts.fetch ? 'true' : 'false');
+  if (opts.remote) q.set('remote', opts.remote);
+  return request('GET', `/api/repos/${id}/merge/order?${q.toString()}`);
+}
+
+export function mrPrepare(
+  id: number,
+  opts: { into: string; from: string; remote?: string; sourceBranch?: string }
+): Promise<PrepareMrResult> {
+  const q = new URLSearchParams();
+  q.set('into', opts.into);
+  q.set('from', opts.from);
+  if (opts.remote) q.set('remote', opts.remote);
+  if (opts.sourceBranch) q.set('sourceBranch', opts.sourceBranch);
+  return request('GET', `/api/repos/${id}/mr/prepare?${q.toString()}`);
 }
 
 export function getReflog(id: number, maxCount = 50): Promise<ReflogEntry[]> {
@@ -196,6 +289,10 @@ export function getJob(id: string): Promise<{ job: CloneJobDetail }> {
 
 export function startClone(url: string, destDir: string): Promise<{ job: CloneJobSummary }> {
   return request('POST', '/api/jobs/clone', { url, destDir });
+}
+
+export function cancelClone(id: string): Promise<{ job: CloneJobSummary }> {
+  return request('POST', `/api/jobs/${encodeURIComponent(id)}/cancel`);
 }
 
 export function getFileContent(id: number, commit: string, path: string): Promise<{ content: string; truncated: boolean }> {

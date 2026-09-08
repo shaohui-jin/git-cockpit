@@ -239,18 +239,12 @@ export const useMergeSessionStore = defineStore('mergeSession', {
       const prev = this.active ? pairKey(this.active.into, this.active.from) : '';
       this.active = null;
       try {
-        const exec = await api.runTool(id, 'git_merge_survey', {
+        const survey = await api.mergeSurvey(id, {
           intos: [...this.intos],
           froms: [...this.froms],
-          fetch: fetchOverride ?? this.fetchRemote,
-          dryRun: false
+          fetch: fetchOverride ?? this.fetchRemote
         });
-        if (!exec.success) {
-          this.loadError = exec.error?.message ?? '矩阵预演失败';
-          this.survey = null;
-          return;
-        }
-        this.survey = exec.result as MergeSurveyResult;
+        this.survey = survey;
         this.surveyStale = false;
         if (prev) {
           this.active = this.survey.cells.find((c) => pairKey(c.into, c.from) === prev) ?? null;
@@ -273,17 +267,11 @@ export const useMergeSessionStore = defineStore('mergeSession', {
       this.loading = true;
       this.loadError = '';
       try {
-        const exec = await api.runTool(id, 'git_merge_order', {
+        this.order = await api.mergeOrder(id, {
           into,
           branches: [...this.froms],
-          fetch: this.fetchRemote,
-          dryRun: false
+          fetch: this.fetchRemote
         });
-        if (!exec.success) {
-          this.loadError = exec.error?.message ?? '顺序推演失败';
-          return;
-        }
-        this.order = exec.result as SuggestOrderResult;
         this.orderView = 'best';
       } catch (err) {
         this.loadError = err instanceof Error ? err.message : String(err);

@@ -36,6 +36,7 @@ export async function initRepo(dir: string): Promise<SimpleGit> {
   await git.init(['-b', 'main']);
   await git.addConfig('user.email', 'test@example.com');
   await git.addConfig('user.name', 'Test User');
+  await git.addConfig('core.autocrlf', 'false');
   return git;
 }
 

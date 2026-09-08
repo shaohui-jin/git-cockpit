@@ -18,6 +18,7 @@ import {
   BackupManager,
   PermissionManager,
   detectMrPlatform,
+  enrichPrepareMr,
   findMrHost,
   hostnameOf,
   methodForRepo,
@@ -42,6 +43,7 @@ import { executeTool } from './tools/handlers.ts';
 import { TOOL_DEF_MAP, toolSummaries } from './tools/index.ts';
 import { registerApiDocs } from './openapi.ts';
 import { JobManager } from './jobs.ts';
+import { version } from '../package.json';
 
 export interface WebServerHandle {
   app: FastifyInstance;
@@ -67,6 +69,21 @@ function resolveWebDist(): string | null {
     if (fs.existsSync(path.join(c, 'index.html'))) return c;
   }
   return null;
+}
+
+function queryFlag(v: string | undefined): boolean | undefined {
+  if (v === undefined || v === '') return undefined;
+  return v === '1' || v === 'true';
+}
+
+function queryList(q: Record<string, string | string[] | undefined>, key: string): string[] {
+  const v = q[key];
+  if (v == null || v === '') return [];
+  const parts = Array.isArray(v) ? v : [v];
+  return parts
+    .flatMap((s) => String(s).split(','))
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 export async function createWebServer(
@@ -95,7 +112,7 @@ export async function createWebServer(
   app.get('/api/health', async () => ({
     ok: true,
     service: 'git-cockpit',
-    version: '0.1.6',
+    version,
     uptimeMs: process.uptime() * 1000
   }));
 
@@ -107,6 +124,17 @@ export async function createWebServer(
     const job = jobs.get(req.params.id);
     if (!job) return reply.code(404).send({ error: '任务不存在' });
     return { job };
+  });
+
+  app.post<{ Params: { id: string } }>('/api/jobs/:id/cancel', async (req, reply) => {
+    try {
+      const job = jobs.cancel(req.params.id);
+      return { job: jobs.summary(job) };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const code = msg === '任务不存在' ? 404 : 400;
+      return reply.code(code).send({ error: msg } as never);
+    }
   });
 
   app.post<{ Body: { url?: string; destDir?: string } }>('/api/jobs/clone', async (req, reply) => {
@@ -268,7 +296,11 @@ export async function createWebServer(
 
   app.get<{ Params: { id: string }; Querystring: Record<string, string | undefined> }>('/api/repos/:id/branch-graph', async (req, reply) =>
     withRepo(req, reply, async ({ service }) =>
-      service.getBranchGraph(req.query.maxNodes ? Number(req.query.maxNodes) : 200)
+      service.getBranchGraph({
+        maxNodes: req.query.maxNodes ? Number(req.query.maxNodes) : 200,
+        into: req.query.into,
+        from: req.query.from
+      })
     )
   );
 
@@ -291,6 +323,103 @@ export async function createWebServer(
 
   app.get<{ Params: { id: string } }>('/api/repos/:id/stashes', async (req, reply) =>
     withRepo(req, reply, async ({ service }) => service.listStashes())
+  );
+
+  app.get<{ Params: { id: string } }>('/api/repos/:id/workspace-conflicts', async (req, reply) =>
+    withRepo(req, reply, async ({ service }) => service.listWorkspaceConflicts())
+  );
+
+  // ---------------------------------------------------------------------------
+  // 只读预演（不走 executeTool，避免大 patch 进审计）。MCP 仍用工具。
+  // ---------------------------------------------------------------------------
+  app.get<{ Params: { id: string }; Querystring: Record<string, string | undefined> }>(
+    '/api/repos/:id/merge/preview',
+    async (req, reply) =>
+      withRepo(req, reply, async ({ service }) =>
+        service.previewMerge({
+          into: req.query.into ?? '',
+          from: req.query.from ?? '',
+          fetch: queryFlag(req.query.fetch),
+          remote: req.query.remote,
+          path: req.query.path
+        })
+      )
+  );
+
+  app.get<{ Params: { id: string }; Querystring: Record<string, string | undefined> }>(
+    '/api/repos/:id/merge/rehearse',
+    async (req, reply) =>
+      withRepo(req, reply, async ({ service }) =>
+        service.rehearseMerge({
+          into: req.query.into ?? '',
+          from: req.query.from ?? '',
+          fetch: queryFlag(req.query.fetch),
+          remote: req.query.remote,
+          path: req.query.path,
+          maxFiles: req.query.maxFiles ? Number(req.query.maxFiles) : undefined
+        })
+      )
+  );
+
+  app.get<{ Params: { id: string }; Querystring: Record<string, string | undefined> }>(
+    '/api/repos/:id/merge/blame',
+    async (req, reply) =>
+      withRepo(req, reply, async ({ service }) => {
+        if (!req.query.into || !req.query.from || !req.query.path) {
+          throw new GitOperationError('需要 into、from 与 path', 'INVALID_REF');
+        }
+        return service.blameConflictFile({
+          into: req.query.into,
+          from: req.query.from,
+          path: req.query.path,
+          fetch: queryFlag(req.query.fetch),
+          remote: req.query.remote
+        });
+      })
+  );
+
+  app.get<{ Params: { id: string }; Querystring: Record<string, string | string[] | undefined> }>(
+    '/api/repos/:id/merge/survey',
+    async (req, reply) =>
+      withRepo(req, reply, async ({ service }) =>
+        service.surveyMerges({
+          intos: queryList(req.query, 'intos'),
+          froms: queryList(req.query, 'froms'),
+          fetch: queryFlag(typeof req.query.fetch === 'string' ? req.query.fetch : undefined),
+          remote: typeof req.query.remote === 'string' ? req.query.remote : undefined
+        })
+      )
+  );
+
+  app.get<{ Params: { id: string }; Querystring: Record<string, string | string[] | undefined> }>(
+    '/api/repos/:id/merge/order',
+    async (req, reply) =>
+      withRepo(req, reply, async ({ service }) => {
+        const branches = queryList(req.query, 'branches');
+        return service.suggestMergeOrder({
+          into: typeof req.query.into === 'string' ? req.query.into : '',
+          branches,
+          fetch: queryFlag(typeof req.query.fetch === 'string' ? req.query.fetch : undefined),
+          remote: typeof req.query.remote === 'string' ? req.query.remote : undefined
+        });
+      })
+  );
+
+  app.get<{ Params: { id: string }; Querystring: Record<string, string | undefined> }>(
+    '/api/repos/:id/mr/prepare',
+    async (req, reply) =>
+      withRepo(req, reply, async ({ service }) => {
+        if (!req.query.into || !req.query.from) {
+          throw new GitOperationError('需要 into 与 from', 'INVALID_REF');
+        }
+        const prep = await service.prepareMr({
+          into: req.query.into,
+          from: req.query.from,
+          remote: req.query.remote?.trim() || undefined,
+          sourceBranch: req.query.sourceBranch
+        });
+        return enrichPrepareMr({ prep, mr: runtime.config.mr, cwd: service.repoPath });
+      })
   );
 
   // ---------------------------------------------------------------------------

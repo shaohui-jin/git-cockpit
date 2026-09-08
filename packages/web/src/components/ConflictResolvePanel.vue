@@ -17,7 +17,13 @@ const props = defineProps<{
   repoId: number | null;
   into: string;
   from: string;
+  leftLabel?: string;
+  rightLabel?: string;
+  enableBlame?: boolean;
 }>();
+
+const leftLabel = computed(() => props.leftLabel || '线上');
+const rightLabel = computed(() => props.rightLabel || '我的');
 
 const activePath = ref('');
 const activeHunkId = ref<string | null>(null);
@@ -216,7 +222,7 @@ const blameTheirs = computed(() => formatBlameSide(blame.value?.hunks.flatMap((h
 
 async function loadBlame(filePath: string): Promise<void> {
   const id = props.repoId;
-  if (id == null || !filePath || !props.into || !props.from) {
+  if (id == null || !filePath || !props.into || !props.from || props.enableBlame === false) {
     blame.value = null;
     blameError.value = '';
     return;
@@ -224,18 +230,12 @@ async function loadBlame(filePath: string): Promise<void> {
   blameLoading.value = true;
   blameError.value = '';
   try {
-    const exec = await api.runTool(id, 'git_merge_blame', {
+    blame.value = await api.mergeBlame(id, {
       into: props.into,
       from: props.from,
       path: filePath,
       fetch: false
     });
-    if (!exec.success || !exec.result || typeof exec.result !== 'object') {
-      blame.value = null;
-      blameError.value = exec.error?.message ?? '溯源失败';
-      return;
-    }
-    blame.value = exec.result as ConflictBlameResult;
   } catch (err) {
     blame.value = null;
     blameError.value = err instanceof Error ? err.message : String(err);
@@ -260,7 +260,7 @@ defineExpose({ buildFiles });
     <div class="resolve-head">
       <span>
         冲突 {{ allStats.resolved }} / {{ allStats.total }}
-        <span class="muted"> · 绿=新增 蓝=修改（自动进结果） · 红块选线上或我的</span>
+        <span class="muted"> · 绿=新增 蓝=修改（自动进结果） · 红块选 {{ leftLabel }} 或 {{ rightLabel }}</span>
       </span>
     </div>
 
@@ -290,8 +290,8 @@ defineExpose({ buildFiles });
             </span>
           </button>
           <div v-if="f.path === activePath" class="file-sides">
-            <el-button size="small" @click="acceptAll('left', f.path)">线上</el-button>
-            <el-button size="small" @click="acceptAll('right', f.path)">我的</el-button>
+            <el-button size="small" @click="acceptAll('left', f.path)">{{ leftLabel }}</el-button>
+            <el-button size="small" @click="acceptAll('right', f.path)">{{ rightLabel }}</el-button>
           </div>
         </template>
         <button
@@ -327,25 +327,25 @@ defineExpose({ buildFiles });
             <el-button size="small" :disabled="!conflictHunks.length" @click="goConflict(-1)">上一处</el-button>
             <span class="nav-pos">{{ activeConflictIndex >= 0 ? activeConflictIndex + 1 : 0 }}/{{ conflictHunks.length }}</span>
             <el-button size="small" :disabled="!conflictHunks.length" @click="goConflict(1)">下一处</el-button>
-            <el-button size="small" :disabled="!canPickHunk" @click="acceptActive('left')">采用线上</el-button>
-            <el-button size="small" :disabled="!canPickHunk" @click="acceptActive('right')">采用我的</el-button>
+            <el-button size="small" :disabled="!canPickHunk" @click="acceptActive('left')">采用{{ leftLabel }}</el-button>
+            <el-button size="small" :disabled="!canPickHunk" @click="acceptActive('right')">采用{{ rightLabel }}</el-button>
             <el-button size="small" :disabled="!activePath" @click="resetCurrentFile">重置本文件</el-button>
           </span>
         </div>
         <div ref="scrollRootRef" class="merge">
           <header class="merge-heads">
-            <div>线上（合入目标）</div>
+            <div>{{ leftLabel }}</div>
             <div />
             <div>结果</div>
             <div />
-            <div>我的分支</div>
+            <div>{{ rightLabel }}</div>
           </header>
           <div v-if="blameLoading || blameError || blame" class="blame-bar">
             <span v-if="blameLoading" class="muted">正在溯源作者…</span>
             <span v-else-if="blameError" class="blame-err">{{ blameError }}</span>
             <template v-else>
-              <span class="blame-side">线上：{{ blameOurs }}</span>
-              <span class="blame-side">我的：{{ blameTheirs }}</span>
+              <span class="blame-side">{{ leftLabel }}：{{ blameOurs }}</span>
+              <span class="blame-side">{{ rightLabel }}：{{ blameTheirs }}</span>
             </template>
           </div>
           <div v-if="hunks.length === 0" class="empty">没有可展示的变更</div>
@@ -374,7 +374,7 @@ defineExpose({ buildFiles });
                 size="small"
                 text
                 type="primary"
-                :title="choseLeft(h) ? '已采用线上' : '采用线上'"
+                :title="choseLeft(h) ? `已采用${leftLabel}` : `采用${leftLabel}`"
                 @click.stop="acceptLeft(h)"
               >
                 {{ choseLeft(h) ? '✓' : '≫' }}
@@ -389,7 +389,7 @@ defineExpose({ buildFiles });
                 size="small"
                 text
                 type="primary"
-                :title="choseRight(h) ? '已采用我的' : '采用我的'"
+                :title="choseRight(h) ? `已采用${rightLabel}` : `采用${rightLabel}`"
                 @click.stop="acceptRight(h)"
               >
                 {{ choseRight(h) ? '✓' : '≪' }}

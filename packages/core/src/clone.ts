@@ -79,11 +79,17 @@ export function assertCloneDest(destDir: string, allowedRepos?: string[]): strin
 export function spawnClone(
   url: string,
   destDir: string,
-  onLog: (chunk: string) => void
+  onLog: (chunk: string) => void,
+  options: { signal?: AbortSignal } = {}
 ): Promise<void> {
   const safeUrl = assertSafeCloneUrl(url);
   const dest = path.resolve(destDir);
+  const signal = options.signal;
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new GitOperationError('用户取消', 'CLONE_CANCELLED'));
+      return;
+    }
     const child = spawn('git', ['clone', '--progress', '--', safeUrl, dest], {
       windowsHide: true,
       shell: false,
@@ -95,9 +101,15 @@ export function spawnClone(
       if (done) return;
       done = true;
       clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
       if (err) reject(err);
       else resolve();
     };
+    const onAbort = () => {
+      child.kill();
+      finish(new GitOperationError('用户取消', 'CLONE_CANCELLED'));
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
     const timer = setTimeout(() => {
       child.kill();
       finish(new GitOperationError(`克隆超时（${CLONE_TIMEOUT_MS}ms）`, 'CLONE_TIMEOUT'));
@@ -114,6 +126,10 @@ export function spawnClone(
       finish(new GitOperationError(err.message, 'CLONE_SPAWN_FAILED'));
     });
     child.on('close', (code) => {
+      if (signal?.aborted) {
+        finish(new GitOperationError('用户取消', 'CLONE_CANCELLED'));
+        return;
+      }
       if (code === 0) {
         finish();
         return;
@@ -122,4 +138,14 @@ export function spawnClone(
       finish(new GitOperationError(msg, 'CLONE_FAILED'));
     });
   });
+}
+
+/** 取消或失败后清掉不完整的目标目录（克隆前必须为空或尚未存在） */
+export function removeIncompleteCloneDest(destDir: string): void {
+  const dest = path.resolve(destDir);
+  try {
+    if (fs.existsSync(dest)) fs.rmSync(dest, { recursive: true, force: true });
+  } catch {
+    /* 清不掉也不挡任务状态 */
+  }
 }

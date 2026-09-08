@@ -46,4 +46,13 @@ describe('spawnClone 本机仓库', () => {
     expect(status.current).toBe('main');
     expect(fs.existsSync(path.join(dest, '.git'))).toBe(true);
   });
+
+  it('已中止的 signal 立即失败', async () => {
+    const { dir: src } = await createSampleRepo();
+    const parent = makeTmpDir('clone-abort-');
+    const dest = path.join(parent, 'copy');
+    const ac = new AbortController();
+    ac.abort();
+    await expect(spawnClone(src, dest, () => undefined, { signal: ac.signal })).rejects.toThrow(/用户取消/);
+  });
 });

@@ -1,8 +1,8 @@
 # Git Cockpit
 
-基于 MCP（Model Context Protocol）的 Git 可视化操作工具：Web 端界面 + AI 调用能力，支持多仓库管理、安全的 Git 操作、与 Cursor/VS Code 集成。
+基于 MCP（Model Context Protocol）的 Git 可视化操作工具：Web 端界面 + 供宿主 Agent 调用的 MCP 工具，支持多仓库管理与安全的 Git 操作。
 
-> 完整设计见 [设计文档.md](docs/设计文档.md)。
+> 完整设计见 [设计文档.md](docs/设计文档.md)。本产品 **不做** Cursor/VS Code 扩展，也不内置聊天或选边模型。
 
 ## Monorepo 结构
 
@@ -123,9 +123,6 @@ git-cockpit start
 
 core 作为 mcp-server 的运行时依赖（`workspace:^`），发布 mcp-server 时 workflow 会先确保 core 已发布。详细发布手册（tag 协议、版本管理、本地发布注意事项）见 [docs/release.md](./docs/release.md)。
 
-## 开发阶段
+## 开发
 
-- 阶段 1：基础架构与只读功能（当前）
-- 阶段 2：写操作与安全机制
-- 阶段 3：高级功能与扩展
-- 阶段 4：发布与部署
+日常 Git、合并预演（merge-tree）、矩阵、开 PR/MR、状态页分支图均已落地。下一阶段（Agent 加深、通用 Job、工作台、产品化）见 [docs/发展规划.md](docs/发展规划.md)。已落地行为见 [docs/设计文档.md](docs/设计文档.md)。

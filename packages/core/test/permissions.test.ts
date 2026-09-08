@@ -18,12 +18,19 @@ describe('PermissionManager', () => {
     expect(pm.evaluate('git_status').allowed).toBe(true);
     expect(pm.evaluate('git_log').allowed).toBe(true);
     expect(pm.evaluate('git_diff').allowed).toBe(true);
+    expect(pm.evaluate('git_branch_graph').allowed).toBe(true);
+    expect(pm.getRiskLevel('git_branch_graph')).toBe('readonly');
+    expect(pm.getRiskLevel('git_reflog')).toBe('readonly');
+    expect(pm.getRiskLevel('git_backup_list')).toBe('readonly');
   });
 
   it('普通写操作默认开放', () => {
     const pm = new PermissionManager(makeConfig());
     expect(pm.evaluate('git_add').allowed).toBe(true);
     expect(pm.evaluate('git_commit').allowed).toBe(true);
+    expect(pm.evaluate('git_fetch').allowed).toBe(true);
+    expect(pm.evaluate('git_merge_continue').allowed).toBe(true);
+    expect(pm.getRiskLevel('git_fetch')).toBe('write');
   });
 
   it('高风险工具默认禁用', () => {

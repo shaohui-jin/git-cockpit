@@ -106,7 +106,12 @@ export const TOOL_DEFS: ToolDef[] = [
       '分支 tip DAG：for-each-ref + rev-list --parents。节点是各分支 tip，边是最近祖先 tip。与 Git Insight 画布同一口径。不改工作区。',
     risk: 'readonly',
     schema: S.GitBranchGraphSchema,
-    handler: async (args: Args, ctx) => ctx.git.getBranchGraph(args.maxNodes as number | undefined)
+    handler: async (args: Args, ctx) =>
+      ctx.git.getBranchGraph({
+        maxNodes: args.maxNodes as number | undefined,
+        into: args.into as string | undefined,
+        from: args.from as string | undefined
+      })
   },
   {
     name: 'git_reflog',
@@ -281,6 +286,26 @@ export const TOOL_DEFS: ToolDef[] = [
       ctx.git.merge(args.branch as string, { dryRun: args.dryRun as boolean | undefined })
   },
   {
+    name: 'git_merge_abort',
+    description:
+      '中止当前工作区 merge（git merge --abort）。只用于已经开始的工作区合并，禁止拿来代替 merge-tree 预演。',
+    risk: 'write',
+    schema: S.GitMergeAbortSchema,
+    handler: async (args: Args, ctx) => ctx.git.mergeAbort({ dryRun: args.dryRun as boolean | undefined })
+  },
+  {
+    name: 'git_merge_continue',
+    description:
+      '继续当前工作区 merge。可把 files[{path,resolvedContent}] 写入工作区并 git add 后再 continue。不是 git_apply_resolve。',
+    risk: 'write',
+    schema: S.GitMergeContinueSchema,
+    handler: async (args: Args, ctx) =>
+      ctx.git.mergeContinue({
+        dryRun: args.dryRun as boolean | undefined,
+        files: args.files as { path: string; resolvedContent: string }[] | undefined
+      })
+  },
+  {
     name: 'git_pull',
     description: '从远程拉取并合并（非强制）。远程有冲突将提示。支持 dry_run 预览。',
     risk: 'write',
@@ -290,6 +315,18 @@ export const TOOL_DEFS: ToolDef[] = [
         dryRun: args.dryRun as boolean | undefined,
         remote: args.remote as string | undefined,
         branch: args.branch as string | undefined
+      })
+  },
+  {
+    name: 'git_fetch',
+    description:
+      '从远程抓取跟踪分支（git fetch --prune --no-tags），不改工作区、不合并。更新 origin/xxx 后再做预演或分支图对比。支持 dry_run 预览。',
+    risk: 'write',
+    schema: S.GitFetchSchema,
+    handler: async (args: Args, ctx) =>
+      ctx.git.fetch({
+        dryRun: args.dryRun as boolean | undefined,
+        remote: args.remote as string | undefined
       })
   },
   {
@@ -459,6 +496,25 @@ export const TOOL_DEFS: ToolDef[] = [
     schema: S.GitRebaseSchema,
     handler: async (args: Args, ctx) =>
       ctx.git.rebase(args.branch as string, { dryRun: args.dryRun as boolean | undefined })
+  },
+  {
+    name: 'git_rebase_abort',
+    description: '中止当前工作区 rebase（git rebase --abort）。只用于已经开始的变基。',
+    risk: 'write',
+    schema: S.GitRebaseAbortSchema,
+    handler: async (args: Args, ctx) => ctx.git.rebaseAbort({ dryRun: args.dryRun as boolean | undefined })
+  },
+  {
+    name: 'git_rebase_continue',
+    description:
+      '继续当前工作区 rebase。可把 files 写入工作区并 git add 后再 continue。冲突须先解决。',
+    risk: 'write',
+    schema: S.GitRebaseContinueSchema,
+    handler: async (args: Args, ctx) =>
+      ctx.git.rebaseContinue({
+        dryRun: args.dryRun as boolean | undefined,
+        files: args.files as { path: string; resolvedContent: string }[] | undefined
+      })
   }
 ];
 

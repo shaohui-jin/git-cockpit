@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { EventEmitter } from 'node:events';
-import { assertCloneDest, assertSafeCloneUrl, JobStore, spawnClone, type CloneJob } from '@shaohui_jin/git-cockpit-core';
+import { assertCloneDest, assertSafeCloneUrl, JobStore, spawnClone, removeIncompleteCloneDest, type CloneJob } from '@shaohui_jin/git-cockpit-core';
 
 export type JobStatus = CloneJob['status'];
 export type { CloneJob };
@@ -44,6 +44,7 @@ export class JobManager {
   private pending: CloneJob | null = null;
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly pendingChunks = new Map<string, string>();
+  private readonly aborts = new Map<string, AbortController>();
 
   constructor(
     private readonly eventBus: EventEmitter,
@@ -102,7 +103,19 @@ export class JobManager {
     this.persist(job);
     this.prune();
     this.emit(job);
-    void this.runClone(job, opts.onSuccess);
+    const ac = new AbortController();
+    this.aborts.set(job.id, ac);
+    void this.runClone(job, opts.onSuccess, ac);
+    return job;
+  }
+
+  cancel(id: string): CloneJob {
+    const job = this.jobs.get(id);
+    if (!job) throw new Error('任务不存在');
+    if (job.status !== 'running') throw new Error('任务已结束，无法取消');
+    const ac = this.aborts.get(id);
+    if (!ac) throw new Error('任务无法取消');
+    ac.abort();
     return job;
   }
 
@@ -139,9 +152,18 @@ export class JobManager {
     }
   }
 
-  private async runClone(job: CloneJob, onSuccess?: (destDir: string) => Promise<number | void>): Promise<void> {
+  private async runClone(
+    job: CloneJob,
+    onSuccess?: (destDir: string) => Promise<number | void>,
+    ac?: AbortController
+  ): Promise<void> {
     try {
-      await spawnClone(job.url, job.destDir, (chunk) => this.append(job, chunk));
+      await spawnClone(job.url, job.destDir, (chunk) => this.append(job, chunk), {
+        signal: ac?.signal
+      });
+      if (ac?.signal.aborted) {
+        throw new Error('用户取消');
+      }
       if (onSuccess) {
         const repoId = await onSuccess(job.destDir);
         if (typeof repoId === 'number') job.repoId = repoId;
@@ -149,10 +171,15 @@ export class JobManager {
       job.status = 'ok';
       this.append(job, '\n克隆完成\n');
     } catch (err) {
+      const cancelled =
+        ac?.signal.aborted ||
+        (err instanceof Error && (err.message === '用户取消' || ('code' in err && err.code === 'CLONE_CANCELLED')));
       job.status = 'error';
-      job.error = err instanceof Error ? err.message : String(err);
+      job.error = cancelled ? '用户取消' : err instanceof Error ? err.message : String(err);
+      if (cancelled) removeIncompleteCloneDest(job.destDir);
       this.append(job, `\n失败: ${job.error}\n`);
     } finally {
+      if (job.id) this.aborts.delete(job.id);
       job.finishedAt = new Date().toISOString();
       this.emit(job, true);
     }

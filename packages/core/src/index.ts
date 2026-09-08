@@ -3,7 +3,7 @@ export * from './gitService.ts';
 export * from './permissions.ts';
 export * from './blame.ts';
 export { assertRepoAllowed, isRepoAllowed } from './allowedRepos.ts';
-export { assertSafeCloneUrl, assertCloneDest, spawnClone } from './clone.ts';
+export { assertSafeCloneUrl, assertCloneDest, spawnClone, removeIncompleteCloneDest } from './clone.ts';
 export * from './backup.ts';
 export * from './auditLogger.ts';
 export * from './repoStore.ts';

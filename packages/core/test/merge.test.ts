@@ -183,3 +183,30 @@ describe('prepareMr', () => {
     expect(prep.sourceBranch).toBe(applied.tempBranch);
   });
 });
+
+describe('工作区 merge 收尾', () => {
+  beforeEach(() => cleanupTmp());
+  afterAll(() => cleanupTmp());
+
+  it('冲突后 operation=merge，选边 continue 结束', async () => {
+    const { dir } = await createConflictRepo();
+    const svc = await GitService.open(dir);
+    await expect(svc.merge('feature')).rejects.toThrow(/冲突/);
+    expect((await svc.getStatus()).operation).toBe('merge');
+    const listed = await svc.listWorkspaceConflicts();
+    expect(listed.operation).toBe('merge');
+    expect(listed.files.some((f) => f.path === 'a.txt')).toBe(true);
+    await svc.mergeContinue({ files: [{ path: 'a.txt', resolvedContent: 'resolved\n' }] });
+    expect((await svc.getStatus()).operation).toBe('none');
+    expect(fs.readFileSync(path.join(dir, 'a.txt'), 'utf8')).toBe('resolved\n');
+  });
+
+  it('mergeAbort 清掉工作区 merge', async () => {
+    const { dir } = await createConflictRepo();
+    const svc = await GitService.open(dir);
+    await expect(svc.merge('feature')).rejects.toThrow(/冲突/);
+    await svc.mergeAbort();
+    expect((await svc.getStatus()).operation).toBe('none');
+    expect(fs.readFileSync(path.join(dir, 'a.txt'), 'utf8').replace(/\r\n/g, '\n')).toBe('ours\n');
+  });
+});

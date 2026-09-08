@@ -63,6 +63,7 @@ describe('GitService 只读操作', () => {
     expect(status.current).toBe('main');
     expect(status.isClean).toBe(true);
     expect(status.ahead).toBe(0);
+    expect(status.operation).toBe('none');
   });
 
   it('getStatus 识别未跟踪 / 已暂存 / 已修改', async () => {
@@ -152,6 +153,13 @@ describe('GitService 只读操作', () => {
     expect(graph.tips.every((t) => /^[0-9a-f]{40}$/i.test(t.sha))).toBe(true);
   });
 
+  it('getBranchGraph 带 into/from 返回 lineage', async () => {
+    const graph = await svc.getBranchGraph({ into: 'main', from: 'feature/x' });
+    expect(graph.lineage?.mergeBase).toMatch(/^[0-9a-f]{40}$/i);
+    expect(graph.lineage?.fromOnlyCount).toBeGreaterThanOrEqual(1);
+    expect(graph.lineage?.intoOnlyCount).toBe(0);
+  });
+
   it('getReflog 返回 HEAD 记录', async () => {
     const log = await svc.getReflog(20);
     expect(log.length).toBeGreaterThan(0);
@@ -234,6 +242,11 @@ describe('GitService 写操作与 dry-run', () => {
     expect(status.isClean).toBe(false);
     const { content } = await svc.getFileContent('HEAD', 'a.txt');
     void content;
+  });
+
+  it('fetch dryRun 只返回预览', async () => {
+    const preview = await svc.fetch({ dryRun: true, remote: 'origin' });
+    expect(preview).toMatchObject({ dryRun: true, command: expect.stringContaining('fetch') });
   });
 
   it('merge 冲突时抛出 MERGE_CONFLICT', async () => {

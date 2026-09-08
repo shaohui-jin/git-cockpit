@@ -20,8 +20,10 @@ import type {
   DiffOptions,
   GraphData,
   BranchGraph,
+  BranchLineage,
   BranchTip,
   GraphCommitNode,
+  WorkspaceOperation,
   ReflogEntry,
   GitCommandResult,
   MergePreviewResult,
@@ -31,6 +33,7 @@ import type {
   SuggestOrderResult,
   ApplyResolveFile,
   ApplyResolveResult,
+  ConflictFile,
   PrepareMrResult
 } from './types.ts';
 import {
@@ -214,8 +217,28 @@ export class GitService extends EventEmitter {
       untracked: files.filter((f) => f.untracked).map((f) => f.path),
       conflicted: s.conflicted ?? [],
       files,
-      isClean: s.isClean() ?? files.length === 0
+      isClean: s.isClean() ?? files.length === 0,
+      operation: await this.detectWorkspaceOperation()
     };
+  }
+
+  /** MERGE_HEAD / REBASE_HEAD；cherry-pick 本期不当作 operation */
+  async detectWorkspaceOperation(): Promise<WorkspaceOperation> {
+    const merge = await this.runAllowFail(['rev-parse', '-q', '--verify', 'MERGE_HEAD']);
+    if (merge.code === 0 && merge.stdout.trim()) return 'merge';
+    const rebase = await this.runAllowFail(['rev-parse', '-q', '--verify', 'REBASE_HEAD']);
+    if (rebase.code === 0 && rebase.stdout.trim()) return 'rebase';
+    try {
+      if (
+        fs.existsSync(path.join(this.gitDir, 'rebase-merge')) ||
+        fs.existsSync(path.join(this.gitDir, 'rebase-apply'))
+      ) {
+        return 'rebase';
+      }
+    } catch {
+      /* ignore */
+    }
+    return 'none';
   }
 
   /** 提交历史 */
@@ -511,8 +534,8 @@ export class GitService extends EventEmitter {
    * 分支 tip DAG（对齐 Git Insight）：for-each-ref 取 tip，rev-list --parents 从 tip 往回走。
    * 前端只画 tip 节点，中间 commit 用来算最近祖先边。simple-git 没有这套高层 API，走 raw。
    */
-  async getBranchGraph(maxNodes = 200): Promise<BranchGraph> {
-    const cap = Math.max(1, Math.min(2000, maxNodes));
+  async getBranchGraph(options: { maxNodes?: number; into?: string; from?: string } = {}): Promise<BranchGraph> {
+    const cap = Math.max(1, Math.min(2000, options.maxNodes ?? 200));
     const tipsOut = await this.run([
       'for-each-ref',
       '--format=%(refname)%00%(refname:short)%00%(objectname)%00%(upstream:short)',
@@ -569,13 +592,58 @@ export class GitService extends EventEmitter {
       for (const parent of parents) edges.push([sha, parent]);
     }
 
+    const into = options.into?.trim();
+    const from = options.from?.trim();
+    const lineage = into && from ? await this.buildBranchLineage(into, from) : undefined;
+
     return {
       repoRoot: this.repoPath,
       nodes,
       tips,
       edges,
       truncated: shas.length >= cap,
-      maxNodes: cap
+      maxNodes: cap,
+      lineage
+    };
+  }
+
+  /** 两分支 merge-base 与两侧独有提交数（不改工作区） */
+  async buildBranchLineage(into: string, from: string): Promise<BranchLineage> {
+    const intoSha = await this.ensureRev(into);
+    const fromSha = await this.ensureRev(from);
+    const base = await this.tryMergeBase(intoSha, fromSha);
+    if (!base) {
+      return {
+        into,
+        from,
+        intoSha,
+        fromSha,
+        mergeBase: '',
+        fromOnlyCount: 0,
+        intoOnlyCount: 0
+      };
+    }
+    const fromOnly = await this.run(['rev-list', '--count', `${base}..${fromSha}`]);
+    const intoOnly = await this.run(['rev-list', '--count', `${base}..${intoSha}`]);
+    let branchedFrom: BranchLineage['branchedFrom'];
+    const first = await this.runAllowFail(['rev-list', '--reverse', '--max-count=1', `${base}..${fromSha}`]);
+    const firstSha = first.stdout.trim();
+    if (firstSha) {
+      const meta = await this.loadGraphCommitMeta([firstSha]);
+      const node = meta.get(firstSha);
+      if (node) {
+        branchedFrom = { sha: node.sha, author: node.author, message: node.message, time: node.time };
+      }
+    }
+    return {
+      into,
+      from,
+      intoSha,
+      fromSha,
+      mergeBase: base,
+      fromOnlyCount: Number(fromOnly.trim() || 0),
+      intoOnlyCount: Number(intoOnly.trim() || 0),
+      branchedFrom
     };
   }
 
@@ -831,6 +899,29 @@ export class GitService extends EventEmitter {
         throw new GitOperationError(`合并 ${branchName} 产生冲突，请解决冲突后提交`, 'MERGE_CONFLICT');
       }
       throw new GitOperationError(this.extractGitMessage(msg), 'GIT_MERGE_FAILED');
+    }
+  }
+
+  /** git fetch（改远程跟踪引用，不改工作区） */
+  async fetch(options: { dryRun?: boolean; remote?: string } = {}): Promise<WritePreview | string> {
+    const remote = options.remote?.trim() || 'origin';
+    this.validateRefName(remote);
+    const cmd = ['fetch', '--prune', '--no-tags', remote];
+    if (options.dryRun) {
+      return GitService.preview(
+        ['fetch', '--dry-run', '--prune', '--no-tags', remote],
+        'low',
+        undefined,
+        `将从 ${remote} 抓取远程跟踪分支（不改工作区）`
+      );
+    }
+    await this.prepareWrite();
+    try {
+      const out = await this.run(cmd);
+      this.emit('changed', { repoPath: this.repoPath, command: cmd });
+      return out;
+    } catch (err) {
+      throw new GitOperationError(this.extractGitMessage(String((err as Error).message ?? '')), 'GIT_FETCH_FAILED');
     }
   }
 
@@ -1097,6 +1188,162 @@ export class GitService extends EventEmitter {
       }
       throw new GitOperationError(this.extractGitMessage(msg), 'GIT_REBASE_FAILED');
     }
+  }
+
+  /** 中止工作区 merge（不要用于 merge-tree 预演） */
+  async mergeAbort(options: { dryRun?: boolean } = {}): Promise<WritePreview | string> {
+    const cmd = ['merge', '--abort'];
+    if (options.dryRun) {
+      return GitService.preview(cmd, 'medium', undefined, '将中止当前工作区 merge，丢弃未提交的合并');
+    }
+    const op = await this.detectWorkspaceOperation();
+    if (op !== 'merge') {
+      throw new GitOperationError('当前没有进行中的 merge', 'NO_MERGE_IN_PROGRESS');
+    }
+    return this.runWrite(cmd, { risk: 'medium', note: '已中止 merge' });
+  }
+
+  /** 继续工作区 merge；可选先写入选边结果并 git add。GIT_EDITOR 关掉以免弹编辑器 */
+  async mergeContinue(options: { dryRun?: boolean; files?: ApplyResolveFile[] } = {}): Promise<WritePreview | string> {
+    const cmd = ['-c', 'core.editor=true', 'merge', '--continue'];
+    const paths = (options.files ?? []).map((f) => f.path);
+    if (options.dryRun) {
+      return GitService.preview(cmd, 'medium', paths.length ? paths : undefined, '将提交当前 merge（需已解决全部冲突）');
+    }
+    const op = await this.detectWorkspaceOperation();
+    if (op !== 'merge') {
+      throw new GitOperationError('当前没有进行中的 merge', 'NO_MERGE_IN_PROGRESS');
+    }
+    await this.prepareWrite();
+    if (options.files?.length) await this.writeResolvedToWorktree(options.files);
+    return this.runContinue(cmd, 'GIT_MERGE_CONTINUE_FAILED', 'merge --continue 失败，请确认冲突已全部暂存');
+  }
+
+  /** 中止工作区 rebase */
+  async rebaseAbort(options: { dryRun?: boolean } = {}): Promise<WritePreview | string> {
+    const cmd = ['rebase', '--abort'];
+    if (options.dryRun) {
+      return GitService.preview(cmd, 'medium', undefined, '将中止当前变基，回到变基开始前');
+    }
+    const op = await this.detectWorkspaceOperation();
+    if (op !== 'rebase') {
+      throw new GitOperationError('当前没有进行中的 rebase', 'NO_REBASE_IN_PROGRESS');
+    }
+    return this.runWrite(cmd, { risk: 'medium', note: '已中止 rebase' });
+  }
+
+  /** 继续工作区 rebase；可选先写入选边结果并 git add */
+  async rebaseContinue(options: { dryRun?: boolean; files?: ApplyResolveFile[] } = {}): Promise<WritePreview | string> {
+    const cmd = ['-c', 'core.editor=true', 'rebase', '--continue'];
+    const paths = (options.files ?? []).map((f) => f.path);
+    if (options.dryRun) {
+      return GitService.preview(cmd, 'medium', paths.length ? paths : undefined, '将继续变基（需已解决当前提交的冲突）');
+    }
+    const op = await this.detectWorkspaceOperation();
+    if (op !== 'rebase') {
+      throw new GitOperationError('当前没有进行中的 rebase', 'NO_REBASE_IN_PROGRESS');
+    }
+    await this.prepareWrite();
+    if (options.files?.length) await this.writeResolvedToWorktree(options.files);
+    return this.runContinue(cmd, 'GIT_REBASE_CONTINUE_FAILED', 'rebase --continue 失败，请确认冲突已全部暂存');
+  }
+
+  private async runContinue(cmd: string[], code: string, fallback: string): Promise<string> {
+    const r = await this.runAllowFail(cmd, { ...process.env, GIT_EDITOR: 'true' });
+    if (r.code !== 0) {
+      const msg = (r.stderr || r.stdout).trim() || fallback;
+      throw new GitOperationError(this.extractGitMessage(msg) || fallback, code);
+    }
+    this.emit('changed', { repoPath: this.repoPath, command: cmd });
+    return r.stdout;
+  }
+
+  /** 把选边结果写进当前工作区并 git add（工作区冲突收尾，不是 worktree 落盘） */
+  async writeResolvedToWorktree(files: ApplyResolveFile[]): Promise<void> {
+    if (!files.length) return;
+    const paths = files.map((f) => this.validateRepoRelativePath(f.path).replace(/\\/g, '/'));
+    await this.enqueue(async () => {
+      for (let i = 0; i < files.length; i++) {
+        const rel = paths[i]!;
+        const full = path.join(this.repoPath, rel);
+        await mkdir(path.dirname(full), { recursive: true });
+        await writeFile(full, files[i]!.resolvedContent, 'utf8');
+      }
+      await this.git.raw(['add', '--', ...paths]);
+    });
+  }
+
+  /**
+   * 工作区未合并文件：index 三阶段 :1: / :2: / :3: → 三栏选边。
+   * 仅 merge / rebase。
+   */
+  async listWorkspaceConflicts(): Promise<{
+    operation: WorkspaceOperation;
+    into: string;
+    from: string;
+    oursLabel: string;
+    theirsLabel: string;
+    files: ConflictFile[];
+  }> {
+    const operation = await this.detectWorkspaceOperation();
+    if (operation === 'none') {
+      return {
+        operation,
+        into: 'HEAD',
+        from: 'HEAD',
+        oursLabel: '当前分支',
+        theirsLabel: '合入的',
+        files: []
+      };
+    }
+    const into = 'HEAD';
+    const from = operation === 'merge' ? 'MERGE_HEAD' : 'REBASE_HEAD';
+    const oursLabel = operation === 'merge' ? '当前分支' : '变基目标';
+    const theirsLabel = operation === 'merge' ? '合入的' : '正在重放的提交';
+    const listed = await this.runAllowFail(['ls-files', '-u']);
+    const stages = new Map<string, { s1?: string; s2?: string; s3?: string }>();
+    for (const line of listed.stdout.split('\n')) {
+      if (!line.trim()) continue;
+      const tab = line.indexOf('\t');
+      if (tab < 0) continue;
+      const meta = line.slice(0, tab).trim();
+      const filePath = line.slice(tab + 1);
+      const parts = meta.split(/\s+/);
+      const stage = parts[2];
+      const blob = parts[1];
+      if (!filePath || !stage || !blob) continue;
+      const rec = stages.get(filePath) ?? {};
+      if (stage === '1') rec.s1 = blob;
+      else if (stage === '2') rec.s2 = blob;
+      else if (stage === '3') rec.s3 = blob;
+      stages.set(filePath, rec);
+    }
+    const files: ConflictFile[] = [];
+    for (const [filePath, rec] of stages) {
+      const baseContent = rec.s1 ? await this.showFileAtRev(':1', filePath) : null;
+      const oursContent = rec.s2 ? await this.showFileAtRev(':2', filePath) : null;
+      const theirsContent = rec.s3 ? await this.showFileAtRev(':3', filePath) : null;
+      let conflictContent: string | null = null;
+      try {
+        const full = path.join(this.repoPath, filePath);
+        if (fs.existsSync(full) && fs.statSync(full).isFile()) {
+          conflictContent = fs.readFileSync(full, 'utf8');
+        }
+      } catch {
+        conflictContent = null;
+      }
+      files.push({
+        path: filePath,
+        contentConflict: Boolean(oursContent || theirsContent),
+        hunks: [],
+        conflictContent,
+        oursContent,
+        theirsContent,
+        baseContent
+      });
+    }
+    files.sort((a, b) => a.path.localeCompare(b.path));
+    return { operation, into, from, oursLabel, theirsLabel, files };
   }
 
   /** 强制删除分支（高风险） */

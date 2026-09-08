@@ -95,8 +95,11 @@ export class ConfigStore {
         const out: Record<string, unknown> = {};
         for (const [k, val] of Object.entries(v)) {
           const lower = k.toLowerCase();
-          if (/password|token|secret|authorization/i.test(lower)) out[k] = '[REDACTED]';
-          else out[k] = redact(val);
+          if (/password|token|secret|authorization/i.test(lower)) {
+            out[k] = typeof val === 'string' && val.length > 0 ? '[REDACTED]' : val;
+          } else {
+            out[k] = redact(val);
+          }
         }
         return out;
       }

@@ -230,8 +230,54 @@ function tipsToBranchGraph(graph: BranchGraph, options?: TipsGraphOptions): G6Gr
   return { nodes, edges };
 }
 
-/** 画布只含分支 tip；边 = 最近 tip 祖先。中间 commit 不画。 */
+/** 画布只含分支 tip；带 lineage 且有 merge-base 时切成三节点 Y 图。 */
 export function branchGraphToG6(graph: BranchGraph, options?: TipsGraphOptions): G6GraphData {
+  const L = graph.lineage;
+  if (L?.mergeBase) {
+    const p = graphPalette();
+    return {
+      nodes: [
+        {
+          id: 'base',
+          data: {
+            label: `分叉点 ${short(L.mergeBase)}`,
+            sub: 'merge-base',
+            kind: 'base',
+            sha: L.mergeBase,
+            color: p.base
+          }
+        },
+        {
+          id: 'into',
+          data: {
+            label: L.into,
+            sub: `+${L.intoOnlyCount} commits`,
+            kind: 'remote-tip',
+            sha: L.intoSha,
+            tipName: L.into,
+            tipFullName: L.into,
+            color: p.remote
+          }
+        },
+        {
+          id: 'from',
+          data: {
+            label: L.from,
+            sub: `+${L.fromOnlyCount} commits`,
+            kind: 'local-tip',
+            sha: L.fromSha,
+            tipName: L.from,
+            tipFullName: L.from,
+            color: p.local
+          }
+        }
+      ],
+      edges: [
+        { id: 'e-base-into', source: 'base', target: 'into' },
+        { id: 'e-base-from', source: 'base', target: 'from' }
+      ]
+    };
+  }
   return tipsToBranchGraph(graph, options);
 }
 
@@ -239,6 +285,14 @@ export function legendItemsForGraph(
   graph: BranchGraph,
   options?: TipsGraphOptions
 ): Array<{ key: string; label: string; color: string }> {
+  if (graph.lineage?.mergeBase) {
+    const p = graphPalette();
+    return [
+      { key: 'base', label: '分叉点', color: p.base },
+      { key: 'into', label: '合入目标', color: p.remote },
+      { key: 'from', label: '我的分支', color: p.local }
+    ];
+  }
   const remotes = options?.remotes?.length ? options.remotes : collectRemotesFromTips(graph.tips);
   const defaultRemote =
     options?.defaultRemote?.trim() || (remotes.includes('origin') ? 'origin' : remotes[0] || 'origin');

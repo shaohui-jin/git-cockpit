@@ -90,6 +90,9 @@ export const useJobsStore = defineStore('jobs', {
       if (status === 'ok' || status === 'error') {
         void this.loadDetail(p.id).catch(() => undefined);
       }
+    },
+    async cancel(id: string): Promise<void> {
+      await api.cancelClone(id);
     }
   }
 });
