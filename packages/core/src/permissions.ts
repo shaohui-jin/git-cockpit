@@ -24,6 +24,9 @@ export const TOOL_RISK_LEVELS: Record<string, RiskLevel> = {
   git_merge_survey: 'readonly',
   git_merge_order: 'readonly',
   git_mr_prepare: 'readonly',
+  git_repo_overview: 'readonly',
+  git_job_list: 'readonly',
+  git_job_get: 'readonly',
   // 写操作工具（默认开放，需预览/确认）
   git_add: 'write',
   git_unstage: 'write',
@@ -46,6 +49,7 @@ export const TOOL_RISK_LEVELS: Record<string, RiskLevel> = {
   git_stash_pop: 'write',
   git_apply_resolve: 'write',
   git_mr_create: 'write',
+  git_job_cancel: 'write',
   // 高风险工具（默认禁用，需用户主动开启或审批）
   git_reset_hard: 'dangerous',
   git_clean: 'dangerous',

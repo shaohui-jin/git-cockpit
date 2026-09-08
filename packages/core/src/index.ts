@@ -7,7 +7,9 @@ export { assertSafeCloneUrl, assertCloneDest, spawnClone, removeIncompleteCloneD
 export * from './backup.ts';
 export * from './auditLogger.ts';
 export * from './repoStore.ts';
+export * from './jobTypes.ts';
 export * from './jobStore.ts';
+export * from './jobEngine.ts';
 export * from './db.ts';
 export {
   branchNameForMr,

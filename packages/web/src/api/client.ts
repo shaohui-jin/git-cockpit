@@ -19,6 +19,7 @@ import type {
   PermissionsPayload,
   ReflogEntry,
   RemoteInfo,
+  RepoOverview,
   RepoStatus,
   SettingsData,
   StashInfo,
@@ -104,6 +105,10 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
 /** 打开仓库列表 */
 export function listRepos(): Promise<{ repos: OpenedRepo[] }> {
   return request('GET', '/api/repos');
+}
+
+export function listOverview(): Promise<{ repos: RepoOverview[] }> {
+  return request('GET', '/api/repos/overview');
 }
 
 /** 打开一个本地仓库 */

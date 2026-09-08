@@ -169,13 +169,16 @@ export interface BackupList {
 }
 
 export type JobStatus = 'running' | 'ok' | 'error';
+export type JobKind = 'clone' | 'survey' | 'fetch';
 
 export interface CloneJobSummary {
   id: string;
-  kind: 'clone';
+  kind: JobKind;
   status: JobStatus;
-  url: string;
-  destDir: string;
+  title?: string;
+  url?: string;
+  destDir?: string;
+  repoPath?: string;
   error?: string;
   startedAt: string;
   finishedAt?: string;
@@ -186,20 +189,39 @@ export interface CloneJobSummary {
 
 export interface CloneJobDetail extends Omit<CloneJobSummary, 'logCount' | 'tail'> {
   logs: string[];
+  result?: unknown;
 }
 
 export interface JobProgressPayload {
   id: string;
-  kind: 'clone';
+  kind: JobKind;
   status: JobStatus;
-  url: string;
-  destDir: string;
+  title?: string;
+  url?: string;
+  destDir?: string;
+  repoPath?: string;
   chunk?: string;
   error?: string;
   startedAt: string;
   finishedAt?: string;
   repoId?: number;
   logCount: number;
+}
+
+export interface RepoOverview {
+  id?: number;
+  path: string;
+  name: string;
+  available: boolean;
+  current: string;
+  tracking: string | null;
+  ahead: number;
+  behind: number;
+  dirtyCount: number;
+  conflictCount: number;
+  operation: 'none' | 'merge' | 'rebase';
+  tempMergeBranchCount: number;
+  lastOpenedAt?: string;
 }
 
 export type RiskLevel = 'readonly' | 'write' | 'dangerous';

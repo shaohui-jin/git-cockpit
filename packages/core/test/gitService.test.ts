@@ -66,6 +66,15 @@ describe('GitService 只读操作', () => {
     expect(status.operation).toBe('none');
   });
 
+  it('getOverview 只计脏文件数', async () => {
+    const overview = await svc.getOverview();
+    expect(overview.available).toBe(true);
+    expect(overview.current).toBe('main');
+    expect(overview.dirtyCount).toBe(0);
+    expect(overview.operation).toBe('none');
+    expect(overview.tempMergeBranchCount).toBe(0);
+  });
+
   it('getStatus 识别未跟踪 / 已暂存 / 已修改', async () => {
     fs.writeFileSync(path.join(dir, 'new.txt'), 'new\n');
     fs.writeFileSync(path.join(dir, 'a.txt'), 'modified a\n');

@@ -125,4 +125,4 @@ core 作为 mcp-server 的运行时依赖（`workspace:^`），发布 mcp-server
 
 ## 开发
 
-日常 Git、合并预演（merge-tree）、矩阵、开 PR/MR、状态页分支图均已落地。下一阶段（Agent 加深、通用 Job、工作台、产品化）见 [docs/发展规划.md](docs/发展规划.md)。已落地行为见 [docs/设计文档.md](docs/设计文档.md)。
+日常 Git、合并预演、矩阵、开 PR/MR、工作台、MCP 摘要输出、通用后台任务均已落地。下一阶段见 [docs/发展规划.md](docs/发展规划.md)。已落地行为见 [docs/设计文档.md](docs/设计文档.md)。

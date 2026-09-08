@@ -8,6 +8,7 @@ import { useMergeSessionStore } from '@/stores/mergeSession';
 import { useJobsStore } from '@/stores/jobs';
 import { subscribeEvents } from '@/api/client';
 import { useRevision } from '@/composables/revision';
+import { notifyJobEnded } from '@/utils/jobNotify';
 
 const repos = useReposStore();
 const settings = useSettingsStore();
@@ -19,10 +20,11 @@ const router = useRouter();
 const { bump, revision } = useRevision();
 
 const menu = [
+  { path: '/dashboard', label: '工作台', icon: '▤' },
+  { path: '/jobs', label: '任务', icon: '↻' },
   { path: '/status', label: '状态', icon: '◧' },
   { path: '/merge', label: '合并', icon: '⇄' },
   { path: '/history', label: '历史', icon: '◫' },
-  { path: '/repos', label: '仓库管理', icon: '▤' },
   { path: '/logs', label: '操作日志', icon: '≡' },
   { path: '/settings', label: '设置', icon: '⚙' }
 ];
@@ -52,7 +54,11 @@ onMounted(async () => {
     onLog: () => bump(),
     onJobProgress: (payload) => {
       jobs.onProgress(payload);
-      if (payload.status === 'ok') void repos.load();
+      notifyJobEnded(payload, router);
+      if (payload.status === 'ok') {
+        bump();
+        void repos.load();
+      }
     },
     onError: () => {
       // SSE 断开会由浏览器自动重连；这里仅静默
@@ -91,11 +97,9 @@ onUnmounted(() => {
         <el-menu-item v-for="m in menu" :key="m.path" :index="m.path" @click="goMenu(m.path)">
           <span class="menu-icon">{{ m.icon }}</span>
           <span>{{ m.label }}</span>
-          <el-badge
-            v-if="m.path === '/repos' && jobs.runningCount"
-            :value="jobs.runningCount"
-            class="menu-badge"
-          />
+          <span v-if="m.path === '/jobs' && jobs.runningCount" class="menu-count">{{
+            jobs.runningCount
+          }}</span>
         </el-menu-item>
       </el-menu>
 
@@ -160,12 +164,25 @@ onUnmounted(() => {
   border-right: none;
   flex: 1;
 }
+.nav-menu :deep(.el-menu-item) {
+  display: flex;
+  align-items: center;
+}
 .menu-icon {
   margin-right: 8px;
   color: var(--el-color-primary);
 }
-.menu-badge {
+.menu-count {
   margin-left: auto;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: var(--el-color-danger);
+  color: #fff;
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
 }
 .aside-footer {
   padding: var(--gc-gap) var(--gc-pad);

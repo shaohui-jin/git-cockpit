@@ -69,6 +69,13 @@ describe('Web API', () => {
     expect(body.repos.length).toBeGreaterThanOrEqual(1);
   });
 
+  it('GET /api/repos/overview 返回脉搏', async () => {
+    const res = await server.app.inject({ method: 'GET', url: '/api/repos/overview' });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { repos: Array<{ path: string; available: boolean; dirtyCount: number }> };
+    expect(body.repos.some((r) => r.path === repoDir && r.available)).toBe(true);
+  });
+
   it('打开不存在目录返回 400', async () => {
     const res = await server.app.inject({
       method: 'POST',

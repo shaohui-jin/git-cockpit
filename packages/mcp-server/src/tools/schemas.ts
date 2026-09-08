@@ -14,6 +14,11 @@ const dryRun = z
   .optional()
   .describe('为 true 时仅返回将执行的命令与影响范围（预览/干运行），不真正修改仓库。');
 
+const detail = z
+  .boolean()
+  .optional()
+  .describe('为 true 时 MCP 返回完整正文；默认只回摘要（路径/统计）。网页 GET 不受影响。');
+
 const maxCount = z
   .number()
   .int()
@@ -45,7 +50,8 @@ export const GitDiffSchema = z.object({
   to: z.string().optional().describe('终点提交'),
   path: z.string().optional().describe('限定的文件路径'),
   staged: z.boolean().optional().describe('查看已暂存（索引）差异'),
-  maxPatchBytes: z.number().int().positive().optional().describe('diff 正文最大字节数，超出截断')
+  maxPatchBytes: z.number().int().positive().optional().describe('diff 正文最大字节数，超出截断'),
+  detail
 });
 export type GitDiffArgs = z.infer<typeof GitDiffSchema>;
 
@@ -53,7 +59,8 @@ export const GitShowSchema = z.object({
   ...readonlyBase,
   commit: z.string().describe('要查看的提交 hash'),
   path: z.string().optional().describe('限定文件'),
-  maxPatchBytes: z.number().int().positive().optional()
+  maxPatchBytes: z.number().int().positive().optional(),
+  detail
 });
 export type GitShowArgs = z.infer<typeof GitShowSchema>;
 
@@ -69,7 +76,8 @@ export type GitRemoteListArgs = z.infer<typeof GitRemoteListSchema>;
 export const GitFileContentSchema = z.object({
   ...readonlyBase,
   commit: z.string().describe('提交 hash（如 HEAD、main）'),
-  path: z.string().describe('仓库内文件相对路径')
+  path: z.string().describe('仓库内文件相对路径'),
+  detail
 });
 export type GitFileContentArgs = z.infer<typeof GitFileContentSchema>;
 
@@ -110,7 +118,8 @@ export type GitMergePreviewArgs = z.infer<typeof GitMergePreviewSchema>;
 export const GitMergeRehearseSchema = z.object({
   ...readonlyBase,
   ...mergeIntoFrom,
-  maxFiles: z.number().int().min(1).max(100).optional().describe('最多生成冲突正文的文件数，缺省 20')
+  maxFiles: z.number().int().min(1).max(100).optional().describe('最多生成冲突正文的文件数，缺省 20'),
+  detail
 });
 export type GitMergeRehearseArgs = z.infer<typeof GitMergeRehearseSchema>;
 
@@ -129,7 +138,11 @@ export const GitMergeSurveySchema = z.object({
   intos: z.array(z.string().min(1)).min(1).describe('合入目标（线上 / ours）列表'),
   froms: z.array(z.string().min(1)).min(1).describe('我的分支（theirs）列表'),
   fetch: z.boolean().optional().describe('是否先非交互 fetch。缺省 true；整批只 fetch 一次'),
-  remote: z.string().optional().describe('fetch 使用的远程名，缺省 origin')
+  remote: z.string().optional().describe('fetch 使用的远程名，缺省 origin'),
+  async: z
+    .boolean()
+    .optional()
+    .describe('为 true 或格子数>20 时后台跑，立即返回 jobId，用 git_job_get 查结果')
 });
 export type GitMergeSurveyArgs = z.infer<typeof GitMergeSurveySchema>;
 
@@ -255,8 +268,27 @@ export type GitStashListArgs = z.infer<typeof GitStashListSchema>;
 export const GitStashShowSchema = z.object({
   ...readonlyBase,
   index: z.number().int().min(0).optional().describe('stash 序号，缺省为 stash@{0}'),
-  maxPatchBytes: z.number().int().positive().optional().describe('diff 正文最大字节数，超出截断')
+  maxPatchBytes: z.number().int().positive().optional().describe('diff 正文最大字节数，超出截断'),
+  detail
 });
+
+export const GitRepoOverviewSchema = z.object({ ...readonlyBase });
+export type GitRepoOverviewArgs = z.infer<typeof GitRepoOverviewSchema>;
+
+export const GitJobListSchema = z.object({ ...readonlyBase });
+export type GitJobListArgs = z.infer<typeof GitJobListSchema>;
+
+export const GitJobGetSchema = z.object({
+  ...readonlyBase,
+  id: z.string().min(1).describe('后台任务 id')
+});
+export type GitJobGetArgs = z.infer<typeof GitJobGetSchema>;
+
+export const GitJobCancelSchema = z.object({
+  ...writeBase,
+  id: z.string().min(1).describe('要取消的后台任务 id')
+});
+export type GitJobCancelArgs = z.infer<typeof GitJobCancelSchema>;
 export type GitStashShowArgs = z.infer<typeof GitStashShowSchema>;
 
 export const GitStashApplySchema = z.object({

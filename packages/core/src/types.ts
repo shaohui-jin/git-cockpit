@@ -56,6 +56,23 @@ export interface RepoStatus {
 /** 当前工作区进行中的 git 操作；cherry-pick / revert 本期不处理 */
 export type WorkspaceOperation = 'none' | 'merge' | 'rebase';
 
+/** 已打开仓库的轻量脉搏（工作台 / git_repo_overview） */
+export interface RepoOverview {
+  id?: number;
+  path: string;
+  name: string;
+  available: boolean;
+  current: string;
+  tracking: string | null;
+  ahead: number;
+  behind: number;
+  dirtyCount: number;
+  conflictCount: number;
+  operation: WorkspaceOperation;
+  tempMergeBranchCount: number;
+  lastOpenedAt?: string;
+}
+
 /** 一次提交的信息 */
 export interface CommitInfo {
   hash: string;

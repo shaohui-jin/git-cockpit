@@ -7,6 +7,8 @@ import { EventEmitter } from 'node:events';
 import type { DatabaseSync } from 'node:sqlite';
 import {
   AuditLogger,
+  JobEngine,
+  JobStore,
   PermissionManager,
   RepoStore,
   openDatabase,
@@ -30,6 +32,7 @@ export interface Runtime {
   permissions: PermissionManager;
   repoStore: RepoStore;
   repoManager: RepoManager;
+  jobs: JobEngine;
   /** 全局事件总线：'repo-changed' | 'log' */
   eventBus: EventEmitter;
 }
@@ -47,6 +50,16 @@ export function createRuntime(options: RuntimeOptions = {}): Runtime {
   const permissions = new PermissionManager(config);
   const repoStore = new RepoStore(db);
   const repoManager = new RepoManager({ repoStore, eventBus, getConfig: () => configStore.get() });
+  const jobs = new JobEngine(eventBus, new JobStore(db), {
+    resolveGit: async (repoPath) => {
+      try {
+        return repoManager.getByPath(repoPath).service;
+      } catch {
+        const handle = await repoManager.open(repoPath);
+        return handle.service;
+      }
+    }
+  });
 
   return {
     configStore,
@@ -56,6 +69,7 @@ export function createRuntime(options: RuntimeOptions = {}): Runtime {
     permissions,
     repoStore,
     repoManager,
+    jobs,
     eventBus
   };
 }

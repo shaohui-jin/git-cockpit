@@ -53,18 +53,57 @@ function migrate(db: DatabaseSync): void {
       last_opened_at TEXT NOT NULL
     );
 
-    CREATE TABLE IF NOT EXISTS clone_jobs (
+    CREATE TABLE IF NOT EXISTS jobs (
       id TEXT PRIMARY KEY,
-      kind TEXT NOT NULL DEFAULT 'clone',
+      kind TEXT NOT NULL,
       status TEXT NOT NULL,
-      url TEXT NOT NULL,
-      dest_dir TEXT NOT NULL,
+      title TEXT NOT NULL,
+      repo_path TEXT,
+      repo_id INTEGER,
+      payload TEXT NOT NULL,
       logs TEXT NOT NULL,
+      result TEXT,
       error TEXT,
+      progress TEXT,
       started_at TEXT NOT NULL,
-      finished_at TEXT,
-      repo_id INTEGER
+      finished_at TEXT
     );
-    CREATE INDEX IF NOT EXISTS idx_clone_jobs_started ON clone_jobs(started_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_jobs_started ON jobs(started_at DESC);
   `);
+  migrateCloneJobs(db);
+}
+
+function tableExists(db: DatabaseSync, name: string): boolean {
+  const row = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name);
+  return !!row;
+}
+
+/** 把旧 clone_jobs 灌进 jobs 后删除。新库不会创建 clone_jobs。 */
+function migrateCloneJobs(db: DatabaseSync): void {
+  if (!tableExists(db, 'clone_jobs')) return;
+  const rows = db.prepare('SELECT * FROM clone_jobs').all() as Record<string, unknown>[];
+  const insert = db.prepare(
+    `INSERT OR IGNORE INTO jobs (id, kind, status, title, repo_path, repo_id, payload, logs, result, error, progress, started_at, finished_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  );
+  for (const r of rows) {
+    const url = String(r.url ?? '');
+    const destDir = String(r.dest_dir ?? '');
+    insert.run(
+      String(r.id),
+      String(r.kind ?? 'clone'),
+      String(r.status ?? 'error'),
+      url || String(r.id),
+      null,
+      r.repo_id == null ? null : Number(r.repo_id),
+      JSON.stringify({ url, destDir }),
+      typeof r.logs === 'string' ? r.logs : JSON.stringify(r.logs ?? []),
+      null,
+      r.error == null ? null : String(r.error),
+      null,
+      String(r.started_at ?? ''),
+      r.finished_at == null ? null : String(r.finished_at)
+    );
+  }
+  db.exec('DROP TABLE clone_jobs');
 }

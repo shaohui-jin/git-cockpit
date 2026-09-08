@@ -32,9 +32,9 @@ import {
   toHttpsRemoteUrl,
   upsertMrHost,
   maskToken,
-  validateMrToken,
-  JobStore
+  validateMrToken
 } from '@shaohui_jin/git-cockpit-core';
+import { collectRepoOverviews } from './overview.ts';
 import type { MrCliStatus, MrTokenStatus, OpenedRepo } from '@shaohui_jin/git-cockpit-core';
 import { disposeRuntime } from './runtime.ts';
 import type { Runtime } from './runtime.ts';
@@ -42,7 +42,6 @@ import { McpHttpHandler } from './mcpServer.ts';
 import { executeTool } from './tools/handlers.ts';
 import { TOOL_DEF_MAP, toolSummaries } from './tools/index.ts';
 import { registerApiDocs } from './openapi.ts';
-import { JobManager } from './jobs.ts';
 import { version } from '../package.json';
 
 export interface WebServerHandle {
@@ -106,7 +105,7 @@ export async function createWebServer(
   }
 
   const mcpHttp = new McpHttpHandler(runtime);
-  const jobs = new JobManager(runtime.eventBus, new JobStore(runtime.db));
+  const jobs = runtime.jobs;
 
   // Health
   app.get('/api/health', async () => ({
@@ -123,7 +122,7 @@ export async function createWebServer(
   app.get<{ Params: { id: string } }>('/api/jobs/:id', async (req, reply) => {
     const job = jobs.get(req.params.id);
     if (!job) return reply.code(404).send({ error: '任务不存在' });
-    return { job };
+    return { job: jobs.detail(job) };
   });
 
   app.post<{ Params: { id: string } }>('/api/jobs/:id/cancel', async (req, reply) => {
@@ -159,9 +158,66 @@ export async function createWebServer(
     }
   });
 
+  app.post<{
+    Body: { kind?: string; payload?: Record<string, unknown>; repoPath?: string; repoId?: number };
+  }>('/api/jobs', async (req, reply) => {
+    const kind = req.body?.kind?.trim();
+    const payload = req.body?.payload ?? {};
+    try {
+      if (kind === 'clone') {
+        const job = jobs.startClone({
+          url: String(payload.url ?? ''),
+          destDir: String(payload.destDir ?? ''),
+          allowedRepos: runtime.configStore.get().git.allowedRepos,
+          onSuccess: async (dest) => {
+            const handle = await runtime.repoManager.open(dest);
+            return handle.record.id;
+          }
+        });
+        return { job: jobs.summary(job) };
+      }
+      if (kind === 'survey' || kind === 'fetch') {
+        let repoPath = typeof req.body?.repoPath === 'string' ? req.body.repoPath.trim() : '';
+        if (!repoPath && req.body?.repoId != null) {
+          const handle = await runtime.repoManager.getById(Number(req.body.repoId));
+          repoPath = handle?.service.repoPath ?? '';
+        }
+        if (!repoPath) {
+          const current = await runtime.repoManager.getCurrent();
+          repoPath = current?.service.repoPath ?? '';
+        }
+        if (!repoPath) return reply.code(400).send({ error: 'survey/fetch 需要仓库' } as never);
+        const handle = await runtime.repoManager.open(repoPath);
+        const job =
+          kind === 'survey'
+            ? jobs.startSurvey({
+                repoPath: handle.service.repoPath,
+                intos: (payload.intos as string[]) ?? [],
+                froms: (payload.froms as string[]) ?? [],
+                fetch: payload.fetch as boolean | undefined,
+                remote: payload.remote as string | undefined,
+                git: handle.service
+              })
+            : jobs.startFetch({
+                repoPath: handle.service.repoPath,
+                remote: payload.remote as string | undefined,
+                git: handle.service
+              });
+        return { job: jobs.summary(job) };
+      }
+      return reply.code(400).send({ error: '不支持的 kind，使用 clone / survey / fetch' } as never);
+    } catch (err) {
+      return reply.code(400).send({ error: toError(err) } as never);
+    }
+  });
+
   // ---------------------------------------------------------------------------
   // 仓库管理
   // ---------------------------------------------------------------------------
+  app.get('/api/repos/overview', async () => ({
+    repos: await collectRepoOverviews(runtime)
+  }));
+
   app.get('/api/repos', async () => ({
     repos: runtime.repoManager.list()
   }));

@@ -54,7 +54,8 @@ git-cockpit version # 输出版本号
 
 - **多仓库管理**：统一打开/移除仓库，跨仓库操作
 - **安全机制**：工具按风险分级（readonly / write / dangerous），写操作 dry-run 预览 → 确认 → 执行；高危操作可配置人工审批
-- **内置 Web UI**：状态 / 历史 / 日志 / 设置视图，支持提交、分支、stash、pull/push、硬重置等操作
+- **MCP 默认摘要**：`git_diff` / `git_show` / `git_merge_rehearse` 默认不回完整正文；要正文请加 `path` 或 `detail=true`（网页 GET 仍是全文）
+- **内置 Web UI**：工作台 / 状态 / 历史 / 日志 / 设置视图，支持提交、分支、stash、pull/push、硬重置等操作
 - **审计日志**：所有工具调用记录落库，可回溯
 - **备份**：高危操作前自动备份分支引用与 stash 快照
 

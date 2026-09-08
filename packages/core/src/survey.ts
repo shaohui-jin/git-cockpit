@@ -84,7 +84,13 @@ export function parseTempBranches(stdout: string, remoteNames: string[]): Map<st
 
 export async function runSurvey(
   runner: SurveyRunner,
-  options: { pairs: readonly MergeSurveyPair[]; fetched: boolean; cache?: boolean }
+  options: {
+    pairs: readonly MergeSurveyPair[];
+    fetched: boolean;
+    cache?: boolean;
+    shouldStop?: () => boolean;
+    onProgress?: (current: number, total: number) => void;
+  }
 ): Promise<MergeSurveyResult> {
   const useCache = options.cache !== false;
   const remotes = runner.remoteNames.length ? runner.remoteNames : ['origin'];
@@ -92,7 +98,10 @@ export async function runSurvey(
     runner.tempBranches.get(defaultTempBranchName(into, from, remotes));
 
   const cells: MergeSurveyCell[] = [];
+  const total = options.pairs.length;
   for (const pair of options.pairs) {
+    if (options.shouldStop?.()) break;
+    options.onProgress?.(cells.length, total);
     if (isSameBranchForMr(pair.into, pair.from, remotes)) {
       cells.push({
         into: pair.into,
@@ -142,6 +151,7 @@ export async function runSurvey(
         error: err instanceof Error ? err.message : String(err)
       });
     }
+    options.onProgress?.(cells.length, total);
   }
 
   return {

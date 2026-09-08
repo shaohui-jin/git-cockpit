@@ -38,7 +38,9 @@ export function createMcpServer(runtime: Runtime): McpServer {
         '6. 落盘用 git_apply_resolve（独立 worktree，主区不切换）；冲突时把选边后的 files 一并传入。',
         '7. 工作区已经冲突：git_merge_continue / git_rebase_continue（可带 files）或 abort；不是 apply_resolve。',
         '8. 更新远程跟踪分支用 git_fetch。两分支分叉对比用 git_branch_graph 并传 into/from。',
-        '9. 开 PR/MR 用 git_mr_prepare / git_mr_create。方式与 Token 在设置 MR 配置（不进工具参数）：本机 gh·glab / Token / 浏览器页。找不到 CLI 时结果含官方安装地址。'
+        '9. 开 PR/MR 用 git_mr_prepare / git_mr_create。方式与 Token 在设置 MR 配置（不进工具参数）：本机 gh·glab / Token / 浏览器页。找不到 CLI 时结果含官方安装地址。',
+        '10. 大结果默认摘要：git_diff / git_show / git_merge_rehearse 要正文请加 path 或 detail=true。',
+        '11. 已打开仓库脉搏用 git_repo_overview。长任务用 git_job_list / git_job_get / git_job_cancel。'
       ].join('\n')
     }
   );

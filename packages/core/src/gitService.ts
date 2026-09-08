@@ -14,6 +14,7 @@ import type {
   TagInfo,
   RemoteInfo,
   RepoStatus,
+  RepoOverview,
   CommitInfo,
   StashInfo,
   LogOptions,
@@ -219,6 +220,29 @@ export class GitService extends EventEmitter {
       files,
       isClean: s.isClean() ?? files.length === 0,
       operation: await this.detectWorkspaceOperation()
+    };
+  }
+
+  /** 工作台脉搏：计数即可，不读 diff */
+  async getOverview(): Promise<RepoOverview> {
+    const s = await this.getStatus();
+    const refs = await this.runAllowFail(['for-each-ref', '--format=%(refname:short)', 'refs/heads/merge/']);
+    const tempMergeBranchCount = refs.stdout
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l.startsWith('merge/')).length;
+    return {
+      path: this.repoPath,
+      name: path.basename(this.repoPath.replace(/[\\/]+$/, '')) || this.repoPath,
+      available: true,
+      current: s.currentShort || s.current,
+      tracking: s.tracking,
+      ahead: s.ahead,
+      behind: s.behind,
+      dirtyCount: s.staged.length + s.unstaged.length + s.untracked.length,
+      conflictCount: s.conflicted.length,
+      operation: s.operation,
+      tempMergeBranchCount
     };
   }
 
@@ -1720,6 +1744,8 @@ export class GitService extends EventEmitter {
     fetch?: boolean;
     remote?: string;
     cache?: boolean;
+    signal?: AbortSignal;
+    onProgress?: (current: number, total: number) => void;
   }): Promise<MergeSurveyResult> {
     const pairs =
       options.pairs?.map((p) => ({ into: p.into.trim(), from: p.from.trim() })).filter((p) => p.into && p.from) ??
@@ -1761,7 +1787,13 @@ export class GitService extends EventEmitter {
           };
         }
       },
-      { pairs, fetched, cache: options.cache }
+      {
+        pairs,
+        fetched,
+        cache: options.cache,
+        shouldStop: () => options.signal?.aborted === true,
+        onProgress: options.onProgress
+      }
     );
   }
 

@@ -39,6 +39,8 @@ export interface ToolDefBase {
 export interface ToolDef<TSchema extends z.ZodTypeAny = z.ZodTypeAny> extends ToolDefBase {
   schema: TSchema;
   handler: ToolHandler<TSchema>;
+  /** false 时不解析仓库（任务列表、多仓脉搏） */
+  needsRepo?: boolean;
 }
 
 export type ToolHandler<TSchema extends z.ZodTypeAny> = (
@@ -63,6 +65,8 @@ export interface ToolExecutionResult {
   durationMs: number;
   /** 预览格式（dryRun 时返回的 WritePreview 已包含命令） */
   preview?: unknown;
+  /** 校验后的参数，供 MCP 摘要判断 detail/path */
+  args?: Record<string, unknown>;
 }
 
 /** 解析目标仓库：优先级 repoId > repoPath(上下文) > args.repoPath > 最近打开 */
@@ -144,20 +148,24 @@ export async function executeTool(
       return { tool: def.name, source: ctx.source, dryRun, success: false, error: e, durationMs: Date.now() - t0 };
     }
 
-    // 3. 仓库解析
-    const handle = await resolveRepo(runtime, ctx, args.repoPath as string | undefined);
-    const git = handle.service;
-    const repoPath = git.repoPath;
+    // 3. 仓库解析（任务/多仓一览可不依赖当前仓）
+    let git: GitService | undefined;
+    let repoPath = '';
+    if (def.needsRepo !== false) {
+      const handle = await resolveRepo(runtime, ctx, args.repoPath as string | undefined);
+      git = handle.service;
+      repoPath = git.repoPath;
+    }
 
     // 4. 高风险自动备份（非预览时）
     let backup: BackupResult | null = null;
-    if (!dryRun && def.risk === 'dangerous' && runtime.config.git.backupOnDangerousOps) {
+    if (!dryRun && def.risk === 'dangerous' && runtime.config.git.backupOnDangerousOps && git) {
       backup = await new BackupManager(git).createBackup();
       args = { ...args, __backup: { branch: backup.branch, stashRef: backup.stashRef } };
     }
 
     // 5. 执行
-    const result = await def.handler(args, { ...ctx, git, repoPath });
+    const result = await def.handler(args, { ...ctx, git: git as GitService, repoPath });
 
     // 6. 审计
     record('success', args, undefined, repoPath);
@@ -171,7 +179,8 @@ export async function executeTool(
       result,
       preview,
       backupCreated: backup,
-      durationMs: Date.now() - t0
+      durationMs: Date.now() - t0,
+      args
     };
   } catch (err) {
     const e = extractError(err);
@@ -188,23 +197,4 @@ export async function executeTool(
   }
 }
 
-/** 把干运行/真实结果统一包成 MCP 文本输出 */
-export function formatResultForMcp(exec: ToolExecutionResult): string {
-  if (!exec.success) {
-    const prefix = exec.error?.requiredApproval ? '需要审批' : '操作失败';
-    return `${prefix}：${exec.error?.message ?? '未知错误'}`;
-  }
-  const parts: string[] = [];
-  if (exec.dryRun) {
-    parts.push('[dry-run 预览] 未实际执行任何操作');
-  }
-  if (exec.backupCreated) {
-    parts.push(`[自动备份] 分支 ${exec.backupCreated.branch ?? '(未创建)'}${exec.backupCreated.stashRef ? `，stash ${exec.backupCreated.stashRef}` : ''}`);
-  }
-  const payload =
-    typeof exec.result === 'string'
-      ? exec.result
-      : JSON.stringify(exec.result, null, 2);
-  parts.push(payload);
-  return parts.join('\n\n');
-}
+export { formatResultForMcp, summarizeForAgent } from './format.ts';

@@ -75,10 +75,12 @@ export const useJobsStore = defineStore('jobs', {
       const status: JobStatus = p.status;
       this.jobs = upsert(this.jobs, {
         id: p.id,
-        kind: 'clone',
+        kind: p.kind,
+        title: p.title,
         status,
         url: p.url,
         destDir: p.destDir,
+        repoPath: p.repoPath,
         error: p.error,
         startedAt: p.startedAt,
         finishedAt: p.finishedAt,

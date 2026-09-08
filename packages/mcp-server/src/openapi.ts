@@ -12,6 +12,8 @@ import { TOOL_DEFS } from './tools/index.ts';
 const REST_META: Record<string, { summary: string; tags: string[] }> = {
   'get /api/health': { summary: '探活', tags: ['系统'] },
   'get /api/repos': { summary: '已打开仓库列表', tags: ['仓库'] },
+  'get /api/repos/overview': { summary: '已打开仓库脉搏（工作台）', tags: ['仓库'] },
+  'post /api/jobs': { summary: '提交后台任务（clone / survey / fetch）', tags: ['仓库'] },
   'post /api/repos/open': { summary: '打开本地仓库', tags: ['仓库'] },
   'delete /api/repos/{id}': { summary: '关闭并移除仓库', tags: ['仓库'] },
   'post /api/repos/{id}/activate': { summary: '激活仓库（置顶）', tags: ['仓库'] },
@@ -37,7 +39,7 @@ const REST_META: Record<string, { summary: string; tags: string[] }> = {
   'get /api/repos/{id}/reflog': { summary: 'reflog', tags: ['只读'] },
   'get /api/jobs': { summary: '后台任务列表（克隆等）', tags: ['仓库'] },
   'get /api/jobs/{id}': { summary: '后台任务详情与日志', tags: ['仓库'] },
-  'post /api/jobs/{id}/cancel': { summary: '取消进行中的克隆任务', tags: ['仓库'] },
+  'post /api/jobs/{id}/cancel': { summary: '取消进行中的后台任务', tags: ['仓库'] },
   'post /api/jobs/clone': { summary: '后台克隆远程仓库', tags: ['仓库'] },
   'get /api/tools': { summary: '工具注册表（含风险与是否启用）', tags: ['系统'] },
   'get /api/logs': { summary: '操作审计日志', tags: ['系统'] },

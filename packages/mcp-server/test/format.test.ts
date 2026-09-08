@@ -1,0 +1,81 @@
+import { describe, expect, it } from 'vitest';
+import { formatResultForMcp, summarizeForAgent } from '../src/tools/format.ts';
+import type { ToolExecutionResult } from '../src/tools/handlers.ts';
+
+function ok(tool: string, result: unknown, args: Record<string, unknown> = {}): ToolExecutionResult {
+  return {
+    tool,
+    source: 'mcp',
+    dryRun: false,
+    success: true,
+    result,
+    durationMs: 1,
+    args
+  };
+}
+
+describe('summarizeForAgent', () => {
+  it('git_diff 默认去掉 rawPatch', () => {
+    const out = summarizeForAgent(
+      'git_diff',
+      { files: [{ path: 'a.ts' }], rawPatch: '@@ -1 +1 @@\n-old\n+new\n', stats: { filesChanged: 1 } },
+      {}
+    ) as { rawPatch?: string; detailAvailable?: boolean };
+    expect(out.rawPatch).toBeUndefined();
+    expect(out.detailAvailable).toBe(true);
+  });
+
+  it('git_diff 带 path 或 detail 保留正文', () => {
+    const full = { files: [], rawPatch: '+x', stats: {} };
+    expect((summarizeForAgent('git_diff', full, { path: 'a.ts' }) as { rawPatch: string }).rawPatch).toBe('+x');
+    expect((summarizeForAgent('git_diff', full, { detail: true }) as { rawPatch: string }).rawPatch).toBe('+x');
+  });
+
+  it('git_merge_rehearse 默认去掉冲突正文', () => {
+    const out = summarizeForAgent(
+      'git_merge_rehearse',
+      {
+        into: 'main',
+        from: 'feat',
+        clean: false,
+        conflictFiles: [
+          {
+            path: 'a.ts',
+            contentConflict: true,
+            hunks: [],
+            conflictContent: '<<<<<<< ours\nA\n=======\nB\n>>>>>>> theirs\n'
+          }
+        ]
+      },
+      {}
+    ) as { conflictFiles: Array<{ conflictContent?: string; path: string }>; next: unknown[] };
+    expect(out.conflictFiles[0]?.conflictContent).toBeUndefined();
+    expect(out.conflictFiles[0]?.path).toBe('a.ts');
+    expect(out.next?.[0]).toMatchObject({ tool: 'git_merge_rehearse' });
+  });
+});
+
+describe('formatResultForMcp', () => {
+  it('摘要文本不含冲突标记', () => {
+    const text = formatResultForMcp(
+      ok('git_merge_rehearse', {
+        into: 'main',
+        from: 'feat',
+        conflictFiles: [{ path: 'a.ts', conflictContent: '<<<<<<< ours\nA\n' }]
+      })
+    );
+    expect(text).not.toContain('<<<<<<<');
+    expect(text).toContain('a.ts');
+  });
+
+  it('detail=true 保留冲突标记', () => {
+    const text = formatResultForMcp(
+      ok(
+        'git_merge_rehearse',
+        { conflictFiles: [{ path: 'a.ts', conflictContent: '<<<<<<< ours\nA\n' }] },
+        { detail: true }
+      )
+    );
+    expect(text).toContain('<<<<<<<');
+  });
+});

@@ -6,8 +6,11 @@ import {
   enrichPrepareMr,
   createPullOrMergeRequest,
   BackupManager,
+  GitOperationError,
+  SURVEY_ASYNC_THRESHOLD,
   type GitService
 } from '@shaohui_jin/git-cockpit-core';
+import { collectRepoOverviews } from '../overview.ts';
 import * as S from './schemas.ts';
 import type { ToolDef } from './handlers.ts';
 
@@ -145,18 +148,29 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     name: 'git_merge_rehearse',
     description:
-      '完整合并预演：冲突文件 + diff3 冲突正文 + ours/theirs/base（仍不改工作区）。选边后把 files[{path,resolvedContent}] 交给 git_apply_resolve。into/from 含义同 git_merge_preview。',
+      '完整合并预演：冲突文件 + diff3 冲突正文 + ours/theirs/base（仍不改工作区）。MCP 默认只回路径摘要；要正文请带 path 或 detail=true。选边后把 files 交给 git_apply_resolve。into/from 同 git_merge_preview。',
     risk: 'readonly',
     schema: S.GitMergeRehearseSchema,
-    handler: async (args: Args, ctx) =>
-      ctx.git.rehearseMerge({
+    handler: async (args: Args, ctx) => {
+      const wantBody = args.detail === true || (typeof args.path === 'string' && args.path.trim().length > 0);
+      if (!wantBody) {
+        return ctx.git.previewMerge({
+          into: args.into as string,
+          from: args.from as string,
+          fetch: args.fetch as boolean | undefined,
+          remote: args.remote as string | undefined,
+          path: args.path as string | undefined
+        });
+      }
+      return ctx.git.rehearseMerge({
         into: args.into as string,
         from: args.from as string,
         fetch: args.fetch as boolean | undefined,
         remote: args.remote as string | undefined,
         path: args.path as string | undefined,
         maxFiles: args.maxFiles as number | undefined
-      })
+      });
+    }
   },
   {
     name: 'git_merge_blame',
@@ -176,16 +190,31 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     name: 'git_merge_survey',
     description:
-      '批量预演矩阵：intos × froms 每对跑一次 merge-tree，整批只 fetch 一次。只返回结论与冲突路径，不生成正文。适合发布前扫描。禁止用 git_merge 做预演。',
+      '批量预演矩阵：intos × froms 每对跑一次 merge-tree，整批只 fetch 一次。只返回结论与冲突路径。格子>20 或 async=true 时后台跑并返回 jobId（git_job_get）。禁止用 git_merge 做预演。',
     risk: 'readonly',
     schema: S.GitMergeSurveySchema,
-    handler: async (args: Args, ctx) =>
-      ctx.git.surveyMerges({
-        intos: args.intos as string[],
-        froms: args.froms as string[],
+    handler: async (args: Args, ctx) => {
+      const intos = args.intos as string[];
+      const froms = args.froms as string[];
+      const asyncWanted = args.async === true || intos.length * froms.length > SURVEY_ASYNC_THRESHOLD;
+      if (asyncWanted) {
+        const job = ctx.runtime.jobs.startSurvey({
+          repoPath: ctx.repoPath,
+          intos,
+          froms,
+          fetch: args.fetch as boolean | undefined,
+          remote: args.remote as string | undefined,
+          git: ctx.git
+        });
+        return { jobId: job.id, status: job.status, async: true, title: job.title };
+      }
+      return ctx.git.surveyMerges({
+        intos,
+        froms,
         fetch: args.fetch as boolean | undefined,
         remote: args.remote as string | undefined
-      })
+      });
+    }
   },
   {
     name: 'git_merge_order',
@@ -216,6 +245,34 @@ export const TOOL_DEFS: ToolDef[] = [
         sourceBranch: args.sourceBranch as string | undefined
       });
       return enrichPrepareMr({ prep, mr, cwd: ctx.git.repoPath });
+    }
+  },
+  {
+    name: 'git_repo_overview',
+    description: '已打开仓库脉搏：分支、脏文件数、ahead/behind、工作区 operation、本地 merge/* 数。不回 diff。',
+    risk: 'readonly',
+    needsRepo: false,
+    schema: S.GitRepoOverviewSchema,
+    handler: async (_args: Args, ctx) => ({ repos: await collectRepoOverviews(ctx.runtime) })
+  },
+  {
+    name: 'git_job_list',
+    description: '列出后台任务摘要（克隆 / survey / fetch）。',
+    risk: 'readonly',
+    needsRepo: false,
+    schema: S.GitJobListSchema,
+    handler: async (_args: Args, ctx) => ({ jobs: ctx.runtime.jobs.list().map((j) => ctx.runtime.jobs.summary(j)) })
+  },
+  {
+    name: 'git_job_get',
+    description: '查看一条后台任务（日志 + 完成时的 result 摘要）。',
+    risk: 'readonly',
+    needsRepo: false,
+    schema: S.GitJobGetSchema,
+    handler: async (args: Args, ctx) => {
+      const job = ctx.runtime.jobs.get(args.id as string);
+      if (!job) throw new GitOperationError('任务不存在', 'JOB_NOT_FOUND');
+      return ctx.runtime.jobs.detail(job);
     }
   },
 
@@ -448,6 +505,25 @@ export const TOOL_DEFS: ToolDef[] = [
         reviewers: args.reviewers as string[] | undefined,
         dryRun: args.dryRun as boolean | undefined
       });
+    }
+  },
+  {
+    name: 'git_job_cancel',
+    description: '取消进行中的后台任务。克隆会杀进程并删除不完整目录。',
+    risk: 'write',
+    needsRepo: false,
+    schema: S.GitJobCancelSchema,
+    handler: async (args: Args, ctx) => {
+      if (args.dryRun) {
+        return {
+          dryRun: true,
+          command: 'job cancel',
+          args: [args.id],
+          risk: 'low',
+          note: '将取消进行中的后台任务'
+        };
+      }
+      return ctx.runtime.jobs.summary(ctx.runtime.jobs.cancel(args.id as string));
     }
   },
 

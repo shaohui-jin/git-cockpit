@@ -3,6 +3,7 @@ import ReposView from '@/views/ReposView.vue';
 import StatusView from '@/views/StatusView.vue';
 import MergeView from '@/views/MergeView.vue';
 import HistoryView from '@/views/HistoryView.vue';
+import JobsView from '@/views/JobsView.vue';
 import LogsView from '@/views/LogsView.vue';
 import SettingsView from '@/views/SettingsView.vue';
 
@@ -10,8 +11,10 @@ export const router = createRouter({
   // 使用 hash 历史模式：后端 SPA fallback 与文件托管下均无需服务端改写
   history: createWebHashHistory(),
   routes: [
-    { path: '/', redirect: '/status' },
-    { path: '/repos', name: 'repos', component: ReposView, meta: { title: '仓库管理' } },
+    { path: '/', redirect: '/dashboard' },
+    { path: '/dashboard', name: 'dashboard', component: ReposView, meta: { title: '工作台' } },
+    { path: '/jobs', name: 'jobs', component: JobsView, meta: { title: '任务' } },
+    { path: '/repos', redirect: '/dashboard' },
     { path: '/status', name: 'status', component: StatusView, meta: { title: '状态' } },
     { path: '/merge', name: 'merge', component: MergeView, meta: { title: '合并' } },
     { path: '/matrix', redirect: { path: '/merge', query: { mode: 'matrix' } } },

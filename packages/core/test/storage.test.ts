@@ -220,3 +220,54 @@ describe('JobStore（SQLite）', () => {
     expect(store.list()).toHaveLength(0);
   });
 });
+
+describe('clone_jobs 迁到 jobs', () => {
+  afterAll(() => cleanupTmp());
+
+  it('旧表一行能被 openDatabase 读到', () => {
+    const dir = makeTmpDir('job-mig-');
+    const raw = new DatabaseSync(path.join(dir, 'git-cockpit.db'));
+    raw.exec(`
+      CREATE TABLE clone_jobs (
+        id TEXT PRIMARY KEY,
+        kind TEXT NOT NULL DEFAULT 'clone',
+        status TEXT NOT NULL,
+        url TEXT NOT NULL,
+        dest_dir TEXT NOT NULL,
+        logs TEXT NOT NULL,
+        error TEXT,
+        started_at TEXT NOT NULL,
+        finished_at TEXT,
+        repo_id INTEGER
+      );
+    `);
+    raw
+      .prepare(
+        `INSERT INTO clone_jobs (id, kind, status, url, dest_dir, logs, error, started_at, finished_at, repo_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        'clone-old',
+        'clone',
+        'ok',
+        'https://example.com/a.git',
+        '/tmp/a',
+        JSON.stringify(['done']),
+        null,
+        '2026-01-01T00:00:00.000Z',
+        '2026-01-01T00:01:00.000Z',
+        2
+      );
+    raw.close();
+
+    const db = openDatabase(dir);
+    const store = new JobStore(db);
+    const job = store.get('clone-old');
+    expect(job?.kind).toBe('clone');
+    expect(job?.status).toBe('ok');
+    expect(job?.payload).toEqual({ url: 'https://example.com/a.git', destDir: '/tmp/a' });
+    expect(job?.repoId).toBe(2);
+    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='clone_jobs'").get();
+    expect(tables).toBeUndefined();
+  });
+});
