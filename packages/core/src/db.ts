@@ -50,7 +50,8 @@ function migrate(db: DatabaseSync): void {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       path TEXT NOT NULL UNIQUE,
       added_at TEXT NOT NULL,
-      last_opened_at TEXT NOT NULL
+      last_opened_at TEXT NOT NULL,
+      pin_order INTEGER NOT NULL DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS jobs (
@@ -71,6 +72,24 @@ function migrate(db: DatabaseSync): void {
     CREATE INDEX IF NOT EXISTS idx_jobs_started ON jobs(started_at DESC);
   `);
   migrateCloneJobs(db);
+  migrateRepoPinOrder(db);
+}
+
+function tableHasColumn(db: DatabaseSync, table: string, column: string): boolean {
+  const rows = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  return rows.some((r) => r.name === column);
+}
+
+/** 已有库补 pin_order，初值按当时的最近打开倒序，之后只跟拖拽走。 */
+function migrateRepoPinOrder(db: DatabaseSync): void {
+  if (!tableExists(db, 'opened_repos')) return;
+  if (tableHasColumn(db, 'opened_repos', 'pin_order')) return;
+  db.exec('ALTER TABLE opened_repos ADD COLUMN pin_order INTEGER NOT NULL DEFAULT 0');
+  const rows = db.prepare('SELECT id FROM opened_repos ORDER BY last_opened_at DESC, id ASC').all() as Array<{
+    id: number;
+  }>;
+  const upd = db.prepare('UPDATE opened_repos SET pin_order = ? WHERE id = ?');
+  rows.forEach((r, i) => upd.run(i, r.id));
 }
 
 function tableExists(db: DatabaseSync, name: string): boolean {

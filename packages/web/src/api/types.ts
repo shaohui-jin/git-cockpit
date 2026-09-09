@@ -30,6 +30,7 @@ export interface OpenedRepo {
   path: string;
   addedAt: string;
   lastOpenedAt: string;
+  pinOrder?: number;
   available?: boolean;
 }
 
@@ -221,6 +222,9 @@ export interface RepoOverview {
   conflictCount: number;
   operation: 'none' | 'merge' | 'rebase';
   tempMergeBranchCount: number;
+  activityStart: string;
+  activity: number[];
+  activityTotal: number;
   lastOpenedAt?: string;
 }
 

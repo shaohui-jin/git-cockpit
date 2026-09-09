@@ -70,6 +70,11 @@ export interface RepoOverview {
   conflictCount: number;
   operation: WorkspaceOperation;
   tempMergeBranchCount: number;
+  /** 热力窗口第一天（本地日历周一，YYYY-MM-DD） */
+  activityStart: string;
+  /** 近 12 周每日提交数，旧→新，长度 84 */
+  activity: number[];
+  activityTotal: number;
   lastOpenedAt?: string;
 }
 

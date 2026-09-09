@@ -70,6 +70,20 @@ export function summarizeForAgent(tool: string, result: unknown, args: Record<st
     if (detail || pathSet) return result;
     return stripRehearseBodies(result);
   }
+  if (tool === 'git_repo_overview') {
+    if (detail) return result;
+    const row = asRecord(result);
+    const repos = Array.isArray(row?.repos) ? row.repos : [];
+    return {
+      ...row,
+      repos: repos.map((item) => {
+        const rec = asRecord(item);
+        if (!rec) return item;
+        const { activity: _days, ...rest } = rec;
+        return rest;
+      })
+    };
+  }
   if (tool === 'git_file_content') {
     if (detail) return result;
     const row = asRecord(result);

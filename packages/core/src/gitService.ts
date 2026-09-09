@@ -5,6 +5,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import { simpleGit, type SimpleGit } from 'simple-git';
+import { bucketActivityDays, emptyActivity } from './activity.ts';
 import { GitOperationError } from './types.ts';
 import type {
   DiffResult,
@@ -231,6 +232,7 @@ export class GitService extends EventEmitter {
       .split('\n')
       .map((l) => l.trim())
       .filter((l) => l.startsWith('merge/')).length;
+    const heat = await this.collectActivity();
     return {
       path: this.repoPath,
       name: path.basename(this.repoPath.replace(/[\\/]+$/, '')) || this.repoPath,
@@ -242,8 +244,27 @@ export class GitService extends EventEmitter {
       dirtyCount: s.staged.length + s.unstaged.length + s.untracked.length,
       conflictCount: s.conflicted.length,
       operation: s.operation,
-      tempMergeBranchCount
+      tempMergeBranchCount,
+      ...heat
     };
+  }
+
+  /** 近 12 周 `--all` 提交日计数，不读 diff */
+  private async collectActivity(): Promise<{
+    activityStart: string;
+    activity: number[];
+    activityTotal: number;
+  }> {
+    const since = emptyActivity().activityStart;
+    const log = await this.runAllowFail([
+      'log',
+      '--all',
+      '--pretty=format:%cd',
+      '--date=short',
+      `--since=${since}`
+    ]);
+    if (log.code !== 0 || !log.stdout.trim()) return emptyActivity();
+    return bucketActivityDays(log.stdout.split('\n'));
   }
 
   /** MERGE_HEAD / REBASE_HEAD；cherry-pick 本期不当作 operation */

@@ -44,6 +44,13 @@
   --gc-select-active: color-mix(in srgb, var(--el-color-primary) 28%, transparent);
   --gc-select-current: color-mix(in srgb, var(--el-color-primary) 40%, transparent);
 
+  /* 工作台 12 周热力（按日，绝对档位，跨仓可对比） */
+  --gc-heat-0: var(--el-fill-color);
+  --gc-heat-1: color-mix(in srgb, var(--el-color-primary) 28%, var(--el-fill-color));
+  --gc-heat-2: color-mix(in srgb, var(--el-color-primary) 50%, var(--el-fill-color));
+  --gc-heat-3: color-mix(in srgb, var(--el-color-primary) 72%, var(--el-fill-color));
+  --gc-heat-4: var(--el-color-primary);
+
   /* ---- 字号：基础统一 12px，标题档位仅保留层级 ---- */
   --el-font-size-extra-large: 14px;
   --el-font-size-large: 13px;

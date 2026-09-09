@@ -1,4 +1,4 @@
-import type { RepoOverview } from '@shaohui_jin/git-cockpit-core';
+import { emptyActivity, type RepoOverview } from '@shaohui_jin/git-cockpit-core';
 import type { Runtime } from './runtime.ts';
 
 const CONCURRENCY = 4;
@@ -17,6 +17,7 @@ export function unavailableOverview(path: string, extra: Partial<RepoOverview> =
     conflictCount: 0,
     operation: 'none',
     tempMergeBranchCount: 0,
+    ...emptyActivity(),
     ...extra
   };
 }

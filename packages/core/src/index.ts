@@ -1,4 +1,5 @@
 export * from './types.ts';
+export * from './activity.ts';
 export * from './gitService.ts';
 export * from './permissions.ts';
 export * from './blame.ts';

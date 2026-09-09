@@ -249,7 +249,7 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'git_repo_overview',
-    description: '已打开仓库脉搏：分支、脏文件数、ahead/behind、工作区 operation、本地 merge/* 数。不回 diff。',
+    description: '已打开仓库脉搏：分支、脏文件数、ahead/behind、工作区 operation、本地 merge/* 数、近 12 周提交总数。默认不含每日格子；detail=true 才回 activity[]。不回 diff。',
     risk: 'readonly',
     needsRepo: false,
     schema: S.GitRepoOverviewSchema,

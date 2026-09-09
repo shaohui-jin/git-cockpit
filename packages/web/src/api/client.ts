@@ -116,9 +116,13 @@ export function openRepo(path: string): Promise<{ repo: OpenedRepo }> {
   return request('POST', '/api/repos/open', { path });
 }
 
-/** 激活/进入仓库：后端刷新最近打开排序并记录操作日志 */
+/** 激活/进入仓库：刷新最近打开时间，不改卡片顺序 */
 export function activateRepo(id: number): Promise<{ repo: OpenedRepo }> {
   return request('POST', `/api/repos/${id}/activate`);
+}
+
+export function reorderRepos(ids: number[]): Promise<{ repos: OpenedRepo[] }> {
+  return request('PUT', '/api/repos/order', { ids });
 }
 
 /** 关闭并移除仓库记录 */

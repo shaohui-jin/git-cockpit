@@ -47,10 +47,14 @@ export class RepoManager {
     }));
   }
 
-  /** 取最近打开的仓库（懒创建服务） */
+  /** 取最近打开的仓库（懒创建服务）。与工作台拖拽顺序无关。 */
   async getCurrent(): Promise<RepoHandle | null> {
-    const record = this.options.repoStore.list()[0];
+    const record = this.options.repoStore.listByLastOpened()[0];
     return record ? this.getByRecord(record) : null;
+  }
+
+  reorder(ids: number[]): OpenedRepo[] {
+    return this.options.repoStore.reorder(ids);
   }
 
   /** 按 id 取仓库（懒创建服务） */
@@ -90,7 +94,7 @@ export class RepoManager {
     return { service, record };
   }
 
-  /** 激活仓库：刷新最近打开时间，驱动「最近打开」列表重排到首位；仓库不存在返回 null */
+  /** 激活仓库：只刷新 last_opened_at，不改工作台拖拽顺序；仓库不存在返回 null */
   activate(id: number): OpenedRepo | null {
     const record = this.options.repoStore.getById(id);
     if (!record) return null;

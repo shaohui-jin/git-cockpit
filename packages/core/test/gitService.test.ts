@@ -73,6 +73,8 @@ describe('GitService 只读操作', () => {
     expect(overview.dirtyCount).toBe(0);
     expect(overview.operation).toBe('none');
     expect(overview.tempMergeBranchCount).toBe(0);
+    expect(overview.activity).toHaveLength(84);
+    expect(overview.activityTotal).toBeGreaterThanOrEqual(4);
   });
 
   it('getStatus 识别未跟踪 / 已暂存 / 已修改', async () => {

@@ -10,7 +10,7 @@ interface State {
   healthOk: boolean | null;
 }
 
-/** 当前仓库记忆：刷新后恢复上次进入的仓库（与后端 lastOpenedAt 排序互为目标） */
+/** 当前仓库记忆：刷新后恢复上次进入的仓库 */
 const CURRENT_ID_KEY = 'git-cockpit:currentRepoId';
 
 function readStoredId(): number | null {
@@ -63,7 +63,6 @@ export const useReposStore = defineStore('repos', {
       try {
         const { repos } = await api.listRepos();
         this.repos = repos;
-        // 恢复策略：localStorage 记忆的仓库 > 当前选择 > 最近打开（列表首位）
         const stored = readStoredId();
         if (stored !== null && repos.some((r) => r.id === stored)) {
           this.currentId = stored;
@@ -82,13 +81,22 @@ export const useReposStore = defineStore('repos', {
       await this.load();
       return repo;
     },
-    /** 激活/进入仓库：后端刷新最近打开时间并记录操作日志，随后重排列表 */
     async activate(id: number): Promise<OpenedRepo> {
       const { repo } = await api.activateRepo(id);
       this.currentId = id;
       storeId(id);
       await this.load();
       return repo;
+    },
+    async reorder(ids: number[]): Promise<void> {
+      const byId = new Map(this.repos.map((r) => [r.id, r]));
+      this.repos = ids.map((id) => byId.get(id)).filter((r): r is OpenedRepo => !!r);
+      try {
+        const { repos } = await api.reorderRepos(ids);
+        this.repos = repos;
+      } catch {
+        await this.load();
+      }
     },
     async remove(id: number): Promise<void> {
       await api.removeRepo(id);

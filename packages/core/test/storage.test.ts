@@ -122,12 +122,22 @@ describe('RepoStore（SQLite）', () => {
     expect(store.list()).toHaveLength(1);
   });
 
-  it('list 按最近打开倒序', async () => {
+  it('list 按打开先后（新仓在队尾），再打开不改顺序', async () => {
     store.open('/repo/one');
     await new Promise((r) => setTimeout(r, 5));
     store.open('/repo/two');
-    const list = store.list();
-    expect(list[0]!.path).toBe('/repo/two');
+    expect(store.list().map((r) => r.path)).toEqual(['/repo/one', '/repo/two']);
+    store.open('/repo/one');
+    expect(store.list().map((r) => r.path)).toEqual(['/repo/one', '/repo/two']);
+    expect(store.listByLastOpened()[0]!.path).toBe('/repo/one');
+  });
+
+  it('reorder 按给定 id 排列', () => {
+    const a = store.open('/repo/a');
+    const b = store.open('/repo/b');
+    const c = store.open('/repo/c');
+    store.reorder([c.id, a.id, b.id]);
+    expect(store.list().map((r) => r.path)).toEqual(['/repo/c', '/repo/a', '/repo/b']);
   });
 
   it('remove 删除仓库记录', () => {

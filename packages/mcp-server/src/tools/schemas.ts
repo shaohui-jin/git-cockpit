@@ -272,7 +272,7 @@ export const GitStashShowSchema = z.object({
   detail
 });
 
-export const GitRepoOverviewSchema = z.object({ ...readonlyBase });
+export const GitRepoOverviewSchema = z.object({ ...readonlyBase, detail });
 export type GitRepoOverviewArgs = z.infer<typeof GitRepoOverviewSchema>;
 
 export const GitJobListSchema = z.object({ ...readonlyBase });

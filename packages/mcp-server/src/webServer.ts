@@ -222,6 +222,18 @@ export async function createWebServer(
     repos: runtime.repoManager.list()
   }));
 
+  app.put<{ Body: { ids?: number[] } }>('/api/repos/order', async (req, reply) => {
+    const ids = req.body?.ids;
+    if (!Array.isArray(ids) || ids.some((id) => !Number.isInteger(id))) {
+      return reply.code(400).send({ error: '缺少 ids' } as never);
+    }
+    try {
+      return { repos: runtime.repoManager.reorder(ids) };
+    } catch (err) {
+      return reply.code(400).send({ error: toError(err) } as never);
+    }
+  });
+
   app.post<{ Body: { path?: string } }>('/api/repos/open', async (req, reply) => {
     const target = req.body?.path?.trim();
     if (!target) {
@@ -244,7 +256,7 @@ export async function createWebServer(
     return { ok: true };
   });
 
-  /** 激活/进入仓库：刷新最近打开排序，并记录一条操作日志（source=web） */
+  /** 激活/进入仓库：刷新 last_opened_at 并记日志，不改拖拽顺序 */
   app.post<{ Params: { id: string } }>('/api/repos/:id/activate', async (req, reply) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) {

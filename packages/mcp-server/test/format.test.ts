@@ -53,6 +53,18 @@ describe('summarizeForAgent', () => {
     expect(out.conflictFiles[0]?.path).toBe('a.ts');
     expect(out.next?.[0]).toMatchObject({ tool: 'git_merge_rehearse' });
   });
+
+  it('git_repo_overview 默认去掉每日热力格子', () => {
+    const days = new Array(84).fill(0);
+    days[0] = 3;
+    const out = summarizeForAgent(
+      'git_repo_overview',
+      { repos: [{ path: 'D:/a', activityTotal: 3, activity: days, activityStart: '2026-06-22' }] },
+      {}
+    ) as { repos: Array<{ activity?: number[]; activityTotal: number }> };
+    expect(out.repos[0]?.activity).toBeUndefined();
+    expect(out.repos[0]?.activityTotal).toBe(3);
+  });
 });
 
 describe('formatResultForMcp', () => {
