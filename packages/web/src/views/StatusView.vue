@@ -10,6 +10,7 @@ import { useRevision } from '@/composables/revision';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import DiffViewer from '@/components/DiffViewer.vue';
 import CommitGraph from '@/components/CommitGraph.vue';
+import CommitLogPanel from '@/components/CommitLogPanel.vue';
 import BranchTreeSelect from '@/components/BranchTreeSelect.vue';
 import ConflictResolvePanel from '@/components/ConflictResolvePanel.vue';
 import { useBranchesStore } from '@/stores/branches';
@@ -39,10 +40,11 @@ const status = ref<RepoStatus | null>(null);
 const stashes = ref<StashInfo[]>([]);
 const loading = ref(false);
 const loadError = ref('');
-const contentMode = ref<'workspace' | 'graph'>('workspace');
+const contentMode = ref<'workspace' | 'graph' | 'log'>('workspace');
 const graph = ref<BranchGraph | null>(null);
 const graphLoading = ref(false);
 const graphError = ref('');
+const logPanel = ref<{ refresh: () => Promise<void>; loading: boolean } | null>(null);
 const lineageInto = ref('');
 const lineageFrom = ref('');
 const workspaceConflicts = ref<WorkspaceConflicts | null>(null);
@@ -282,6 +284,10 @@ async function loadBackupsAndReflog(): Promise<void> {
 async function refresh(): Promise<void> {
   if (contentMode.value === 'graph') {
     await Promise.all([loadStatus(), loadBranches(), loadGraph()]);
+    return;
+  }
+  if (contentMode.value === 'log') {
+    await Promise.all([loadStatus(), loadBranches(), logPanel.value?.refresh() ?? Promise.resolve()]);
     return;
   }
   await Promise.all([loadStatus(), loadBranches(), loadStashes(), loadBackupsAndReflog()]);
@@ -686,8 +692,9 @@ onUnmounted(() => {
         <el-radio-group v-model="contentMode" size="small">
           <el-radio-button value="workspace">工作区</el-radio-button>
           <el-radio-button value="graph">分支图</el-radio-button>
+          <el-radio-button value="log">提交</el-radio-button>
         </el-radio-group>
-        <el-button :loading="loading || graphLoading" @click="refresh">刷新</el-button>
+        <el-button :loading="loading || graphLoading || logPanel?.loading" @click="refresh">刷新</el-button>
       </div>
     </div>
 
@@ -696,7 +703,7 @@ onUnmounted(() => {
 
     <div v-else class="status-layout">
       <!-- 左：分支树 -->
-      <el-card shadow="never" class="branch-panel">
+      <el-card v-if="contentMode === 'workspace'" shadow="never" class="branch-panel">
         <template #header>
           <div class="panel-head">
             <span class="panel-title">分支 Branch</span>
@@ -739,7 +746,7 @@ onUnmounted(() => {
         </div>
       </el-card>
 
-      <!-- 右：状态内容 或 分支图 -->
+      <!-- 右：工作区 / 分支图 / 提交 -->
       <div class="status-content">
         <div v-if="contentMode === 'graph'" class="graph-pane">
           <div class="lineage-bar">
@@ -766,6 +773,10 @@ onUnmounted(() => {
             :default-remote="graphDefaultRemote"
             :remotes="graphRemotes"
           />
+        </div>
+
+        <div v-else-if="contentMode === 'log'" class="log-pane">
+          <CommitLogPanel ref="logPanel" />
         </div>
 
         <template v-else>
@@ -1358,6 +1369,11 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: var(--gc-gap);
+}
+.log-pane {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 .lineage-bar {
   flex: none;

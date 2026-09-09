@@ -4,14 +4,12 @@ import { ElMessage } from 'element-plus';
 import * as api from '@/api/client';
 import { useReposStore } from '@/stores/repos';
 import { useBranchesStore } from '@/stores/branches';
-import { useRevision } from '@/composables/revision';
 import DiffViewer from '@/components/DiffViewer.vue';
 import BranchTreeSelect from '@/components/BranchTreeSelect.vue';
 import type { CommitInfo, DiffResult } from '@/api/types';
 
 const repos = useReposStore();
 const branchStore = useBranchesStore();
-const { revision } = useRevision();
 const repoId = (): number | null => repos.currentId;
 
 const commits = ref<CommitInfo[]>([]);
@@ -23,7 +21,6 @@ const selectedBranch = ref('');
 const pathFilter = ref('');
 const maxCount = ref(50);
 
-/** 提交详情抽屉：openCommit 成功后再置 visible，失败则拦截展开 */
 const showVisible = ref(false);
 const showCommit = ref<CommitInfo | null>(null);
 const showDiff = ref<DiffResult | null>(null);
@@ -55,16 +52,11 @@ async function loadLog(): Promise<void> {
   }
 }
 
-async function refresh(): Promise<void> {
-  await loadLog();
-}
-
 async function openCommit(c: CommitInfo): Promise<void> {
   const id = repoId();
   if (id === null) return;
   loading.value = true;
   try {
-    // 先请求成功再展开抽屉：COMMIT_NOT_FOUND 等错误直接 message 提示并拦截展开
     const { diff } = await api.getShow(id, c.hash);
     showCommit.value = c;
     showDiff.value = diff;
@@ -88,20 +80,20 @@ function formatDate(iso: string): string {
 
 watch(repoId, () => {
   selectedBranch.value = '';
-  void refresh();
+  void loadLog();
 });
-watch(revision, () => void loadLog());
 watch([mode, selectedBranch, maxCount], () => void loadLog());
 
-onMounted(() => void refresh());
+onMounted(() => void loadLog());
+
+defineExpose({ refresh: loadLog, loading });
 </script>
 
 <template>
-  <div class="page">
-    <h2 class="page-title">提交历史</h2>
+  <div class="pane">
     <el-alert v-if="loadError" :title="loadError" type="error" :closable="false" show-icon class="mb" />
 
-    <el-card shadow="never" class="mb">
+    <el-card shadow="never" class="filter-card">
       <div class="filter-bar">
         <el-radio-group v-model="mode">
           <el-radio-button value="head">当前分支（{{ currentBranch }}）</el-radio-button>
@@ -123,28 +115,39 @@ onMounted(() => void refresh());
       </div>
     </el-card>
 
-    <el-card shadow="never">
-      <el-table :data="commits" v-loading="loading" size="default" highlight-current-row @row-click="openCommit">
-        <el-table-column label="提交" width="100">
-          <template #default="{ row }">
-            <span class="mono hash">{{ row.shortHash }}</span>
+    <el-card shadow="never" class="list-card">
+      <div class="table-wrap">
+        <el-table
+          :data="commits"
+          height="100%"
+          v-loading="loading"
+          size="default"
+          highlight-current-row
+          @row-click="openCommit"
+        >
+          <el-table-column label="提交" width="100">
+            <template #default="{ row }">
+              <span class="mono hash">{{ row.shortHash }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="信息" min-width="300" show-overflow-tooltip>
+            <template #default="{ row }">
+              <span class="subject" :title="row.refs ? `${row.subject}  ·  ${row.refs}` : row.subject">{{ row.subject }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="作者" width="170" show-overflow-tooltip>
+            <template #default="{ row }">
+              <span :title="`${row.authorName} <${row.authorEmail}>`">{{ row.authorName }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="时间" width="180">
+            <template #default="{ row }">{{ formatDate(row.authorDate) }}</template>
+          </el-table-column>
+          <template #empty>
+            <el-empty description="暂无提交记录" :image-size="48" />
           </template>
-        </el-table-column>
-        <el-table-column label="信息" min-width="300" show-overflow-tooltip>
-          <template #default="{ row }">
-            <span class="subject" :title="row.refs ? `${row.subject}  ·  ${row.refs}` : row.subject">{{ row.subject }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="作者" width="170" show-overflow-tooltip>
-          <template #default="{ row }">
-            <span :title="`${row.authorName} <${row.authorEmail}>`">{{ row.authorName }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="时间" width="180">
-          <template #default="{ row }">{{ formatDate(row.authorDate) }}</template>
-        </el-table-column>
-      </el-table>
-      <el-empty v-if="!loading && commits.length === 0" description="暂无提交记录" />
+        </el-table>
+      </div>
     </el-card>
 
     <el-drawer v-model="showVisible" size="60%" destroy-on-close>
@@ -190,12 +193,36 @@ onMounted(() => void refresh());
 </template>
 
 <style scoped>
-.page-title {
-  margin: 0 0 var(--gc-gap);
-  font-size: 14px;
+.pane {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 .mb {
   margin-bottom: var(--gc-gap);
+  flex: none;
+}
+.filter-card {
+  flex: none;
+  margin-bottom: var(--gc-gap);
+}
+.list-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.list-card :deep(.el-card__body) {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.table-wrap {
+  flex: 1;
+  min-height: 0;
 }
 .filter-bar {
   display: flex;

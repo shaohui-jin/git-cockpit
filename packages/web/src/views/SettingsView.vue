@@ -406,6 +406,7 @@ onMounted(async () => {
 <template>
   <div class="page">
     <h2 class="page-title">设置</h2>
+    <p v-if="repos.serverVersion" class="page-version">服务 {{ repos.serverVersion }}</p>
     <el-alert v-if="settings.error" :title="settings.error" type="error" :closable="false" show-icon class="mb" />
 
     <el-tabs v-model="activeTab" class="settings-tabs">
@@ -682,6 +683,11 @@ onMounted(async () => {
 .page-title {
   margin: 0 0 var(--gc-gap);
   font-size: 14px;
+}
+.page-version {
+  margin: calc(-1 * var(--gc-gap) + 2px) 0 var(--gc-gap);
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 .settings-tabs {
   min-height: 0;

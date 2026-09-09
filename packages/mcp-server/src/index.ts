@@ -10,6 +10,7 @@ export type { WebServerHandle } from './webServer.ts';
 export { executeTool, formatResultForMcp } from './tools/handlers.ts';
 export type { ToolDef, ToolExecutionContext, ToolExecutionResult } from './tools/handlers.ts';
 export { TOOL_DEFS, TOOL_DEF_MAP, toolSummaries } from './tools/index.ts';
+export { MCP_PROMPTS } from './tools/prompts.ts';
 export { main as runCli } from './cli.ts';
 export { ConfigStore } from './config.ts';
 export type { DeepPartial } from './config.ts';

@@ -52,7 +52,7 @@ const result = await backup.createBackup();
 
 ## 发布说明（维护者）
 
-版本号维护在 `packages/core/package.json`，发布由仓库根目录 `.github/workflows/release-core.yml` 负责：
+版本号维护在 `packages/core/package.json`，发布由仓库根目录 `.github/workflows/release.yml` 的 `release-core` job 负责（与 mcp-server 同一份 workflow，不是历史上的 `release-core.yml`）：
 
 - 判据：远程不存在 `core-v{version}` tag 才发布
 - 流程：构建 → `pnpm publish` → 成功后才推送 tag `core-v{version}`

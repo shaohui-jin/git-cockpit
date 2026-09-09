@@ -19,12 +19,13 @@ const route = useRoute();
 const router = useRouter();
 const { bump, revision } = useRevision();
 
-const menu = [
+const menuWork = [
   { path: '/dashboard', label: '工作台', icon: '▤' },
-  { path: '/jobs', label: '任务', icon: '↻' },
   { path: '/status', label: '状态', icon: '◧' },
-  { path: '/merge', label: '合并', icon: '⇄' },
-  { path: '/history', label: '历史', icon: '◫' },
+  { path: '/merge', label: '合并', icon: '⇄' }
+];
+const menuSystem = [
+  { path: '/jobs', label: '任务', icon: '↻' },
   { path: '/logs', label: '操作日志', icon: '≡' },
   { path: '/settings', label: '设置', icon: '⚙' }
 ];
@@ -94,7 +95,12 @@ onUnmounted(() => {
       </div>
 
       <el-menu :default-active="route.path" class="nav-menu">
-        <el-menu-item v-for="m in menu" :key="m.path" :index="m.path" @click="goMenu(m.path)">
+        <el-menu-item v-for="m in menuWork" :key="m.path" :index="m.path" @click="goMenu(m.path)">
+          <span class="menu-icon">{{ m.icon }}</span>
+          <span>{{ m.label }}</span>
+        </el-menu-item>
+        <div class="nav-divider" role="separator" />
+        <el-menu-item v-for="m in menuSystem" :key="m.path" :index="m.path" @click="goMenu(m.path)">
           <span class="menu-icon">{{ m.icon }}</span>
           <span>{{ m.label }}</span>
           <span v-if="m.path === '/jobs' && jobs.runningCount" class="menu-count">{{
@@ -107,6 +113,7 @@ onUnmounted(() => {
         <el-tag v-if="repos.healthOk" size="small" type="success">后端已连接</el-tag>
         <el-tag v-else-if="repos.healthOk === false" size="small" type="danger">后端离线</el-tag>
         <el-tag v-else size="small" type="info">连接中…</el-tag>
+        <div v-if="repos.serverVersion" class="aside-version">{{ repos.serverVersion }}</div>
       </div>
     </el-aside>
 
@@ -164,6 +171,11 @@ onUnmounted(() => {
   border-right: none;
   flex: 1;
 }
+.nav-divider {
+  height: 1px;
+  margin: 6px 16px;
+  background: var(--el-border-color-lighter);
+}
 .nav-menu :deep(.el-menu-item) {
   display: flex;
   align-items: center;
@@ -187,6 +199,12 @@ onUnmounted(() => {
 .aside-footer {
   padding: var(--gc-gap) var(--gc-pad);
   border-top: 1px solid var(--el-border-color-lighter);
+}
+.aside-version {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--el-text-color-secondary);
+  font-family: var(--el-font-family);
 }
 .main-content {
   padding: var(--gc-pad);

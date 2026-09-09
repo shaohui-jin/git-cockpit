@@ -88,13 +88,49 @@ git-cockpit start
 }
 ```
 
+**多窗口一起用**（网页 + Cursor，或两个聊天窗口）：只跑 `git-cockpit start`，都连上面这个 `/mcp`。不要再开一个 `git-cockpit mcp`——那是另一个进程，和网页不共用同一份任务队列。
+
+**不要**和 Git Insight（或其它会直接改同一仓的 Git MCP）同时用于同一个仓库。
+
+### Agent 该怎么用
+
+配好之后，让模型按下面四件事做。不要用终端 git 代替「预演、落盘、开 PR」。
+
+默认只给摘要；要看某文件正文时再说路径，或加 `detail=true`。写操作先干跑（`dry_run=true`）。高风险操作默认关着。
+
+**1. 提交**  
+先看工作区有没有改、改了什么，再暂存，再提交。不要一上来就提交。
+
+对应工具：`git_status` → `git_diff` → 按需 `git_add` → `git_commit`。
+
+**2. 合不合得进去，以及写进仓库**  
+先看工作区是不是已经卡在 merge / rebase 里。卡住了走第 3 条，不要走这条。
+
+问能不能合进去时，只做预演，**不要**在当前工作区执行 merge。`into` 是要合进去的目标（线上），`from` 是你的分支。有冲突时把正文给人看、人选边，不要让模型自动选。
+
+看完要写进仓库：用独立目录落盘，不要切走你正在干活的分支。
+
+对应工具：`git_merge_preview` / `git_merge_rehearse`（冲突行是谁改的用 `git_merge_blame`）→ `git_apply_resolve`。禁止用 `git_merge` 冒充预演。
+
+**3. 工作区已经卡在 merge 或 rebase 里**  
+这是另一回事：冲突已经发生在当前目录了。看状态，然后继续或放弃。不要用第 2 条的「预演落盘」去收尾。
+
+对应工具：`git_status`（看 `operation`）→ `git_merge_continue` / `git_rebase_continue` 或 abort。禁止用 `git_apply_resolve`。
+
+**4. 开 Pull Request / Merge Request**  
+先准备标题和目标分支等信息，再创建。登录用的 Token 写在网页设置里，不要塞进工具参数。
+
+对应工具：`git_mr_prepare` → `git_mr_create`。
+
+宿主可插入这四条 Prompt（名字：`safe_commit` / `merge_preview_apply` / `workspace_continue` / `open_mr`），正文即上面四段。只读状态也可读 Resource：`git-cockpit://repos`、`git-cockpit://repo/current`、`git-cockpit://jobs`、`git-cockpit://jobs/{id}`。
+
 ### 端点一览
 
 | 端点 | 说明 |
 | --- | --- |
 | `/mcp` | MCP Streamable HTTP 接入点（常驻服务模式） |
 | `/api/*` | Web 前端 REST API（仓库、状态、设置、日志） |
-| `/` | Web 管理界面（仓库管理、状态/历史/日志/设置） |
+| `/` | Web 管理界面（工作台 / 状态 / 合并 / 任务 / 操作日志 / 设置） |
 
 ### 环境变量
 

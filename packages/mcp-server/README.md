@@ -42,6 +42,29 @@ git-cockpit version # 输出版本号
 }
 ```
 
+网页和聊天窗口要一起用时，改跑 `git-cockpit start`，客户端连 `http://localhost:3000/mcp`。不要再开一个 `git-cockpit mcp` 抢同一仓。
+
+**不要**和 Git Insight（或其它会直接改同一仓的 Git MCP）同时用于同一个仓库。
+
+### Agent 该怎么用
+
+和仓库根 [README.md](../../README.md) 同一套，这里再写一遍（npm 包装的人看不到仓库根文档）：
+
+**1. 提交** — 先看改了什么，再暂存、再提交。写之前先 `dry_run=true`。  
+`git_status` → `git_diff` → 按需 `git_add` → `git_commit`。
+
+**2. 合不合得进去，以及写进仓库** — 先看工作区是不是已经卡在 merge / rebase 里（卡住了走第 3 条）。问能不能合时只做预演，不要在当前目录 merge。`into` 是线上目标，`from` 是你的分支。人选边，模型不要自动选。写进仓库用独立目录落盘（`git_apply_resolve`），不要用 `git_merge` 冒充预演。
+
+**3. 工作区已经卡在 merge 或 rebase 里** — 看状态，然后继续或放弃。不要用第 2 条的落盘去收尾。  
+`git_status` → `git_merge_continue` / `git_rebase_continue` 或 abort。禁止 `git_apply_resolve`。
+
+**4. 开 Pull Request / Merge Request** — 先准备信息再创建。Token 在网页设置里，不要塞进工具参数。  
+`git_mr_prepare` → `git_mr_create`。
+
+宿主可插入这四条 Prompt（`safe_commit` / `merge_preview_apply` / `workspace_continue` / `open_mr`），正文即上面四段。只读状态也可读 Resource：`git-cockpit://repos`、`git-cockpit://repo/current`、`git-cockpit://jobs`、`git-cockpit://jobs/{id}`。
+
+默认只给摘要；要某文件正文加 `path` 或 `detail=true`。
+
 ### 环境变量
 
 | 变量 | 说明 | 默认 |
@@ -55,13 +78,13 @@ git-cockpit version # 输出版本号
 - **多仓库管理**：统一打开/移除仓库，跨仓库操作
 - **安全机制**：工具按风险分级（readonly / write / dangerous），写操作 dry-run 预览 → 确认 → 执行；高危操作可配置人工审批
 - **MCP 默认摘要**：`git_diff` / `git_show` / `git_merge_rehearse` 默认不回完整正文；要正文请加 `path` 或 `detail=true`（网页 GET 仍是全文）
-- **内置 Web UI**：工作台 / 状态 / 历史 / 日志 / 设置视图，支持提交、分支、stash、pull/push、硬重置等操作
+- **内置 Web UI**：工作台 / 状态 / 合并 / 任务 / 操作日志 / 设置，支持提交、分支、stash、pull/push、硬重置等操作
 - **审计日志**：所有工具调用记录落库，可回溯
 - **备份**：高危操作前自动备份分支引用与 stash 快照
 
 ## 发布说明（维护者）
 
-版本号维护在 `packages/mcp-server/package.json`，发布由仓库根目录 `.github/workflows/release-mcp-server.yml` 负责：
+版本号维护在 `packages/mcp-server/package.json`，发布由仓库根目录 `.github/workflows/release.yml` 的 `release-mcp-server` job 负责（不是历史上的 `release-mcp-server.yml`）：
 
 - **判据**：远程不存在 `mcp-server-v{version}` tag 才发布
 - **流程**：构建 web → 构建 mcp-server（`prepublishOnly` 自动把 web/dist 内嵌进 `dist/web`）→ `pnpm publish` → 成功后才推送 tag `mcp-server-v{version}`

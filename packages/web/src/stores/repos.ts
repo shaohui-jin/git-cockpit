@@ -8,6 +8,7 @@ interface State {
   loading: boolean;
   error: string | null;
   healthOk: boolean | null;
+  serverVersion: string | null;
 }
 
 /** 当前仓库记忆：刷新后恢复上次进入的仓库 */
@@ -37,7 +38,8 @@ export const useReposStore = defineStore('repos', {
     currentId: readStoredId(),
     loading: false,
     error: null,
-    healthOk: null
+    healthOk: null,
+    serverVersion: null
   }),
   getters: {
     current(state): OpenedRepo | null {
@@ -52,8 +54,10 @@ export const useReposStore = defineStore('repos', {
       try {
         const h = await api.getHealth();
         this.healthOk = h.ok;
+        this.serverVersion = h.version || null;
       } catch {
         this.healthOk = false;
+        this.serverVersion = null;
       }
       return this.healthOk === true;
     },
