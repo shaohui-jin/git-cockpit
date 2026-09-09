@@ -2,6 +2,17 @@ export * from './types.ts';
 export * from './activity.ts';
 export * from './gitService.ts';
 export * from './permissions.ts';
+export type {
+  Capability,
+  CapabilityHost,
+  CapabilityHandlerContext,
+  ExecutionContext,
+  ExecutionResult,
+  NextStep
+} from './capabilities/types.ts';
+export { CapabilityRegistry, getCapabilityRegistry } from './capabilities/registry.ts';
+export { executeCapability } from './capabilities/executor.ts';
+export { suggestNext } from './capabilities/next.ts';
 export * from './blame.ts';
 export { assertRepoAllowed, isRepoAllowed } from './allowedRepos.ts';
 export { assertSafeCloneUrl, assertCloneDest, spawnClone, removeIncompleteCloneDest } from './clone.ts';

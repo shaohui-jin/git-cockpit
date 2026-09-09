@@ -3,7 +3,7 @@
  * - 基于官方 SDK 的 McpServer（tools 能力），注册全部工具；
  * - 支持 stdio（独立子进程模式）与 Streamable HTTP（daemon 转发模式）两种传输。
  *
- * 所有工具共用 executeTool 安全链路（权限/dry-run/备份/审计）。
+ * 所有工具共用 executeCapability 安全链路（权限/dry-run/备份/审计）。
  */
 import { randomUUID } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
@@ -12,7 +12,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { Runtime } from './runtime.ts';
 import { version } from '../package.json';
-import { executeTool, formatResultForMcp } from './tools/handlers.ts';
+import { bindMcpTools } from './tools/bindMcp.ts';
 import { TOOL_DEFS } from './tools/index.ts';
 import { registerMcpPrompts } from './tools/prompts.ts';
 import { registerMcpResources } from './tools/resources.ts';
@@ -49,31 +49,7 @@ export function createMcpServer(runtime: Runtime): McpServer {
     }
   );
 
-  for (const def of TOOL_DEFS) {
-    // SDK registerTool 的泛型联合推断在遍历场景下不稳定，统一收窄为运行时签名。
-    // 注意：必须 bind(server)，SDK 1.30 的 registerTool 内部访问 this._registeredTools，
-    // 抽成裸函数调用会丢 this，注册时抛 TypeError 导致 MCP 握手挂起。
-    const register = server.registerTool.bind(server) as unknown as (
-      name: string,
-      config: { title?: string; description?: string; inputSchema?: unknown },
-      cb: (args: unknown, extra: unknown) => Promise<unknown>
-    ) => unknown;
-
-    register(
-      def.name,
-      { description: def.description, inputSchema: def.schema },
-      async (args: unknown) => {
-        const exec = await executeTool(def, (args ?? {}) as Record<string, unknown>, {
-          runtime,
-          source: 'mcp'
-        });
-        return {
-          content: [{ type: 'text' as const, text: formatResultForMcp(exec) }],
-          isError: !exec.success
-        };
-      }
-    );
-  }
+  bindMcpTools(server, runtime, TOOL_DEFS);
 
   registerMcpPrompts(server);
   registerMcpResources(server, runtime);

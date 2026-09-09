@@ -1,6 +1,7 @@
 /**
  * 工具注册表：全部 MCP 工具的静态定义（名称/描述/风险等级/schema/handler）。
- * handler 直接调用 core GitService 的方法；统一安全链路由 executeTool 承担。
+ * handler 直接调用 core GitService 的方法；统一安全链路由 core executeCapability 承担。
+ * 加载本模块时写入 Capability registry，权限表从 registry 推导。
  */
 import {
   enrichPrepareMr,
@@ -8,9 +9,9 @@ import {
   BackupManager,
   GitOperationError,
   SURVEY_ASYNC_THRESHOLD,
+  getCapabilityRegistry,
   type GitService
 } from '@shaohui_jin/git-cockpit-core';
-import { collectRepoOverviews } from '../overview.ts';
 import * as S from './schemas.ts';
 import type { ToolDef } from './handlers.ts';
 
@@ -198,7 +199,7 @@ export const TOOL_DEFS: ToolDef[] = [
       const froms = args.froms as string[];
       const asyncWanted = args.async === true || intos.length * froms.length > SURVEY_ASYNC_THRESHOLD;
       if (asyncWanted) {
-        const job = ctx.runtime.jobs.startSurvey({
+        const job = ctx.host.jobs.startSurvey({
           repoPath: ctx.repoPath,
           intos,
           froms,
@@ -237,7 +238,7 @@ export const TOOL_DEFS: ToolDef[] = [
     risk: 'readonly',
     schema: S.GitMrPrepareSchema,
     handler: async (args: Args, ctx) => {
-      const mr = ctx.runtime.config.mr;
+      const mr = ctx.host.config.mr;
       const prep = await ctx.git.prepareMr({
         into: args.into as string,
         from: args.from as string,
@@ -253,7 +254,7 @@ export const TOOL_DEFS: ToolDef[] = [
     risk: 'readonly',
     needsRepo: false,
     schema: S.GitRepoOverviewSchema,
-    handler: async (_args: Args, ctx) => ({ repos: await collectRepoOverviews(ctx.runtime) })
+    handler: async (_args: Args, ctx) => ({ repos: await ctx.host.listOverviews() })
   },
   {
     name: 'git_job_list',
@@ -261,7 +262,7 @@ export const TOOL_DEFS: ToolDef[] = [
     risk: 'readonly',
     needsRepo: false,
     schema: S.GitJobListSchema,
-    handler: async (_args: Args, ctx) => ({ jobs: ctx.runtime.jobs.list().map((j) => ctx.runtime.jobs.summary(j)) })
+    handler: async (_args: Args, ctx) => ({ jobs: ctx.host.jobs.list().map((j) => ctx.host.jobs.summary(j)) })
   },
   {
     name: 'git_job_get',
@@ -270,9 +271,9 @@ export const TOOL_DEFS: ToolDef[] = [
     needsRepo: false,
     schema: S.GitJobGetSchema,
     handler: async (args: Args, ctx) => {
-      const job = ctx.runtime.jobs.get(args.id as string);
+      const job = ctx.host.jobs.get(args.id as string);
       if (!job) throw new GitOperationError('任务不存在', 'JOB_NOT_FOUND');
-      return ctx.runtime.jobs.detail(job);
+      return ctx.host.jobs.detail(job);
     }
   },
 
@@ -489,7 +490,7 @@ export const TOOL_DEFS: ToolDef[] = [
     risk: 'write',
     schema: S.GitMrCreateSchema,
     handler: async (args: Args, ctx) => {
-      const mr = ctx.runtime.config.mr;
+      const mr = ctx.host.config.mr;
       const prep = await ctx.git.prepareMr({
         into: args.into as string,
         from: args.from as string,
@@ -523,7 +524,7 @@ export const TOOL_DEFS: ToolDef[] = [
           note: '将取消进行中的后台任务'
         };
       }
-      return ctx.runtime.jobs.summary(ctx.runtime.jobs.cancel(args.id as string));
+      return ctx.host.jobs.summary(ctx.host.jobs.cancel(args.id as string));
     }
   },
 
@@ -595,6 +596,8 @@ export const TOOL_DEFS: ToolDef[] = [
 ];
 
 export const TOOL_DEF_MAP: ReadonlyMap<string, ToolDef> = new Map(TOOL_DEFS.map((d) => [d.name, d]));
+
+getCapabilityRegistry().registerAll(TOOL_DEFS);
 
 /** 供 mcpServer 注册工具列表（名称、描述、schema） */
 export function toolSummaries(): { name: string; description: string }[] {

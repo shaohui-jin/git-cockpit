@@ -2,10 +2,16 @@
  * 集成测试：executeTool 安全链路（权限、dry-run、备份、审计）与 MCP 工具行为。
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { PermissionError, PermissionManager, TOOL_RISK_LEVELS, normalizeRepoMethodKey } from '@shaohui_jin/git-cockpit-core';
+import {
+  PermissionError,
+  PermissionManager,
+  TOOL_RISK_LEVELS,
+  getCapabilityRegistry,
+  normalizeRepoMethodKey
+} from '@shaohui_jin/git-cockpit-core';
 import { createTestRuntime, disposeTestRuntime, createSampleRepo, cleanupTmp, commitFile } from './helpers.ts';
 import { executeTool } from '../src/tools/handlers.ts';
-import { TOOL_DEF_MAP } from '../src/tools/index.ts';
+import { TOOL_DEF_MAP, TOOL_DEFS } from '../src/tools/index.ts';
 import type { Runtime } from '../src/index.ts';
 import type { SimpleGit } from 'simple-git';
 
@@ -342,6 +348,17 @@ describe('git_mr_prepare / git_mr_create', () => {
     } finally {
       globalThis.fetch = origFetch;
       disposeTestRuntime(runtime);
+    }
+  });
+});
+
+describe('Capability registry', () => {
+  it('TOOL_DEFS 风险与 TOOL_RISK_LEVELS / registry 一致', () => {
+    const reg = getCapabilityRegistry();
+    expect(reg.list().length).toBe(TOOL_DEFS.length);
+    for (const def of TOOL_DEFS) {
+      expect(TOOL_RISK_LEVELS[def.name], def.name).toBe(def.risk);
+      expect(reg.get(def.name)?.risk, def.name).toBe(def.risk);
     }
   });
 });

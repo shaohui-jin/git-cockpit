@@ -1,5 +1,14 @@
+import { getCapabilityRegistry } from './capabilities/registry.ts';
 import { PermissionError } from './types.ts';
 import type { GitCockpitConfig, RiskLevel } from './types.ts';
+
+/**
+ * 未注册 Capability 时的回退目录（core 单测不加载 mcp-server）。
+ * 已注册则以 registry.risk 为准，避免加工具时再改本表。
+ */
+export function resolveToolRisk(toolName: string): RiskLevel {
+  return getCapabilityRegistry().get(toolName)?.risk ?? TOOL_RISK_LEVELS[toolName] ?? 'write';
+}
 
 /** 内置工具目录：工具名 -> 风险等级 */
 export const TOOL_RISK_LEVELS: Record<string, RiskLevel> = {
@@ -89,7 +98,7 @@ export class PermissionManager {
   }
 
   evaluate(toolName: string): PermissionDecision {
-    const risk = TOOL_RISK_LEVELS[toolName] ?? 'write';
+    const risk = resolveToolRisk(toolName);
     if (this.disabledTools.has(toolName)) {
       return {
         allowed: false,
@@ -125,6 +134,6 @@ export class PermissionManager {
   }
 
   getRiskLevel(toolName: string): RiskLevel {
-    return TOOL_RISK_LEVELS[toolName] ?? 'write';
+    return resolveToolRisk(toolName);
   }
 }

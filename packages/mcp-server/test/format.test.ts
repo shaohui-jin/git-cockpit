@@ -51,7 +51,29 @@ describe('summarizeForAgent', () => {
     ) as { conflictFiles: Array<{ conflictContent?: string; path: string }>; next: unknown[] };
     expect(out.conflictFiles[0]?.conflictContent).toBeUndefined();
     expect(out.conflictFiles[0]?.path).toBe('a.ts');
-    expect(out.next?.[0]).toMatchObject({ tool: 'git_merge_rehearse' });
+    expect(out.next?.[0]).toMatchObject({ tool: 'git_merge_rehearse', args: { path: 'a.ts' } });
+    expect(out.next?.[1]).toMatchObject({ tool: 'git_apply_resolve' });
+  });
+
+  it('git_status 脏工作区附 next git_add', () => {
+    const out = summarizeForAgent('git_status', {
+      isClean: false,
+      operation: 'none',
+      unstaged: [{ path: 'a.ts' }],
+      untracked: [],
+      staged: []
+    }) as { next: Array<{ tool: string }> };
+    expect(out.next[0]).toMatchObject({ tool: 'git_add' });
+  });
+
+  it('写操作 dry-run 预览附 next 真执行', () => {
+    const out = summarizeForAgent(
+      'git_add',
+      { dryRun: true, command: 'git add -- a.ts', args: ['add', '--', 'a.ts'], risk: 'low' },
+      { paths: ['a.ts'], dryRun: true },
+      true
+    ) as { next: Array<{ tool: string; args?: { dryRun?: boolean } }> };
+    expect(out.next[0]).toMatchObject({ tool: 'git_add', args: { dryRun: false } });
   });
 
   it('git_repo_overview 默认去掉每日热力格子', () => {
@@ -89,5 +111,19 @@ describe('formatResultForMcp', () => {
       )
     );
     expect(text).toContain('<<<<<<<');
+  });
+
+  it('成功输出含 next 提示行', () => {
+    const text = formatResultForMcp(
+      ok('git_status', {
+        isClean: false,
+        operation: 'none',
+        unstaged: [{ path: 'a.ts' }],
+        untracked: [],
+        staged: []
+      })
+    );
+    expect(text).toContain('next: git_add');
+    expect(text).toContain('"tool":"git_add"');
   });
 });
