@@ -17,6 +17,12 @@ coverage/
 *.log
 logs/
 
+# Playwright E2E
+packages/e2e/test/tmp/
+packages/e2e/test-results/
+packages/e2e/playwright-report/
+packages/e2e/blob-report/
+
 # editor / OS
 .idea/
 .vscode/

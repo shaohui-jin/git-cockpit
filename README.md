@@ -10,7 +10,8 @@
 packages/
 ├── core/        # 共享核心逻辑：GitService、权限、备份、日志（简单）
 ├── mcp-server/  # MCP Server + Fastify Web 服务 + CLI（发布包）
-└── web/         # Vue 3 前端（构建产物由 web 服务托管）
+├── web/         # Vue 3 前端（构建产物由 web 服务托管）
+└── e2e/         # Playwright：只测发布形态，不进 `pnpm test`
 ```
 
 ## 快速开始（开发）
@@ -19,6 +20,12 @@ packages/
 pnpm install
 pnpm build
 node packages/mcp-server/dist/cli-entry.js start   # 本地构建产物直接启动
+```
+
+网页回归（Playwright）测 **build 后的 daemon 静态页**，不测 Vite，也不进 `pnpm test`。默认用本机 Edge/Chrome：
+
+```bash
+pnpm test:e2e
 ```
 
 ## CLI 与 bin 用法

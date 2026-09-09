@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "dist",
+    "noEmit": true,
+    "allowImportingTsExtensions": false,
+    "types": ["node"]
+  },
+  "include": ["playwright.config.ts", "helpers/**/*.ts", "tests/**/*.ts"]
+}

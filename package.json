@@ -20,6 +20,7 @@
     "prestart": "pnpm --filter @shaohui_jin/git-cockpit-core build && pnpm --filter @shaohui_jin/git-cockpit-mcp-server build",
     "start": "pnpm --parallel --filter @shaohui_jin/git-cockpit-mcp-server --filter @shaohui_jin/git-cockpit-web start",
     "test": "pnpm -r --filter './packages/**' test",
+    "test:e2e": "pnpm --filter @shaohui_jin/git-cockpit-e2e test:e2e",
     "typecheck": "pnpm -r --filter './packages/**' typecheck",
     "lint": "eslint .",
     "clean": "pnpm -r exec tsc --build --clean"
