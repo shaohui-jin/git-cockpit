@@ -551,7 +551,6 @@ watch([pairInto, pairFrom], () => {
 }
 .page-title {
   margin: 0;
-  font-size: var(--el-font-size-extra-large);
 }
 .head-actions {
   display: flex;

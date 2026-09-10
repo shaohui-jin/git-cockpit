@@ -26,6 +26,7 @@ import type {
   RepoStatus,
   StashInfo,
   ToolExecResult,
+  WorktreeInfo,
   WorkspaceConflicts
 } from '@/api/types';
 
@@ -38,6 +39,7 @@ const repoId = (): number | null => repos.currentId;
 
 const status = ref<RepoStatus | null>(null);
 const stashes = ref<StashInfo[]>([]);
+const worktrees = ref<WorktreeInfo[]>([]);
 const loading = ref(false);
 const loadError = ref('');
 const contentMode = ref<'workspace' | 'graph' | 'log'>('workspace');
@@ -53,7 +55,7 @@ const workspacePanel = ref<{ buildFiles: () => Array<{ path: string; resolvedCon
 );
 const backups = ref<BackupList>({ branches: [], stashes: [] });
 const reflog = ref<ReflogEntry[]>([]);
-const historyTab = ref<'stash' | 'backup' | 'reflog'>('stash');
+const historyTab = ref<'stash' | 'backup' | 'reflog' | 'worktree'>('stash');
 const branchMenu = reactive<{ visible: boolean; x: number; y: number; node: BranchTreeNode | null }>({
   visible: false,
   x: 0,
@@ -79,6 +81,10 @@ const branchStart = ref('');
 const stashVisible = ref(false);
 const stashMessage = ref('');
 const stashIncludeUntracked = ref(false);
+const worktreeVisible = ref(false);
+const worktreePath = ref('');
+const worktreeBranch = ref('');
+const worktreeStart = ref('');
 const resetVisible = ref(false);
 const resetTarget = ref('');
 const mergeVisible = ref(false);
@@ -187,6 +193,17 @@ async function loadStashes(): Promise<void> {
   }
 }
 
+async function loadWorktrees(): Promise<void> {
+  const id = repoId();
+  if (id === null) return;
+  try {
+    const { worktrees: rows } = await api.listWorktrees(id);
+    worktrees.value = rows;
+  } catch {
+    worktrees.value = [];
+  }
+}
+
 async function loadWorkspaceConflicts(): Promise<void> {
   const id = repoId();
   const op = status.value?.operation;
@@ -290,7 +307,7 @@ async function refresh(): Promise<void> {
     await Promise.all([loadStatus(), loadBranches(), logPanel.value?.refresh() ?? Promise.resolve()]);
     return;
   }
-  await Promise.all([loadStatus(), loadBranches(), loadStashes(), loadBackupsAndReflog()]);
+  await Promise.all([loadStatus(), loadBranches(), loadStashes(), loadWorktrees(), loadBackupsAndReflog()]);
 }
 
 /** 通用写流程：dry-run 预览 → ConfirmDialog → 真实执行 → 刷新 */
@@ -457,6 +474,40 @@ function dropStash(s: StashInfo): void {
     cancelButtonText: '取消'
   })
     .then(() => void run('git_stash_drop', { index: s.index }))
+    .catch(() => undefined);
+}
+
+function openWorktreeDialog(): void {
+  worktreePath.value = '';
+  worktreeBranch.value = '';
+  worktreeStart.value = '';
+  worktreeVisible.value = true;
+}
+
+function confirmAddWorktree(): void {
+  const dest = worktreePath.value.trim();
+  if (!dest) {
+    ElMessage.warning('请填写 worktree 绝对路径');
+    return;
+  }
+  const params: Record<string, unknown> = { path: dest };
+  if (worktreeBranch.value.trim()) params.branch = worktreeBranch.value.trim();
+  if (worktreeStart.value.trim()) params.startPoint = worktreeStart.value.trim();
+  worktreeVisible.value = false;
+  void run('git_worktree_add', params);
+}
+
+function removeWorktree(w: WorktreeInfo): void {
+  if (w.isMain) {
+    ElMessage.warning('不能移除主工作区');
+    return;
+  }
+  ElMessageBox.confirm(
+    `确定移除 worktree ${w.path}？不会删除主仓库。不要在 linked worktree 里当第二套工作区做 merge。`,
+    '移除 worktree',
+    { type: 'warning', confirmButtonText: '继续', cancelButtonText: '取消' }
+  )
+    .then(() => void run('git_worktree_remove', { path: w.path }))
     .catch(() => undefined);
 }
 
@@ -915,7 +966,8 @@ onUnmounted(() => {
             <div class="card-head">
               <span class="card-title">记录 Records</span>
               <div class="card-actions">
-                <el-button size="small" text @click="loadStashes(); loadBackupsAndReflog()">刷新</el-button>
+                <el-button size="small" text @click="openWorktreeDialog">添加 worktree</el-button>
+                <el-button size="small" text @click="loadStashes(); loadWorktrees(); loadBackupsAndReflog()">刷新</el-button>
               </div>
             </div>
           </template>
@@ -961,6 +1013,24 @@ onUnmounted(() => {
                   </div>
                   <div class="stash-actions">
                     <el-button size="small" text type="success" @click="applyBackupStash(s)">应用</el-button>
+                  </div>
+                </div>
+              </div>
+            </el-tab-pane>
+            <el-tab-pane name="worktree">
+              <template #label>Worktree（{{ worktrees.length }}）</template>
+              <div v-if="worktrees.length === 0" class="file-empty">没有 worktree。可点记录卡片上的「添加 worktree」。</div>
+              <div v-else class="stash-list mono">
+                <div v-for="w in worktrees" :key="w.path" class="stash-row">
+                  <div class="stash-main">
+                    <span class="stash-ref">{{ w.isMain ? '主区' : w.detached ? 'detached' : w.branch || 'worktree' }}</span>
+                    <span class="stash-msg" :title="w.path">{{ w.path }}</span>
+                    <span v-if="w.head" class="stash-date">{{ w.head.slice(0, 7) }}</span>
+                  </div>
+                  <div class="stash-actions">
+                    <el-button v-if="!w.isMain" size="small" text type="danger" @click="removeWorktree(w)">
+                      移除
+                    </el-button>
                   </div>
                 </div>
               </div>
@@ -1057,6 +1127,31 @@ onUnmounted(() => {
       <template #footer>
         <el-button @click="branchVisible = false">取消</el-button>
         <el-button type="primary" @click="confirmCreateBranch">下一步（dry-run 预览）</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="worktreeVisible" title="添加 worktree" width="560px">
+      <el-alert
+        class="stash-tip"
+        title="在独立目录检出，不切换主工作区。不要把 linked worktree 当成第二套工作区做 merge。"
+        type="info"
+        :closable="false"
+        show-icon
+      />
+      <el-form label-width="100px">
+        <el-form-item label="绝对路径">
+          <el-input v-model="worktreePath" placeholder="例如 D:\work\repo-feat 或 /tmp/repo-feat" />
+        </el-form-item>
+        <el-form-item label="新分支">
+          <el-input v-model="worktreeBranch" placeholder="可选，对应 git worktree add -b" />
+        </el-form-item>
+        <el-form-item label="起点">
+          <el-input v-model="worktreeStart" placeholder="可选，分支或提交，缺省 HEAD" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="worktreeVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmAddWorktree">下一步（dry-run 预览）</el-button>
       </template>
     </el-dialog>
 
@@ -1163,11 +1258,6 @@ onUnmounted(() => {
 <style scoped>
 .page-title {
   margin: 0;
-  font-size: 14px;
-  flex: none;
-}
-.mb {
-  margin-bottom: var(--gc-gap);
 }
 .empty-tip {
   padding: 40px 0;
@@ -1248,15 +1338,12 @@ onUnmounted(() => {
   flex-direction: column;
   height: 100%;
 }
-.branch-panel :deep(.el-card__header) {
-  padding: 8px 12px;
-}
 .branch-panel :deep(.el-card__body) {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 8px;
+  padding: var(--gc-gap);
 }
 .panel-head {
   display: flex;
@@ -1401,9 +1488,6 @@ onUnmounted(() => {
 .toolbar-card {
   flex: none;
 }
-.toolbar-card :deep(.el-card__body) {
-  padding: 8px 12px;
-}
 .toolbar {
   display: flex;
   justify-content: space-between;
@@ -1427,15 +1511,12 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
 }
-.changes-card :deep(.el-card__header) {
-  padding: 8px 12px;
-}
 .changes-card :deep(.el-card__body) {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 0 12px 8px;
+  padding: 0 var(--gc-pad) var(--gc-gap);
 }
 .card-head {
   display: flex;
@@ -1461,7 +1542,6 @@ onUnmounted(() => {
   flex-direction: column;
 }
 .changes-tabs :deep(.el-tabs__header) {
-  margin: 0;
   flex: none;
 }
 .changes-tabs :deep(.el-tabs__content) {
@@ -1603,15 +1683,12 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
 }
-.history-card :deep(.el-card__header) {
-  padding: 8px 12px;
-}
 .history-card :deep(.el-card__body) {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 0 12px 8px;
+  padding: 0 var(--gc-pad) var(--gc-gap);
 }
 .history-tabs {
   flex: 1;
@@ -1620,7 +1697,6 @@ onUnmounted(() => {
   flex-direction: column;
 }
 .history-tabs :deep(.el-tabs__header) {
-  margin: 0;
   flex: none;
 }
 .history-tabs :deep(.el-tabs__content) {
@@ -1679,7 +1755,7 @@ onUnmounted(() => {
 
 /* stash 弹窗 */
 .stash-tip {
-  margin-bottom: 12px;
+  margin-bottom: var(--gc-gap);
 }
 .stash-files {
   border: 1px solid var(--el-border-color-lighter);

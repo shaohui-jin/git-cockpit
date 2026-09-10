@@ -48,6 +48,7 @@ describe('Web API', () => {
     expect(body.info?.title).toBe('Git Cockpit API');
     expect(body.paths?.['/api/health']).toBeTruthy();
     expect(body.paths?.['/api/repos/{id}/tools/git_status']).toBeTruthy();
+    expect(body.paths?.['/api/repos/{id}/tools/git_worktree_list']).toBeTruthy();
     expect(body.paths?.['/api/repos/{id}/tools/{tool}']).toBeUndefined();
   });
 
@@ -93,6 +94,15 @@ describe('Web API', () => {
     const body = res.json();
     expect(body.current).toBe('main');
     expect(body.operation).toBe('none');
+  });
+
+  it('GET /api/repos/:id/worktrees 含主工作区', async () => {
+    const repos = (await server.app.inject({ method: 'GET', url: '/api/repos' })).json();
+    const id = repos.repos[0].id;
+    const res = await server.app.inject({ method: 'GET', url: `/api/repos/${id}/worktrees` });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { worktrees: Array<{ isMain: boolean; path: string }> };
+    expect(body.worktrees.some((w) => w.isMain)).toBe(true);
   });
 
   it('GET /api/repos/:id/merge/preview 走只读 GET', async () => {

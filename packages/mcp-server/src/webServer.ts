@@ -393,6 +393,10 @@ export async function createWebServer(
     withRepo(req, reply, async ({ service }) => service.listStashes())
   );
 
+  app.get<{ Params: { id: string } }>('/api/repos/:id/worktrees', async (req, reply) =>
+    withRepo(req, reply, async ({ service }) => ({ worktrees: await service.listWorktrees() }))
+  );
+
   app.get<{ Params: { id: string } }>('/api/repos/:id/workspace-conflicts', async (req, reply) =>
     withRepo(req, reply, async ({ service }) => service.listWorkspaceConflicts())
   );

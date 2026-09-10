@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { DEFAULT_CONFIG, PermissionError, PermissionManager } from '../src/index.ts';
 import { executeCapability } from '../src/capabilities/executor.ts';
+import { TOOL_DEFS } from '../src/capabilities/git/index.ts';
 import { getCapabilityRegistry } from '../src/capabilities/registry.ts';
 import type { Capability, CapabilityHost, ExecutionResult } from '../src/capabilities/types.ts';
 import type { GitCockpitConfig } from '../src/index.ts';
@@ -118,5 +119,15 @@ describe('executeCapability', () => {
     expect(exec.success).toBe(true);
     expect(exec.result).toEqual({ repoPath: '/opened' });
     expect(seen).toMatchObject({ repoId: 7, argsPath: 'D:/x' });
+  });
+});
+
+describe('TOOL_DEFS 按域', () => {
+  it('含 worktree 且无重名', () => {
+    const names = TOOL_DEFS.map((d) => d.name);
+    expect(names).toContain('git_worktree_list');
+    expect(names).toContain('git_worktree_add');
+    expect(names).toContain('git_worktree_remove');
+    expect(new Set(names).size).toBe(names.length);
   });
 });

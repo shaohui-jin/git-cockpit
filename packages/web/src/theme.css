@@ -3,10 +3,11 @@
    --------------------------------------------------------------------------
    所有视觉参数集中在 :root 令牌中，改一处即可全局同步：
    - 文字：默认 12px（html/body + --gc-text，覆盖 Element 字号档位）
-   - 控件：按钮与分支下拉 --gc-control 28px；下拉宽度 --gc-select-width 280px
+   - 控件：按钮 / 输入 / 下拉 --gc-control 28px；下拉宽度 --gc-select-width 280px
    - 行高：var(--gc-line) 32px（菜单 / 表格行）
    - 内边距：var(--gc-pad) 12px（卡片等上限）
    - 间距：var(--gc-gap) 8px（组件与组件间隙）
+   - 提示条 / 表单：.el-alert .el-input .el-select 走同一套字号 / 内边距
    - 浮层阴影：var(--gc-shadow-menu)（右键 / 下拉，与页面底拉开）
 
    依赖：element-plus/theme-chalk/dark/css-vars.css（main.ts 已引入）+ html.dark
@@ -127,9 +128,94 @@ body,
   padding: 0 8px;
 }
 
+/* ---- Input / Select / Textarea：EP 默认 32px 高、Select 字号 14px，压到 --gc-control / --gc-text ---- */
+.el-input,
+.el-input--large,
+.el-input--small {
+  --el-input-height: var(--gc-control);
+  font-size: var(--gc-text);
+}
+.el-input__wrapper {
+  padding: 1px var(--gc-pad);
+  font-size: var(--gc-text);
+}
+.el-textarea {
+  font-size: var(--gc-text);
+}
+.el-textarea__inner {
+  padding: var(--gc-gap) var(--gc-pad);
+  font-size: var(--gc-text);
+}
+.el-select {
+  --el-select-font-size: var(--gc-text);
+  font-size: var(--gc-text);
+}
+.el-select__wrapper {
+  min-height: var(--gc-control);
+  padding: 1px var(--gc-pad);
+  font-size: var(--gc-text);
+  line-height: calc(var(--gc-control) - 2px);
+  gap: var(--gc-gap);
+}
+.el-select__selected-item,
+.el-select__placeholder,
+.el-select__input-wrapper {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--gc-text);
+}
+.el-select__wrapper .el-tag {
+  height: 20px;
+  max-height: 20px;
+}
+.el-select__wrapper .el-tag .el-tag__content {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- Radio / Checkbox / Switch：高度与字号跟控件档对齐 ---- */
+.el-radio,
+.el-checkbox {
+  height: var(--gc-control);
+  font-size: var(--gc-text);
+  margin-right: var(--gc-pad);
+}
+.el-checkbox {
+  --el-checkbox-font-size: var(--gc-text);
+  --el-checkbox-height: var(--gc-control);
+}
+.el-radio-button__inner,
+.el-radio-button--small .el-radio-button__inner,
+.el-radio-button--large .el-radio-button__inner {
+  height: var(--gc-control);
+  padding: 0 var(--gc-pad);
+  font-size: var(--gc-text);
+  display: inline-flex;
+  align-items: center;
+}
+.el-switch {
+  height: var(--gc-control);
+  font-size: var(--gc-text);
+}
+.el-switch__label,
+.el-switch__label * {
+  font-size: var(--gc-text);
+}
+.el-form-item__label {
+  font-size: var(--gc-text);
+}
+
 /* ---- 组件级变量（EP 定义在组件类上，需按组件覆盖才生效） ---- */
 .el-card {
   --el-card-padding: var(--gc-pad);
+}
+.el-card__header,
+.el-card__footer {
+  padding: var(--gc-gap) var(--gc-pad);
+}
+.el-card__body {
+  padding: var(--gc-gap) var(--gc-pad);
 }
 .el-menu {
   --el-menu-item-height: var(--gc-line);
@@ -180,6 +266,42 @@ body,
 /* ---- 表单：项间距 8px ---- */
 .el-form-item {
   margin-bottom: var(--gc-gap);
+}
+
+/* ---- Alert：EP 默认 14px / 8px 16px / 标题行高 24px，压到 --gc 令牌 ---- */
+.el-alert {
+  --el-alert-padding: var(--gc-gap) var(--gc-pad);
+  --el-alert-title-font-size: var(--gc-text);
+  --el-alert-title-with-description-font-size: var(--gc-text);
+  --el-alert-description-font-size: var(--gc-text);
+  --el-alert-close-font-size: 14px;
+  --el-alert-close-customed-font-size: var(--gc-text);
+  --el-alert-icon-size: 14px;
+  --el-alert-icon-large-size: 16px;
+  margin-bottom: var(--gc-gap);
+}
+.el-alert__content {
+  min-width: 0;
+  flex: 1;
+  gap: 2px;
+  font-size: var(--gc-text);
+}
+.el-alert__title {
+  line-height: 18px;
+  word-break: break-word;
+}
+.el-alert .el-alert__description {
+  line-height: 18px;
+}
+.el-alert .el-alert__icon {
+  margin-right: var(--gc-gap);
+}
+.el-alert .el-alert__icon.is-big {
+  margin-right: var(--gc-gap);
+}
+.el-alert .el-alert__close-btn {
+  top: var(--gc-gap);
+  right: var(--gc-pad);
 }
 
 /* ---- 相邻按钮：覆盖 EP 默认 12px，统一 --gc-gap 8px
@@ -340,6 +462,19 @@ body,
   flex: 1;
   min-height: 0;
   overflow: auto;
+}
+.page-title {
+  margin: 0 0 var(--gc-gap);
+  font-size: var(--el-font-size-extra-large);
+  flex: none;
+}
+.page-version {
+  margin: calc(-1 * var(--gc-gap) + 2px) 0 var(--gc-gap);
+  font-size: var(--gc-text);
+  color: var(--el-text-color-secondary);
+}
+.mb {
+  margin-bottom: var(--gc-gap);
 }
 .el-empty__description p {
   font-size: var(--gc-text);

@@ -8,7 +8,7 @@ import { useRevision } from '@/composables/revision';
 import * as api from '@/api/client';
 import CloneDialog from '@/components/CloneDialog.vue';
 import RepoCard from '@/components/RepoCard.vue';
-import { notifyJobStarted } from '@/utils/jobNotify';
+import { jobLine, notifyJobStarted } from '@/utils/jobNotify';
 import { attentionOf, matchesFilter, type RepoFilter } from '@/utils/repoAttention';
 import { moveAmong } from '@/utils/repoOrder';
 import type { RepoOverview } from '@/api/types';
@@ -29,6 +29,8 @@ const overviewLoading = ref(false);
 const filter = ref<RepoFilter>('all');
 const dragId = ref<number | null>(null);
 const overId = ref<number | null>(null);
+const selectedIds = ref<Set<number>>(new Set());
+const fetching = ref(false);
 const { revision } = useRevision();
 
 function overviewOf(path: string): RepoOverview | undefined {
@@ -54,6 +56,55 @@ const cardRepos = computed(() =>
 
 function setFilter(next: RepoFilter): void {
   filter.value = filter.value === next && next !== 'all' ? 'all' : next;
+}
+
+function toggleSelect(id: number): void {
+  const next = new Set(selectedIds.value);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  selectedIds.value = next;
+}
+
+const selectedCount = computed(() => selectedIds.value.size);
+
+async function fetchSelected(): Promise<void> {
+  const ids = [...selectedIds.value];
+  if (!ids.length) {
+    ElMessage.warning('请先勾选要刷新远程的仓库');
+    return;
+  }
+  fetching.value = true;
+  let ok = 0;
+  const errors: string[] = [];
+  try {
+    for (const id of ids) {
+      const repo = repos.repos.find((r) => r.id === id);
+      const ov = repo ? overviewOf(repo.path) : undefined;
+      if (!repo || ov?.available === false) {
+        errors.push(repo?.path ?? String(id));
+        continue;
+      }
+      try {
+        const { job } = await api.startJob('fetch', { repoId: id });
+        ok += 1;
+        notifyJobStarted({
+          id: job.id,
+          kind: 'fetch',
+          title: jobLine({ ...job, repoPath: job.repoPath || repo.path }),
+          router
+        });
+      } catch (err) {
+        errors.push(err instanceof Error ? err.message : String(err));
+      }
+    }
+    await jobs.load();
+    if (ok && !errors.length) ElMessage.success(`已开始抓取 ${ok} 个仓库`);
+    else if (ok) ElMessage.warning(`已开始 ${ok} 个，失败 ${errors.length}`);
+    else ElMessage.error(errors[0] || '无法开始抓取');
+    selectedIds.value = new Set();
+  } finally {
+    fetching.value = false;
+  }
 }
 
 function onCardDragStart(e: DragEvent, id: number): void {
@@ -232,12 +283,19 @@ onMounted(() => {
               未同步 {{ filterCounts.sync }}
             </button>
           </div>
-          <el-button
-            text
-            type="primary"
-            :loading="repos.loading || overviewLoading"
-            @click="() => { void repos.load(); void loadOverview(); }"
-          >刷新</el-button>
+          <div class="list-actions">
+            <el-button
+              :disabled="selectedCount === 0"
+              :loading="fetching"
+              @click="fetchSelected"
+            >刷新远程{{ selectedCount ? ` (${selectedCount})` : '' }}</el-button>
+            <el-button
+              text
+              type="primary"
+              :loading="repos.loading || overviewLoading"
+              @click="() => { void repos.load(); void loadOverview(); }"
+            >刷新</el-button>
+          </div>
         </div>
       </template>
 
@@ -262,10 +320,12 @@ onMounted(() => {
           :muted="repos.currentId != null && r.id !== repos.currentId"
           :dragging="dragId === r.id"
           :drag-over="overId === r.id"
+          :selected="selectedIds.has(r.id)"
           @select="repos.switchTo(r.id)"
           @enter="openStatus(r.id)"
           @merge="openMerge(r.id)"
           @remove="removeRepo(r.id, r.path)"
+          @toggle-select="toggleSelect(r.id)"
           @dragstart="onCardDragStart($event, r.id)"
           @dragover="onCardDragOver($event, r.id)"
           @drop="onCardDrop($event, r.id)"
@@ -291,11 +351,6 @@ onMounted(() => {
   min-height: 0;
   display: flex;
   flex-direction: column;
-}
-.page-title {
-  margin: 0 0 var(--gc-gap);
-  font-size: 14px;
-  flex: none;
 }
 .open-card {
   flex: none;
@@ -330,6 +385,12 @@ onMounted(() => {
   align-items: center;
   gap: var(--gc-gap);
   flex-wrap: wrap;
+}
+.list-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--gc-gap);
+  flex: none;
 }
 .summary-chips {
   display: flex;

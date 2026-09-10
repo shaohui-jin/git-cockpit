@@ -1,6 +1,13 @@
 import { defineConfig } from '@playwright/test';
 
-const channel = process.env.E2E_BROWSER_CHANNEL || (process.platform === 'win32' ? 'msedge' : 'chrome');
+const channel =
+  process.env.E2E_BROWSER_CHANNEL !== undefined
+    ? process.env.E2E_BROWSER_CHANNEL || undefined
+    : process.env.CI
+      ? undefined
+      : process.platform === 'win32'
+        ? 'msedge'
+        : 'chrome';
 
 export default defineConfig({
   testDir: './tests',
@@ -10,10 +17,10 @@ export default defineConfig({
   expect: { timeout: 20_000 },
   retries: 0,
   forbidOnly: Boolean(process.env.CI),
-  reporter: [['list']],
+  reporter: process.env.CI ? [['list'], ['github']] : [['list']],
   outputDir: './test-results',
   use: {
-    channel,
+    ...(channel ? { channel } : {}),
     viewport: { width: 1400, height: 900 },
     locale: 'zh-CN',
     screenshot: 'only-on-failure',

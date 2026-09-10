@@ -36,6 +36,7 @@ export const TOOL_RISK_LEVELS: Record<string, RiskLevel> = {
   git_repo_overview: 'readonly',
   git_job_list: 'readonly',
   git_job_get: 'readonly',
+  git_worktree_list: 'readonly',
   // 写操作工具（默认开放，需预览/确认）
   git_add: 'write',
   git_unstage: 'write',
@@ -59,6 +60,8 @@ export const TOOL_RISK_LEVELS: Record<string, RiskLevel> = {
   git_apply_resolve: 'write',
   git_mr_create: 'write',
   git_job_cancel: 'write',
+  git_worktree_add: 'write',
+  git_worktree_remove: 'write',
   // 高风险工具（默认禁用，需用户主动开启或审批）
   git_reset_hard: 'dangerous',
   git_clean: 'dangerous',

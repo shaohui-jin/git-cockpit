@@ -26,6 +26,7 @@ import type {
   TagInfo,
   ToolExecResult,
   ToolSummary,
+  WorktreeInfo,
   WorkspaceConflicts,
   MergePreviewResult,
   MergeSurveyResult,
@@ -177,6 +178,10 @@ export function listStashes(id: number): Promise<StashInfo[]> {
   return request('GET', `/api/repos/${id}/stashes`);
 }
 
+export function listWorktrees(id: number): Promise<{ worktrees: WorktreeInfo[] }> {
+  return request('GET', `/api/repos/${id}/worktrees`);
+}
+
 export function listTags(id: number): Promise<TagInfo[]> {
   return request('GET', `/api/repos/${id}/tags`);
 }
@@ -298,6 +303,18 @@ export function getJob(id: string): Promise<{ job: CloneJobDetail }> {
 
 export function startClone(url: string, destDir: string): Promise<{ job: CloneJobSummary }> {
   return request('POST', '/api/jobs/clone', { url, destDir });
+}
+
+export function startJob(
+  kind: 'clone' | 'survey' | 'fetch',
+  opts: { repoId?: number; repoPath?: string; payload?: Record<string, unknown> } = {}
+): Promise<{ job: CloneJobSummary }> {
+  return request('POST', '/api/jobs', {
+    kind,
+    repoId: opts.repoId,
+    repoPath: opts.repoPath,
+    payload: opts.payload ?? {}
+  });
 }
 
 export function cancelClone(id: string): Promise<{ job: CloneJobSummary }> {

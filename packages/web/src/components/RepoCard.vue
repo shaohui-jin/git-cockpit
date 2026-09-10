@@ -10,6 +10,7 @@ const props = defineProps<{
   muted?: boolean;
   dragging?: boolean;
   dragOver?: boolean;
+  selected?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -17,6 +18,7 @@ const emit = defineEmits<{
   enter: [];
   merge: [];
   remove: [];
+  'toggle-select': [];
   dragstart: [e: DragEvent];
   dragover: [e: DragEvent];
   drop: [e: DragEvent];
@@ -62,6 +64,12 @@ function extraBadges(): string[] {
     @dragend="emit('dragend')"
   >
     <div class="card-top">
+      <el-checkbox
+        class="card-check"
+        :model-value="selected"
+        @click.stop
+        @change="emit('toggle-select')"
+      />
       <span class="card-name mono">{{ overview?.name || repo.path.split(/[\\/]/).pop() }}</span>
       <span class="card-actions">
         <el-button size="small" text type="primary" @click.stop="emit('enter')">进入</el-button>
@@ -144,6 +152,10 @@ function extraBadges(): string[] {
   align-items: center;
   gap: var(--gc-gap);
   min-width: 0;
+}
+.card-check {
+  flex: none;
+  margin-right: 0;
 }
 .card-name {
   flex: 1;

@@ -171,6 +171,18 @@ export interface StashInfo {
   date: string | null;
 }
 
+/** `git worktree list --porcelain` 一条记录。主工作区 isMain=true，不能 remove。 */
+export interface WorktreeInfo {
+  path: string;
+  head: string;
+  /** 短分支名；detached 时为 null */
+  branch: string | null;
+  detached: boolean;
+  locked: boolean;
+  prunable: boolean;
+  isMain: boolean;
+}
+
 export interface TagInfo {
   name: string;
   commit: string;

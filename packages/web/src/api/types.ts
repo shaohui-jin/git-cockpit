@@ -169,6 +169,16 @@ export interface BackupList {
   stashes: string[];
 }
 
+export interface WorktreeInfo {
+  path: string;
+  head: string;
+  branch: string | null;
+  detached: boolean;
+  locked: boolean;
+  prunable: boolean;
+  isMain: boolean;
+}
+
 export type JobStatus = 'running' | 'ok' | 'error';
 export type JobKind = 'clone' | 'survey' | 'fetch';
 

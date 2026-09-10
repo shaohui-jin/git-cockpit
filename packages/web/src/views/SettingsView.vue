@@ -680,20 +680,8 @@ onMounted(async () => {
 .page {
   overflow: auto;
 }
-.page-title {
-  margin: 0 0 var(--gc-gap);
-  font-size: 14px;
-}
-.page-version {
-  margin: calc(-1 * var(--gc-gap) + 2px) 0 var(--gc-gap);
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
 .settings-tabs {
   min-height: 0;
-}
-.mb {
-  margin-bottom: var(--gc-gap);
 }
 .form-tip {
   margin-left: var(--gc-gap);
@@ -775,7 +763,6 @@ onMounted(async () => {
   gap: var(--gc-gap);
 }
 .mr-option-head :deep(.el-radio) {
-  height: var(--gc-line);
   margin-right: 0;
 }
 .mr-panel {

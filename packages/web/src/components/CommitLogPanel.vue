@@ -199,10 +199,6 @@ defineExpose({ refresh: loadLog, loading });
   display: flex;
   flex-direction: column;
 }
-.mb {
-  margin-bottom: var(--gc-gap);
-  flex: none;
-}
 .filter-card {
   flex: none;
   margin-bottom: var(--gc-gap);

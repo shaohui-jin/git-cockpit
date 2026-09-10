@@ -5,7 +5,7 @@ import { ElMessage } from 'element-plus';
 import { useJobsStore } from '@/stores/jobs';
 import * as api from '@/api/client';
 import CloneDialog from '@/components/CloneDialog.vue';
-import { kindLabel, notifyJobStarted, statusLabel, statusTag } from '@/utils/jobNotify';
+import { jobLine, kindLabel, notifyJobStarted, statusLabel, statusTag } from '@/utils/jobNotify';
 import type { CloneJobSummary, JobStatus } from '@/api/types';
 
 type Filter = 'all' | JobStatus;
@@ -45,11 +45,6 @@ const activeJob = computed(() => jobs.jobs.find((j) => j.id === activeJobId.valu
 const jobLogText = computed(() =>
   (activeJob.value?.logs ?? []).join('\n').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
 );
-
-function jobLine(j: CloneJobSummary): string {
-  if (j.kind === 'clone') return [j.url, j.destDir ? `→ ${j.destDir}` : ''].filter(Boolean).join(' ');
-  return j.title || j.repoPath || j.id;
-}
 
 function tailOf(j: CloneJobSummary): string {
   if (j.error) return j.error;
@@ -302,11 +297,6 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
 }
-.page-title {
-  margin: 0 0 var(--gc-gap);
-  font-size: 14px;
-  flex: none;
-}
 .split {
   flex: 1;
   min-height: 0;
@@ -459,9 +449,6 @@ onMounted(async () => {
   font-size: var(--gc-text);
   color: var(--el-text-color-secondary);
   word-break: break-all;
-}
-.mb {
-  margin-bottom: var(--gc-gap);
 }
 .job-log {
   flex: 1;

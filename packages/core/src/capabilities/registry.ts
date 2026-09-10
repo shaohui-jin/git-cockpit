@@ -2,7 +2,7 @@ import type { RiskLevel } from '../types.ts';
 import type { Capability } from './types.ts';
 
 /**
- * 进程内 Capability 注册表。mcp-server 启动时 registerAll(TOOL_DEFS)；
+ * 进程内 Capability 注册表。mcp-server 加载 tools/index 时 registerAll(TOOL_DEFS)；
  * 权限等级优先读这里，避免「加工具改三处」。
  */
 export class CapabilityRegistry {

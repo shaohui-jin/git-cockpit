@@ -29,6 +29,7 @@ const REST_META: Record<string, { summary: string; tags: string[] }> = {
   'get /api/repos/{id}/branch-graph': { summary: '分支 tip DAG（状态页 G6）', tags: ['只读'] },
   'get /api/repos/{id}/file': { summary: '读取某提交中的文件', tags: ['只读'] },
   'get /api/repos/{id}/stashes': { summary: 'stash 列表', tags: ['只读'] },
+  'get /api/repos/{id}/worktrees': { summary: 'worktree 列表', tags: ['只读'] },
   'get /api/repos/{id}/workspace-conflicts': { summary: '工作区 merge/rebase 冲突（index 三阶段）', tags: ['只读'] },
   'get /api/repos/{id}/merge/preview': { summary: 'merge-tree 预演（不进审计）', tags: ['只读'] },
   'get /api/repos/{id}/merge/rehearse': { summary: '预演 + 冲突正文（不进审计）', tags: ['只读'] },

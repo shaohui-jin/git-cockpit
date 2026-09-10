@@ -13,6 +13,8 @@ export type {
 export { CapabilityRegistry, getCapabilityRegistry } from './capabilities/registry.ts';
 export { executeCapability } from './capabilities/executor.ts';
 export { suggestNext } from './capabilities/next.ts';
+export { TOOL_DEFS, TOOL_DEF_MAP, toolSummaries } from './capabilities/git/index.ts';
+export * from './capabilities/schemas.ts';
 export * from './blame.ts';
 export { assertRepoAllowed, isRepoAllowed } from './allowedRepos.ts';
 export { assertSafeCloneUrl, assertCloneDest, spawnClone, removeIncompleteCloneDest } from './clone.ts';

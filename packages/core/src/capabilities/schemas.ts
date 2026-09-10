@@ -1,5 +1,5 @@
 /**
- * MCP 工具参数 Schema（zod）。
+ * Capability 工具参数 Schema（zod）。
  * 所有工具均支持可选的 repoPath（缺省使用当前打开的仓库）与 dryRun（缺省为配置默认）。
  */
 import { z } from 'zod';
@@ -376,3 +376,21 @@ export const GitRebaseSchema = z.object({
   branch: z.string().describe('要变基到的分支/提交')
 });
 export type GitRebaseArgs = z.infer<typeof GitRebaseSchema>;
+
+export const GitWorktreeListSchema = z.object({ ...readonlyBase });
+export type GitWorktreeListArgs = z.infer<typeof GitWorktreeListSchema>;
+
+export const GitWorktreeAddSchema = z.object({
+  ...writeBase,
+  path: z.string().min(1).describe('新 worktree 的绝对路径（空目录或不存在均可；不能落在主工作区内）'),
+  startPoint: z.string().optional().describe('检出起点（分支/提交），缺省为 HEAD'),
+  branch: z.string().optional().describe('同时创建并检出新分支（git worktree add -b）')
+});
+export type GitWorktreeAddArgs = z.infer<typeof GitWorktreeAddSchema>;
+
+export const GitWorktreeRemoveSchema = z.object({
+  ...writeBase,
+  path: z.string().min(1).describe('要移除的 worktree 绝对路径（不能是主工作区）'),
+  force: z.boolean().optional().describe('强制移除（工作区不干净时）')
+});
+export type GitWorktreeRemoveArgs = z.infer<typeof GitWorktreeRemoveSchema>;

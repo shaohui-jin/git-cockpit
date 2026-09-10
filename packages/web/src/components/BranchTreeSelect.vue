@@ -76,25 +76,8 @@ function onUpdate(v: string | string[] | null): void {
   width: var(--gc-select-width);
   flex: none;
 }
-.branch-tree-select :deep(.el-select__wrapper) {
-  min-height: var(--gc-control);
-  height: var(--gc-control);
-  font-size: var(--gc-text);
-}
-.branch-tree-select :deep(.el-select__selected-item),
-.branch-tree-select :deep(.el-select__placeholder),
-.branch-tree-select :deep(.el-select__input-wrapper) {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .branch-tree-select :deep(.el-tag) {
-  height: 20px;
   max-width: 160px;
-}
-.branch-tree-select :deep(.el-tag .el-tag__content) {
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .branch-option {
   display: block;

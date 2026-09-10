@@ -43,8 +43,9 @@ export function createMcpServer(runtime: Runtime): McpServer {
         '9. 开 PR/MR 用 git_mr_prepare / git_mr_create。方式与 Token 在设置 MR 配置（不进工具参数）：本机 gh·glab / Token / 浏览器页。找不到 CLI 时结果含官方安装地址。',
         '10. 大结果默认摘要：git_diff / git_show / git_merge_rehearse 要正文请加 path 或 detail=true。',
         '11. 已打开仓库脉搏用 git_repo_overview。长任务用 git_job_list / git_job_get / git_job_cancel。',
-        '12. 提交 / 预演落盘 / 工作区收尾 / 开 PR 用 Prompt：safe_commit、merge_preview_apply、workspace_continue、open_mr（正文与 README「Agent 该怎么用」相同）。',
-        '13. 只读列表可读 Resource：git-cockpit://repos、git-cockpit://repo/current、git-cockpit://jobs、git-cockpit://jobs/{id}。'
+        '12. worktree 列表/添加/删除用 git_worktree_list / git_worktree_add / git_worktree_remove；不要把 linked worktree 当成第二套工作区做 merge。',
+        '13. 提交 / 预演落盘 / 工作区收尾 / 开 PR 用 Prompt：safe_commit、merge_preview_apply、workspace_continue、open_mr（正文与 README「Agent 该怎么用」相同）。',
+        '14. 只读列表可读 Resource：git-cockpit://repos、git-cockpit://repo/current、git-cockpit://jobs、git-cockpit://jobs/{id}。'
       ].join('\n')
     }
   );

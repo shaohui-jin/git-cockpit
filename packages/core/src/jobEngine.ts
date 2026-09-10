@@ -123,7 +123,7 @@ export class JobEngine {
     git?: GitService;
   }): Job {
     this.assertRepoQueueFree(opts.repoPath);
-    const title = `survey ${opts.intos.length}×${opts.froms.length}`;
+    const title = `survey ${opts.intos.length}×${opts.froms.length} → ${opts.repoPath}`;
     const job: Job = {
       id: `survey-${randomUUID()}`,
       kind: 'survey',
@@ -157,7 +157,7 @@ export class JobEngine {
       id: `fetch-${randomUUID()}`,
       kind: 'fetch',
       status: 'running',
-      title: `fetch ${remote}`,
+      title: `fetch ${remote} → ${opts.repoPath}`,
       repoPath: opts.repoPath,
       payload: { remote },
       logs: [`$ git fetch --prune --no-tags ${remote}`],

@@ -120,13 +120,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.page-title {
-  margin: 0 0 var(--gc-gap);
-  font-size: 14px;
-}
-.mb {
-  margin-bottom: var(--gc-gap);
-}
 .filter-bar {
   display: flex;
   align-items: center;

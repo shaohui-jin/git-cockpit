@@ -346,6 +346,44 @@ describe('GitService stash 列表/选择/apply/drop/show', () => {
   });
 });
 
+describe('GitService worktree', () => {
+  let dir: string;
+  let svc: GitService;
+
+  beforeEach(async () => {
+    cleanupTmp();
+    ({ dir } = await createSampleRepo());
+    svc = await GitService.open(dir);
+  });
+
+  it('list 含主工作区', async () => {
+    const list = await svc.listWorktrees();
+    expect(list.length).toBeGreaterThanOrEqual(1);
+    expect(list.some((w) => w.isMain && w.branch === 'main')).toBe(true);
+  });
+
+  it('add / remove linked worktree；拒绝主区路径', async () => {
+    const dest = makeTmpDir('wt-');
+    fs.rmSync(dest, { recursive: true, force: true });
+    const added = await svc.addWorktree(dest, { branch: 'wt-feat' });
+    expect(added).toMatchObject({ path: expect.any(String) });
+    const list = await svc.listWorktrees();
+    expect(list.some((w) => !w.isMain && w.branch === 'wt-feat')).toBe(true);
+
+    await expect(svc.removeWorktree(dir)).rejects.toThrow(/主工作区/);
+    await svc.removeWorktree(dest);
+    const after = await svc.listWorktrees();
+    expect(after.some((w) => w.branch === 'wt-feat')).toBe(false);
+  });
+
+  it('dryRun 不创建目录', async () => {
+    const dest = path.join(makeTmpDir('wt-dry-'), 'linked');
+    const preview = await svc.addWorktree(dest, { dryRun: true, branch: 'dry-wt' });
+    expect(preview).toMatchObject({ dryRun: true, command: expect.stringContaining('worktree add') });
+    expect(fs.existsSync(dest)).toBe(false);
+  });
+});
+
 describe('GitService 串行队列', () => {
   it('高并发读写调用按序执行且不报错', async () => {
     cleanupTmp();

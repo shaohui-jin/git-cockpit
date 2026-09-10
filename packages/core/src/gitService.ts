@@ -18,6 +18,7 @@ import type {
   RepoOverview,
   CommitInfo,
   StashInfo,
+  WorktreeInfo,
   LogOptions,
   DiffOptions,
   GraphData,
@@ -56,6 +57,58 @@ import { parseBlamePorcelain, parseNewSideRanges, type ConflictBlameResult } fro
 import { detectMrPlatform } from './mr.ts';
 import { crossPairs, MAX_SURVEY_PAIRS, parseTempBranches, runSurvey } from './survey.ts';
 import { suggestOrder, type ChainRunner } from './chain.ts';
+
+function sameFsPath(a: string, b: string): boolean {
+  const left = path.resolve(a);
+  const right = path.resolve(b);
+  return process.platform === 'win32' ? left.toLowerCase() === right.toLowerCase() : left === right;
+}
+
+function isFsPathInside(parent: string, child: string): boolean {
+  const root = path.resolve(parent);
+  const target = path.resolve(child);
+  if (sameFsPath(root, target)) return true;
+  const prefix = root.endsWith(path.sep) ? root : root + path.sep;
+  if (process.platform === 'win32') {
+    return target.toLowerCase().startsWith(prefix.toLowerCase());
+  }
+  return target.startsWith(prefix);
+}
+
+export function parseWorktreePorcelain(text: string, mainPath: string): WorktreeInfo[] {
+  const blocks = text
+    .replace(/\r\n/g, '\n')
+    .split('\n\n')
+    .map((b) => b.trim())
+    .filter(Boolean);
+  return blocks.map((block) => {
+    let wtPath = '';
+    let head = '';
+    let branch: string | null = null;
+    let detached = false;
+    let locked = false;
+    let prunable = false;
+    for (const line of block.split('\n')) {
+      if (line.startsWith('worktree ')) wtPath = line.slice('worktree '.length);
+      else if (line.startsWith('HEAD ')) head = line.slice('HEAD '.length);
+      else if (line.startsWith('branch ')) {
+        const ref = line.slice('branch '.length).trim();
+        branch = ref.replace(/^refs\/heads\//, '');
+      } else if (line === 'detached') detached = true;
+      else if (line.startsWith('locked')) locked = true;
+      else if (line.startsWith('prunable')) prunable = true;
+    }
+    return {
+      path: wtPath,
+      head,
+      branch: detached ? null : branch,
+      detached,
+      locked,
+      prunable,
+      isMain: sameFsPath(wtPath, mainPath)
+    };
+  });
+}
 
 export interface GitServiceOptions {
   maxConcurrentProcesses?: number;
@@ -1405,6 +1458,99 @@ export class GitService extends EventEmitter {
       const msg = String((err as Error).message ?? '');
       throw new GitOperationError(this.extractGitMessage(msg), 'GIT_BRANCH_DELETE_FORCE_FAILED');
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // worktree 一等公民（列表/添加/删除；不当成第二套工作区做 merge）
+  // ---------------------------------------------------------------------------
+
+  async listWorktrees(): Promise<WorktreeInfo[]> {
+    const out = await this.run(['worktree', 'list', '--porcelain']);
+    return parseWorktreePorcelain(out, this.repoPath);
+  }
+
+  async addWorktree(
+    dest: string,
+    options: { dryRun?: boolean; startPoint?: string; branch?: string } = {}
+  ): Promise<WritePreview | { path: string; branch: string | null; head: string }> {
+    const resolved = this.assertWorktreeDest(dest);
+    if (options.branch) this.validateRefName(options.branch);
+    const cmd = ['worktree', 'add'];
+    if (options.branch) cmd.push('-b', options.branch);
+    cmd.push(resolved);
+    if (options.startPoint) cmd.push(options.startPoint);
+    if (options.dryRun) {
+      return GitService.preview(
+        cmd,
+        'medium',
+        undefined,
+        '将添加独立 worktree（不切换主工作区；不要在里面当第二套工作区做 merge）'
+      );
+    }
+    await this.prepareWrite();
+    const r = await this.runAllowFail(cmd);
+    if (r.code !== 0) {
+      throw new GitOperationError(
+        this.extractGitMessage((r.stderr || r.stdout).trim()) || '无法添加 worktree',
+        'WORKTREE_ADD_FAILED'
+      );
+    }
+    this.emit('changed', { repoPath: this.repoPath, command: cmd });
+    const listed = await this.listWorktrees();
+    const row = listed.find((w) => sameFsPath(w.path, resolved));
+    return {
+      path: row?.path ?? resolved,
+      branch: row?.branch ?? options.branch ?? null,
+      head: row?.head ?? ''
+    };
+  }
+
+  async removeWorktree(
+    dest: string,
+    options: { dryRun?: boolean; force?: boolean } = {}
+  ): Promise<WritePreview | string> {
+    const resolved = path.resolve(dest.trim());
+    if (!resolved) throw new GitOperationError('worktree 路径不能为空', 'INVALID_PATH');
+    if (sameFsPath(resolved, this.repoPath)) {
+      throw new GitOperationError('不能移除主工作区', 'WORKTREE_IS_MAIN');
+    }
+    const cmd = options.force ? ['worktree', 'remove', '--force', resolved] : ['worktree', 'remove', resolved];
+    if (options.dryRun) {
+      return GitService.preview(cmd, 'medium', undefined, '将移除该 worktree（不删主工作区）');
+    }
+    await this.prepareWrite();
+    const r = await this.runAllowFail(cmd);
+    if (r.code !== 0) {
+      throw new GitOperationError(
+        this.extractGitMessage((r.stderr || r.stdout).trim()) || '无法移除 worktree',
+        'WORKTREE_REMOVE_FAILED'
+      );
+    }
+    this.emit('changed', { repoPath: this.repoPath, command: cmd });
+    return r.stdout || `已移除 worktree ${resolved}`;
+  }
+
+  private assertWorktreeDest(dest: string): string {
+    const trimmed = dest.trim();
+    if (!trimmed) throw new GitOperationError('worktree 路径不能为空', 'INVALID_PATH');
+    if (!path.isAbsolute(trimmed)) {
+      throw new GitOperationError(`worktree 路径必须是绝对路径: ${trimmed}`, 'INVALID_PATH');
+    }
+    const resolved = path.resolve(trimmed);
+    if (sameFsPath(resolved, this.repoPath) || isFsPathInside(this.repoPath, resolved)) {
+      throw new GitOperationError('worktree 路径不能落在主工作区内', 'INVALID_PATH');
+    }
+    if (fs.existsSync(resolved)) {
+      const stat = fs.statSync(resolved);
+      if (!stat.isDirectory()) {
+        throw new GitOperationError(`路径已存在且不是目录: ${resolved}`, 'INVALID_PATH');
+      }
+      const entries = fs.readdirSync(resolved);
+      if (entries.length > 0) {
+        throw new GitOperationError(`目标目录非空: ${resolved}`, 'INVALID_PATH');
+      }
+    }
+    return resolved;
   }
 
   // ---------------------------------------------------------------------------
