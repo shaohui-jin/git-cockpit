@@ -16,6 +16,7 @@ import type {
   PrepareMrResult
 } from './types.ts';
 import { toHttpsRemoteUrl } from './merge.ts';
+import { normalizeMrTemplate } from './mrTemplate.ts';
 import * as path from 'node:path';
 import {
   cliInstallUrl,
@@ -154,7 +155,8 @@ export function normalizeMrConfig(raw: MrConfigRaw | undefined): MrConfig {
     method,
     defaultRemote: src.defaultRemote?.trim() || 'origin',
     hosts,
-    repoMethods: normalizeRepoMethods(src.repoMethods)
+    repoMethods: normalizeRepoMethods(src.repoMethods),
+    template: normalizeMrTemplate((src as { template?: unknown }).template)
   };
 }
 

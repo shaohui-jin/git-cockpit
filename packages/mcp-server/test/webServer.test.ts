@@ -4,6 +4,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createTestRuntime, disposeTestRuntime, createSampleRepo, cleanupTmp, initRepo, commitFile } from './helpers.ts';
 import { createWebServer } from '../src/webServer.ts';
 import type { Runtime } from '../src/index.ts';
@@ -405,6 +406,51 @@ describe('Web API', () => {
     expect(getA.json().mr.method).toBe('cli');
 
     await server.app.inject({ method: 'DELETE', url: `/api/repos/${idB}` });
+  });
+
+  it('导入 MR 模板：parse 不落盘，PUT 保存后 GET 能读回', async () => {
+    const markdown = fs.readFileSync(
+      path.join(path.dirname(fileURLToPath(import.meta.url)), '../../core/test/fixtures/mr-default.md'),
+      'utf8'
+    );
+    const parsed = await server.app.inject({
+      method: 'POST',
+      url: '/api/settings/mr-template/parse',
+      payload: { markdown, filename: 'Default.md' }
+    });
+    expect(parsed.statusCode).toBe(200);
+    const body = parsed.json() as { template: { fields: Array<{ id: string; type: string }>; enabled: boolean }; preview: string };
+    expect(body.template.enabled).toBe(true);
+    expect(body.template.fields.map((f) => f.id)).toContain('purpose');
+    expect(body.preview).toContain('## 变更目的');
+
+    const before = await server.app.inject({ method: 'GET', url: '/api/settings' });
+    expect(before.json().mr.template).toBeNull();
+
+    const put = await server.app.inject({
+      method: 'PUT',
+      url: '/api/settings',
+      payload: { mr: { template: body.template } }
+    });
+    expect(put.statusCode).toBe(200);
+    expect(put.json().mr.template.fields[0].id).toBe('purpose');
+    expect(put.json().mr.template.enabled).toBe(true);
+
+    const putMethod = await server.app.inject({
+      method: 'PUT',
+      url: '/api/settings',
+      payload: { mr: { method: 'browser' } }
+    });
+    expect(putMethod.json().mr.template.fields[0].id).toBe('purpose');
+
+    const clear = await server.app.inject({
+      method: 'PUT',
+      url: '/api/settings',
+      payload: {
+        mr: { template: { enabled: false, agentFill: 'allow', filename: '', sourceMd: '', fields: [] } }
+      }
+    });
+    expect(clear.json().mr.template).toBeNull();
   });
 
   it('GET /api/logs 返回操作日志', async () => {

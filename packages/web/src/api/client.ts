@@ -15,6 +15,7 @@ import type {
   JobProgressPayload,
   LogEntry,
   MrSettings,
+  MrTemplate,
   OpenedRepo,
   PermissionsPayload,
   ReflogEntry,
@@ -368,12 +369,27 @@ export function updateSettings(
         apiBaseUrl?: string;
       };
       deleteHost?: string;
+      template?: MrSettings['template'];
     };
   },
   repoId?: number | null
 ): Promise<{ ok: boolean; mr?: MrSettings }> {
   const q = repoId != null ? `?repoId=${repoId}` : '';
   return request('PUT', `/api/settings${q}`, body);
+}
+
+export function parseMrTemplate(
+  markdown: string,
+  filename?: string
+): Promise<{ template: MrTemplate; preview: string }> {
+  return request('POST', '/api/settings/mr-template/parse', { markdown, filename });
+}
+
+export function previewMrTemplate(
+  template: MrTemplate,
+  values?: Record<string, unknown>
+): Promise<{ preview: string }> {
+  return request('POST', '/api/settings/mr-template/preview', { template, values });
 }
 
 export function getHealth(): Promise<HealthInfo> {

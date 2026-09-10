@@ -47,6 +47,8 @@ const REST_META: Record<string, { summary: string; tags: string[] }> = {
   'get /api/logs': { summary: '操作审计日志', tags: ['系统'] },
   'get /api/settings': { summary: '配置与权限', tags: ['设置'] },
   'put /api/settings': { summary: '更新权限或 MR 配置（Token 明文不回读，保存前校验）', tags: ['设置'] },
+  'post /api/settings/mr-template/parse': { summary: '导入 Markdown 为 MR 正文模板字段（不落盘）', tags: ['设置'] },
+  'post /api/settings/mr-template/preview': { summary: '按模板字段渲染 MR 正文预览', tags: ['设置'] },
   'get /api/events': { summary: 'SSE：仓库变化、日志、后台任务进度', tags: ['系统'] }
 };
 

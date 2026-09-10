@@ -453,6 +453,38 @@ export interface MrHostProfile {
   apiBaseUrl: string;
 }
 
+export type MrTemplateAgentFill = 'allow' | 'forbid';
+export type MrTemplateFieldType = 'markdown' | 'textarea' | 'select' | 'checkboxes';
+
+export interface MrTemplateCheckboxItem {
+  id: string;
+  label: string;
+  required: boolean;
+}
+
+/** 导入 MD 后校对过的字段。运行时认这份，不再现场解析原文 */
+export interface MrTemplateField {
+  id: string;
+  type: MrTemplateFieldType;
+  label: string;
+  help?: string;
+  required: boolean;
+  placeholder?: string;
+  options?: string[];
+  items?: MrTemplateCheckboxItem[];
+  content?: string;
+}
+
+export interface MrTemplate {
+  enabled: boolean;
+  agentFill: MrTemplateAgentFill;
+  filename: string;
+  sourceMd: string;
+  fields: MrTemplateField[];
+}
+
+export type MrTemplateValues = Record<string, unknown>;
+
 /** MR / PR：开单方式按仓库路径；Token / API 按域名。不进工具参数 */
 export interface MrConfig {
   /** 仅作读盘兼容 / 最近一次写入；真正开单看 repoMethods */
@@ -462,6 +494,8 @@ export interface MrConfig {
   hosts: MrHostProfile[];
   /** 规范化仓库绝对路径 → 开单方式；没有记录则默认 browser */
   repoMethods: Record<string, MrMethod>;
+  /** 正文规范；无字段视为未启用。Web / MCP 共用 */
+  template: MrTemplate | null;
 }
 
 /** 读盘时可能仍带旧字段（含 `method: 'auto'`），normalizeMrConfig 会迁到 hosts / browser */
@@ -557,7 +591,8 @@ export const DEFAULT_CONFIG: GitCockpitConfig = {
     method: 'browser',
     defaultRemote: 'origin',
     hosts: [],
-    repoMethods: {}
+    repoMethods: {},
+    template: null
   }
 };
 

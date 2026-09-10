@@ -61,6 +61,16 @@ export {
   tokenForRemote,
   upsertMrHost
 } from './mr.ts';
+export {
+  assertMrTemplateMarkdownSize,
+  emptyMrTemplate,
+  MAX_MR_TEMPLATE_FIELDS,
+  MAX_MR_TEMPLATE_MD,
+  normalizeMrTemplate,
+  parseMrTemplateMarkdown,
+  renderMrTemplate,
+  validateMrTemplateFields
+} from './mrTemplate.ts';
 export { maskToken, validateMrToken, validateGithubTokenFormat, validateGitlabTokenFormat } from './mrToken.ts';
 export { trustSystemCa, describeFetchError } from './trustSystemCa.ts';
 export { crossPairs, clearMergeSurveyCache, MAX_SURVEY_PAIRS, parseTempBranches } from './survey.ts';

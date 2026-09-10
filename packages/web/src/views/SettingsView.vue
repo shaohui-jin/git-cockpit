@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { useSettingsStore } from '@/stores/settings';
+import MrTemplateSettings from '@/components/MrTemplateSettings.vue';
 import { useReposStore } from '@/stores/repos';
 import type { MrMethod, ToolSummary } from '@/api/types';
 
@@ -15,11 +16,16 @@ const GH_INSTALL_URL = 'https://cli.github.com/';
 const GLAB_INSTALL_URL = 'https://gitlab.com/gitlab-org/cli/-/releases';
 const GH_TOKEN_CREATE_URL = 'https://github.com/settings/tokens/new?scopes=repo&description=Git%20Cockpit';
 
-type SettingsTab = 'git' | 'mr';
+type SettingsTab = 'git' | 'mr' | 'template';
 const activeTab = computed<SettingsTab>({
-  get: () => (route.query.tab === 'git' ? 'git' : 'mr'),
+  get: () => {
+    const tab = route.query.tab;
+    if (tab === 'git' || tab === 'template') return tab;
+    return 'mr';
+  },
   set: (name) => {
-    void router.replace({ path: '/settings', query: name === 'git' ? { tab: 'git' } : {} });
+    const query = name === 'mr' ? {} : { tab: name };
+    void router.replace({ path: '/settings', query });
   }
 });
 
@@ -235,7 +241,7 @@ watch(
 );
 
 watch(activeTab, (tab, prev) => {
-  if (tab === 'mr' && prev === 'git') void reloadSettings({ validateToken: true });
+  if (tab === 'mr' && prev !== 'mr') void reloadSettings({ validateToken: true });
 });
 
 async function toggleEnabled(t: ToolSummary, enabled: boolean): Promise<void> {
@@ -586,6 +592,9 @@ onMounted(async () => {
             </li>
           </ul>
         </el-card>
+      </el-tab-pane>
+      <el-tab-pane label="正文规范" name="template">
+        <MrTemplateSettings />
       </el-tab-pane>
       <el-tab-pane label="Git 操作" name="git">
         <el-card shadow="never" class="mb">

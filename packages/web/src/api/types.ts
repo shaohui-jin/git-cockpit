@@ -332,6 +332,35 @@ export interface MrCurrentHost {
   apiBaseUrl: string;
 }
 
+export type MrTemplateAgentFill = 'allow' | 'forbid';
+export type MrTemplateFieldType = 'markdown' | 'textarea' | 'select' | 'checkboxes';
+
+export interface MrTemplateCheckboxItem {
+  id: string;
+  label: string;
+  required: boolean;
+}
+
+export interface MrTemplateField {
+  id: string;
+  type: MrTemplateFieldType;
+  label: string;
+  help?: string;
+  required: boolean;
+  placeholder?: string;
+  options?: string[];
+  items?: MrTemplateCheckboxItem[];
+  content?: string;
+}
+
+export interface MrTemplate {
+  enabled: boolean;
+  agentFill: MrTemplateAgentFill;
+  filename: string;
+  sourceMd: string;
+  fields: MrTemplateField[];
+}
+
 export interface MrSettings {
   method: MrMethod;
   defaultRemote: string;
@@ -339,6 +368,7 @@ export interface MrSettings {
   current: MrCurrentHost | null;
   hosts: MrHostPublic[];
   cli: { gh: MrCliStatus; glab: MrCliStatus };
+  template: MrTemplate | null;
 }
 
 export interface SettingsData {

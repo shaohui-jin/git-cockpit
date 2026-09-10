@@ -24,16 +24,20 @@ import {
   methodForRepo,
   normalizeHostName,
   normalizeMrConfig,
+  normalizeMrTemplate,
   normalizeRepoMethodKey,
+  parseMrTemplateMarkdown,
   pickRemoteName,
   probeAllMrCli,
   readCliAuthToken,
+  renderMrTemplate,
   RepoNotFoundError,
   toHttpsRemoteUrl,
   upsertMrHost,
   maskToken,
   validateMrToken
 } from '@shaohui_jin/git-cockpit-core';
+import type { MrTemplate } from '@shaohui_jin/git-cockpit-core';
 import { collectRepoOverviews } from './overview.ts';
 import type { MrCliStatus, MrTokenStatus, OpenedRepo } from '@shaohui_jin/git-cockpit-core';
 import { disposeRuntime } from './runtime.ts';
@@ -548,6 +552,27 @@ export async function createWebServer(
   // ---------------------------------------------------------------------------
   // 配置 / 权限
   // ---------------------------------------------------------------------------
+  app.post<{ Body: { markdown?: string; filename?: string } }>('/api/settings/mr-template/parse', async (req, reply) => {
+    const markdown = typeof req.body?.markdown === 'string' ? req.body.markdown : '';
+    if (!markdown.trim()) return reply.code(400).send({ error: '请提供 Markdown 文本' });
+    try {
+      const template = parseMrTemplateMarkdown(markdown, req.body?.filename ?? '');
+      return { template, preview: renderMrTemplate(template) };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return reply.code(400).send({ error: message });
+    }
+  });
+
+  app.post<{ Body: { template?: unknown; values?: Record<string, unknown> } }>(
+    '/api/settings/mr-template/preview',
+    async (req, reply) => {
+      const template = normalizeMrTemplate(req.body?.template);
+      if (!template) return reply.code(400).send({ error: '没有可预览的模板字段' });
+      return { preview: renderMrTemplate(template, req.body?.values ?? {}) };
+    }
+  );
+
   app.get<{ Querystring: { repoId?: string; validateToken?: string } }>('/api/settings', async (req) => {
     const repoId = req.query.repoId ? Number(req.query.repoId) : undefined;
     return {
@@ -588,6 +613,7 @@ export async function createWebServer(
           clearToken?: boolean;
         };
         deleteHost?: string;
+        template?: MrTemplate | null;
       };
     };
   }>('/api/settings', async (req, reply) => {
@@ -656,7 +682,15 @@ export async function createWebServer(
         const del = normalizeHostName(patch.mr.deleteHost);
         next.hosts = next.hosts.filter((h) => h.host !== del);
       }
+      if (patch.mr.template !== undefined) {
+        next.template = normalizeMrTemplate(patch.mr.template);
+      }
       runtime.configStore.update({ mr: next });
+      if (patch.mr.template !== undefined) {
+        const cfg = runtime.configStore.get();
+        cfg.mr.template = next.template;
+        runtime.configStore.save();
+      }
     }
     runtime.config = runtime.configStore.get();
     runtime.permissions = new PermissionManager(runtime.config);
@@ -934,6 +968,7 @@ async function mrClientView(
     remotes,
     current,
     hosts: showHosts,
+    template: mr.template,
     cli: await withCliTokenStatus(await probeAllMrCli(repoPath), {
       validate: Boolean(opts?.validateToken),
       platform: current?.platform ?? 'unknown',

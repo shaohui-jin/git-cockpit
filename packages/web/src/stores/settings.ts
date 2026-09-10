@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import * as api from '@/api/client';
-import type { MrCurrentHost, MrSettings, PermissionsPayload, RemoteInfo, ToolSummary } from '@/api/types';
+import type { MrCurrentHost, MrSettings, MrTemplate, PermissionsPayload, RemoteInfo, ToolSummary } from '@/api/types';
 
 interface State {
   permissions: PermissionsPayload | null;
@@ -21,7 +21,8 @@ const emptyMr = (): MrSettings => ({
   cli: {
     gh: { name: 'gh', found: false, loggedIn: false, installUrl: 'https://cli.github.com/' },
     glab: { name: 'glab', found: false, loggedIn: false, installUrl: 'https://gitlab.com/gitlab-org/cli/-/releases' }
-  }
+  },
+  template: null
 });
 
 /** 与 core `toHttpsRemoteUrl` 同规则：仅用于从 remote URL 识别 host / 平台 */
@@ -115,7 +116,8 @@ function normalizeMr(raw: Partial<MrSettings> | null | undefined): MrSettings {
     cli: {
       gh: { ...base.cli.gh, ...raw.cli?.gh },
       glab: { ...base.cli.glab, ...raw.cli?.glab }
-    }
+    },
+    template: (raw.template as MrTemplate | null | undefined) ?? null
   };
 }
 
