@@ -68,6 +68,19 @@ export async function executeCapability(
       return { tool: def.name, source: ctx.source, dryRun, success: false, error: e, durationMs: Date.now() - t0 };
     }
 
+    if (ctx.source === 'mcp' && Array.isArray(args.files) && args.files.length > 0) {
+      if (
+        def.name === 'git_apply_resolve' ||
+        def.name === 'git_merge_continue' ||
+        def.name === 'git_rebase_continue'
+      ) {
+        throw new GitOperationError(
+          '冲突选边只在网页完成。Agent 不要传 files / resolvedContent，请把 preview 的 webUrl 给人。',
+          'AGENT_NO_RESOLVE'
+        );
+      }
+    }
+
     let git: GitService | undefined;
     let repoPath = '';
     if (def.needsRepo !== false) {

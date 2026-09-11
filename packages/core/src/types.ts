@@ -291,6 +291,33 @@ export interface ConflictFile {
 
 export type MergeOutcome = 'clean' | 'conflicts' | 'unrelated';
 
+/**
+ * 单对下一步：先认临时枝 / 已包含，再看 merge-tree 干净或冲突。
+ * already_merged = from 已在 into 里且没有可用临时枝，网页只提示无需操作。
+ */
+export type MergePairSituation =
+  | 'looking_at_temp'
+  | 'temp_remote'
+  | 'temp_local'
+  | 'already_merged'
+  | MergeOutcome;
+
+export type MrMergeGateCode =
+  | 'OK'
+  | 'CONFLICTS_UNRESOLVED'
+  | 'NOT_LANDED'
+  | 'TEMP_NOT_PUSHED'
+  | 'ALREADY_MERGED'
+  | 'REV_NOT_FOUND';
+
+export interface MrMergeGate {
+  ok: boolean;
+  code: MrMergeGateCode;
+  situation: MergePairSituation | 'unknown';
+  message: string;
+  webUrl: string;
+}
+
 /** merge-tree 预演结果（不改工作区） */
 export interface MergePreviewResult {
   repoRoot: string;
@@ -310,6 +337,26 @@ export interface MergePreviewResult {
   unrelatedHistories: boolean;
   /** merge-tree --write-tree 的结果树；冲突时也有（blob 带冲突标记） */
   resultTree?: string;
+  /** from 已是 into 的祖先（再 merge 不会有新提交） */
+  alreadyUpToDate: boolean;
+  /** 当前选中的 into/from 本身是 merge/* 临时枝 */
+  intoIsTempBranch: boolean;
+  fromIsTempBranch: boolean;
+  /** 这对 pair 的默认临时枝（本地 / 远程） */
+  pairTempBranch?: TempBranchState | null;
+  /** 临时枝不再包含当前 into/from tip */
+  tempStale?: boolean;
+  /** into 是临时枝时，从落盘提交说明还原的原 pair */
+  recoveredPair?: { into: string; from: string } | null;
+  situation: MergePairSituation;
+  /** 预演实际用的 git 引用（可能补了 origin/） */
+  intoGit?: string;
+  fromGit?: string;
+  /** 开单用的平台短名 */
+  intoMr?: string;
+  fromMr?: string;
+  /** 有冲突时给 Agent 打开网页选边 */
+  webUrl?: string;
 }
 
 export type MergeRehearsalResult = MergePreviewResult;
@@ -535,6 +582,12 @@ export interface MrCliStatus {
   tokenStatus?: MrTokenStatus | null;
 }
 
+export interface PublicMrTemplate {
+  enabled: boolean;
+  agentFill: MrTemplateAgentFill;
+  fields: MrTemplateField[];
+}
+
 export interface PrepareMrResult {
   platform: MrPlatform;
   remote: string;
@@ -548,6 +601,12 @@ export interface PrepareMrResult {
   cliInstallUrl?: string | null;
   candidates: MrCandidate[];
   messages: string[];
+  /** 正文规范（无 sourceMd）。未导入则为 null */
+  template?: PublicMrTemplate | null;
+  /** 能否开单；冲突/未落盘时 ok=false */
+  mergeGate?: MrMergeGate;
+  /** 当前仓开单方式（按 repoMethods） */
+  method?: MrMethod;
 }
 
 export interface CreateMrResult {
@@ -557,6 +616,8 @@ export interface CreateMrResult {
   sourceBranch: string;
   targetBranch: string;
   title: string;
+  /** browser 开单时带回渲染正文，供复制到平台创建页 */
+  body?: string;
   messages: string[];
   cliInstallUrl?: string | null;
 }

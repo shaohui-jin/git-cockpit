@@ -1,13 +1,115 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
-import { GitOperationError, GitService, isSameBranchForMr } from '../src/index.ts';
+import {
+  GitOperationError,
+  GitService,
+  classifyMergePair,
+  evaluateMrMergeGate,
+  isMergeTempRef,
+  isSameBranchForMr,
+  parseLandedMergeMessage
+} from '../src/index.ts';
 import { cleanupTmp, commitFile, createConflictRepo, createSampleRepo } from './helpers.ts';
 
 describe('isSameBranchForMr', () => {
   it('识别 master 与 origin/master 为同名', () => {
     expect(isSameBranchForMr('origin/master', 'master')).toBe(true);
     expect(isSameBranchForMr('main', 'feature')).toBe(false);
+  });
+});
+
+describe('merge 临时枝档位', () => {
+  it('识别本地 / 远程 merge/*', () => {
+    expect(isMergeTempRef('merge/a-into-b')).toBe(true);
+    expect(isMergeTempRef('origin/merge/a-into-b')).toBe(true);
+    expect(isMergeTempRef('origin/npm_and_yarn/marked-18.0.6')).toBe(false);
+  });
+
+  it('解析落盘提交说明', () => {
+    expect(parseLandedMergeMessage('merge: feature/x into main via merge/feature-x-into-main\n\nClean merge')).toEqual({
+      from: 'feature/x',
+      into: 'main',
+      tempBranch: 'merge/feature-x-into-main'
+    });
+    expect(
+      parseLandedMergeMessage(
+        'resolve: merge origin/a into origin/b via merge/a-into-b\n\nApplied stash'
+      )
+    ).toEqual({ from: 'origin/a', into: 'origin/b', tempBranch: 'merge/a-into-b' });
+  });
+
+  it('档位：对着临时枝 / 已有枝 / 已包含 / 干净', () => {
+    expect(
+      classifyMergePair({
+        outcome: 'clean',
+        alreadyUpToDate: true,
+        intoIsTemp: true,
+        fromIsTemp: false
+      })
+    ).toBe('looking_at_temp');
+    expect(
+      classifyMergePair({
+        outcome: 'conflicts',
+        alreadyUpToDate: false,
+        intoIsTemp: false,
+        fromIsTemp: false,
+        tempBranch: { name: 'merge/x', local: true, remote: true }
+      })
+    ).toBe('temp_remote');
+    expect(
+      classifyMergePair({
+        outcome: 'clean',
+        alreadyUpToDate: true,
+        intoIsTemp: false,
+        fromIsTemp: false
+      })
+    ).toBe('already_merged');
+    expect(
+      classifyMergePair({
+        outcome: 'clean',
+        alreadyUpToDate: false,
+        intoIsTemp: false,
+        fromIsTemp: false
+      })
+    ).toBe('clean');
+  });
+
+  it('开单闸：临时枝已推才 ok', () => {
+    expect(
+      evaluateMrMergeGate({ situation: 'temp_remote', into: 'main', from: 'feat' })
+    ).toMatchObject({ ok: true, code: 'OK' });
+    expect(
+      evaluateMrMergeGate({ situation: 'temp_local', into: 'main', from: 'feat' })
+    ).toMatchObject({ ok: false, code: 'TEMP_NOT_PUSHED' });
+    expect(
+      evaluateMrMergeGate({
+        situation: 'looking_at_temp',
+        into: 'main',
+        from: 'feat',
+        pairTempBranch: { name: 'merge/x', local: true, remote: false }
+      })
+    ).toMatchObject({ ok: false, code: 'TEMP_NOT_PUSHED' });
+    expect(
+      evaluateMrMergeGate({
+        situation: 'looking_at_temp',
+        into: 'main',
+        from: 'feat',
+        pairTempBranch: { name: 'merge/x', local: true, remote: true }
+      })
+    ).toMatchObject({ ok: true, code: 'OK' });
+    expect(evaluateMrMergeGate({ situation: 'clean', into: 'main', from: 'feat' })).toMatchObject({
+      ok: false,
+      code: 'NOT_LANDED'
+    });
+    expect(evaluateMrMergeGate({ situation: 'conflicts', into: 'main', from: 'feat' })).toMatchObject({
+      ok: false,
+      code: 'CONFLICTS_UNRESOLVED'
+    });
+    expect(evaluateMrMergeGate({ situation: 'already_merged', into: 'main', from: 'feat' })).toMatchObject({
+      ok: false,
+      code: 'ALREADY_MERGED'
+    });
   });
 });
 
@@ -69,6 +171,45 @@ describe('merge-tree 预演', () => {
     const { dir } = await createSampleRepo();
     const svc = await GitService.open(dir);
     await expect(svc.previewMerge({ into: 'main', from: 'main', fetch: false })).rejects.toThrow(GitOperationError);
+  });
+
+  it('短名只有 origin/ 跟踪枝时也能预演', async () => {
+    const { dir, git } = await createSampleRepo();
+    const sha = (await git.revparse(['feature/x'])).trim();
+    await git.raw(['update-ref', 'refs/remotes/origin/only-remote', sha]);
+    const svc = await GitService.open(dir);
+    const preview = await svc.previewMerge({ into: 'main', from: 'only-remote', fetch: false });
+    expect(preview.fromGit).toBe('origin/only-remote');
+    expect(preview.fromMr).toBe('only-remote');
+    expect(preview.clean).toBe(true);
+    expect(preview.webUrl).toContain('/#/merge?');
+  });
+
+  it('from 已在 into 里时 situation=already_merged，dry-run 落盘失败', async () => {
+    const { dir } = await createSampleRepo();
+    const svc = await GitService.open(dir);
+    const preview = await svc.previewMerge({ into: 'feature/x', from: 'main', fetch: false });
+    expect(preview.alreadyUpToDate).toBe(true);
+    expect(preview.situation).toBe('already_merged');
+    await expect(
+      svc.applyResolve({ into: 'feature/x', from: 'main', push: false, dryRun: true, files: [] })
+    ).rejects.toMatchObject({ code: 'NOTHING_TO_MERGE' });
+  });
+
+  it('落盘后预演原 pair 为 temp_local；对着临时枝为 looking_at_temp', async () => {
+    const { dir } = await createSampleRepo();
+    const svc = await GitService.open(dir);
+    const applied = await svc.applyResolve({ into: 'main', from: 'feature/x', push: false, files: [] });
+    if ('dryRun' in applied) throw new Error('不应返回 dry-run');
+    const again = await svc.previewMerge({ into: 'main', from: 'feature/x', fetch: false });
+    expect(again.situation).toBe('temp_local');
+    expect(again.pairTempBranch?.name).toBe(applied.tempBranch);
+    const looking = await svc.previewMerge({ into: applied.tempBranch, from: 'main', fetch: false });
+    expect(looking.situation).toBe('looking_at_temp');
+    expect(looking.recoveredPair).toEqual({ into: 'main', from: 'feature/x' });
+    await expect(
+      svc.applyResolve({ into: applied.tempBranch, from: 'main', push: false, dryRun: true, files: [] })
+    ).rejects.toMatchObject({ code: 'TEMP_BRANCH_AS_PAIR' });
   });
 });
 
@@ -148,6 +289,10 @@ describe('prepareMr', () => {
     expect(prep.sourceBranch).toBe('feature/x');
     expect(prep.targetBranch).toBe('main');
     expect(prep.createMrUrl).toBeNull();
+    expect(prep.mergeGate).toMatchObject({ ok: false, code: 'NOT_LANDED' });
+    await expect(svc.assertMrOpenable({ into: 'main', from: 'feature/x' })).rejects.toMatchObject({
+      code: 'NOT_LANDED'
+    });
   });
 
   it('GitHub remote 时 platform 为 github，并拼出 compare URL', async () => {
@@ -181,6 +326,18 @@ describe('prepareMr', () => {
     if ('dryRun' in applied) throw new Error('不应返回 dry-run');
     const prep = await svc.prepareMr({ into: 'main', from: 'feature/x' });
     expect(prep.sourceBranch).toBe(applied.tempBranch);
+    expect(prep.mergeGate).toMatchObject({ ok: false, code: 'TEMP_NOT_PUSHED' });
+  });
+
+  it('冲突 pair 开单闸 CONFLICTS_UNRESOLVED，prepare 不抛', async () => {
+    const { dir } = await createConflictRepo();
+    const svc = await GitService.open(dir);
+    await expect(svc.assertMrOpenable({ into: 'main', from: 'feature' })).rejects.toMatchObject({
+      code: 'CONFLICTS_UNRESOLVED'
+    });
+    const prep = await svc.prepareMr({ into: 'main', from: 'feature' });
+    expect(prep.mergeGate).toMatchObject({ ok: false, code: 'CONFLICTS_UNRESOLVED' });
+    expect(prep.sourceBranch).toBe('feature');
   });
 });
 

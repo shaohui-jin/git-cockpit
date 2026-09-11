@@ -16,7 +16,7 @@ import type {
   PrepareMrResult
 } from './types.ts';
 import { toHttpsRemoteUrl } from './merge.ts';
-import { normalizeMrTemplate } from './mrTemplate.ts';
+import { normalizeMrTemplate, publicMrTemplate } from './mrTemplate.ts';
 import * as path from 'node:path';
 import {
   cliInstallUrl,
@@ -556,7 +556,9 @@ export async function enrichPrepareMr(options: EnrichMrOptions): Promise<Prepare
     cliError,
     cliInstallUrl: installUrl,
     candidates,
-    messages
+    messages,
+    template: publicMrTemplate(options.mr.template),
+    method: methodForRepo(options.mr, options.cwd)
   };
 }
 
@@ -568,7 +570,10 @@ export async function createPullOrMergeRequest(options: {
   body?: string;
   reviewers?: string[];
   dryRun?: boolean;
-}): Promise<CreateMrResult | { dryRun: true; command: string; args: string[]; risk: 'medium'; note: string }> {
+}): Promise<
+  | CreateMrResult
+  | { dryRun: true; command: string; args: string[]; risk: 'medium'; note: string; title: string; body: string }
+> {
   const platform = resolveMrPlatform(options.prep.platform, options.prep.remoteUrl, options.mr);
   const method: MrMethod = methodForRepo(options.mr, options.cwd);
   const title = (options.title ?? '').trim() || options.prep.title;
@@ -606,6 +611,8 @@ export async function createPullOrMergeRequest(options: {
     via = 'browser';
   }
 
+  const templateEnabled = Boolean(options.mr.template?.enabled);
+
   if (options.dryRun) {
     const note =
       via === 'token'
@@ -614,7 +621,9 @@ export async function createPullOrMergeRequest(options: {
           ? `将调用本机 gh pr create：${options.prep.sourceBranch} → ${options.prep.targetBranch}`
           : via === 'glab'
             ? `将调用本机 glab mr create：${options.prep.sourceBranch} → ${options.prep.targetBranch}`
-            : '确认后仅返回浏览器创建页 URL，不会调用 Token / CLI。';
+            : templateEnabled
+              ? '确认后仅返回浏览器创建页，不会把正文写到远程。已启用正文规范，建议改用 Token 或本机 CLI。'
+              : '确认后仅返回浏览器创建页 URL，不会调用 Token / CLI。';
     return {
       dryRun: true,
       command:
@@ -627,7 +636,9 @@ export async function createPullOrMergeRequest(options: {
               : `open ${options.prep.createMrUrl ?? ''}`,
       args: [options.prep.sourceBranch, options.prep.targetBranch],
       risk: 'medium',
-      note
+      note: body.trim() ? `${note} 正文 ${body.trim().length} 字。` : note,
+      title,
+      body
     };
   }
 
@@ -638,13 +649,22 @@ export async function createPullOrMergeRequest(options: {
     if (probe && !probe.found) {
       messages.push(probe.error ?? cliMissingHint(which!));
     }
+    if (templateEnabled) {
+      messages.push(
+        '已启用正文规范。浏览器创建页不会写入这段正文，建议在设置 → MR 配置改用 Token 或本机 CLI。'
+      );
+    }
     messages.push('未调用 Token / CLI，请用浏览器打开创建页。');
+    if (body.trim()) {
+      messages.push('请复制下面的正文，粘贴到平台创建页。');
+    }
     return {
       via: 'browser',
       url: options.prep.createMrUrl,
       sourceBranch: options.prep.sourceBranch,
       targetBranch: options.prep.targetBranch,
       title,
+      body,
       messages,
       cliInstallUrl: probe && !probe.found ? installUrl : null
     };

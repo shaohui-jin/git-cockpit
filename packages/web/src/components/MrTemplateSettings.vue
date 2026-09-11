@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, toRaw, watch } from 'vue';
+import { computed, onUnmounted, ref, toRaw, watch } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import * as api from '@/api/client';
 import { useSettingsStore } from '@/stores/settings';
@@ -13,6 +13,7 @@ const parsing = ref(false);
 const previewing = ref(false);
 const preview = ref('');
 const draft = ref<MrTemplate>(emptyDraft());
+let previewTimer: ReturnType<typeof setTimeout> | null = null;
 
 const typeOptions: Array<{ value: MrTemplateFieldType; label: string }> = [
   { value: 'textarea', label: '多行文本' },
@@ -24,6 +25,7 @@ const typeOptions: Array<{ value: MrTemplateFieldType; label: string }> = [
 const saved = computed(() => settings.mr?.template ?? null);
 const hasFillable = computed(() => draft.value.fields.some((f) => f.type !== 'markdown'));
 const dirty = computed(() => JSON.stringify(plainTemplate(draft.value)) !== JSON.stringify(plainTemplate(saved.value)));
+const draftKey = computed(() => JSON.stringify(plainTemplate(draft.value)));
 
 function emptyDraft(): MrTemplate {
   return { enabled: false, agentFill: 'allow', filename: '', sourceMd: '', fields: [] };
@@ -40,7 +42,6 @@ function normalizeDraft(t: MrTemplate | null): MrTemplate {
 
 function syncFromSaved(): void {
   draft.value = normalizeDraft(saved.value);
-  preview.value = '';
 }
 
 watch(
@@ -52,6 +53,15 @@ watch(
   { immediate: true }
 );
 
+watch(draftKey, () => {
+  if (previewTimer) clearTimeout(previewTimer);
+  previewTimer = setTimeout(() => void refreshPreview(), 400);
+});
+
+onUnmounted(() => {
+  if (previewTimer) clearTimeout(previewTimer);
+});
+
 async function refreshPreview(): Promise<void> {
   if (draft.value.fields.length === 0) {
     preview.value = '';
@@ -59,7 +69,7 @@ async function refreshPreview(): Promise<void> {
   }
   previewing.value = true;
   try {
-    const res = await api.previewMrTemplate(draft.value);
+    const res = await api.previewMrTemplate(plainTemplate(draft.value));
     preview.value = res.preview;
   } catch (err) {
     ElMessage.error(err instanceof Error ? err.message : String(err));
@@ -147,7 +157,7 @@ function addField(): void {
   draft.value.fields.push({
     id: `custom_${n}`,
     type: 'textarea',
-    label: `字段 ${n}`,
+    label: '',
     required: true,
     placeholder: '（请填写）'
   });
@@ -186,210 +196,244 @@ async function clearTemplate(): Promise<void> {
     ElMessage.error(err instanceof Error ? err.message : String(err));
   }
 }
-
-function typeLabel(t: MrTemplateFieldType): string {
-  return typeOptions.find((o) => o.value === t)?.label ?? t;
-}
 </script>
 
 <template>
-  <el-card shadow="never" class="mb tmpl-card">
-    <template #header>
-      <div class="card-head">
-        <span>MR 正文规范</span>
+  <div class="tmpl">
+    <header class="tmpl-head">
+      <div class="tmpl-head-row">
         <el-tag v-if="saved?.enabled" size="small" type="success" effect="plain">已启用</el-tag>
         <el-tag v-else-if="saved?.fields.length" size="small" effect="plain">已导入未启用</el-tag>
         <el-tag v-else size="small" effect="plain">未导入</el-tag>
-      </div>
-    </template>
-
-    <p class="mr-hint">
-      导入团队的 MR Markdown，转成填写模块。表格和引用默认当说明，不进表单。保存后 Web 与 MCP 共用这一份；开单时按字段校验下一期再接。
-    </p>
-
-    <div class="tmpl-toolbar">
-      <el-form-item label="启用规范" class="tmpl-switch">
         <el-switch v-model="draft.enabled" :disabled="!hasFillable" />
-      </el-form-item>
-      <el-form-item label="MCP 填写" class="tmpl-fill">
-        <el-radio-group v-model="draft.agentFill" :disabled="!hasFillable">
-          <el-radio value="allow">允许 AI 按字段填写</el-radio>
+        <span class="tmpl-label">启用规范</span>
+        <el-radio-group v-model="draft.agentFill" :disabled="!hasFillable" class="tmpl-fill">
+          <el-radio value="allow">允许 AI 填写</el-radio>
           <el-radio value="forbid">须人工填写</el-radio>
         </el-radio-group>
-      </el-form-item>
-    </div>
-
-    <div class="tmpl-actions">
-      <el-button :loading="parsing" @click="fileInput?.click()">导入 Markdown</el-button>
-      <el-button @click="pasteOpen = !pasteOpen">粘贴导入</el-button>
-      <el-button :disabled="draft.fields.length === 0" :loading="previewing" @click="refreshPreview">
-        刷新预览
-      </el-button>
-      <span v-if="draft.filename" class="mono muted">{{ draft.filename }}</span>
-      <input
-        ref="fileInput"
-        type="file"
-        accept=".md,.markdown,text/markdown,text/plain"
-        class="file-hidden"
-        @change="onPickFile"
-      />
-    </div>
-
-    <el-input
-      v-if="pasteOpen"
-      v-model="pasteText"
-      type="textarea"
-      :rows="8"
-      class="tmpl-paste"
-      placeholder="粘贴 MR 模板 Markdown"
-    />
-    <div v-if="pasteOpen" class="tmpl-actions">
-      <el-button type="primary" :loading="parsing" @click="importPaste">识别粘贴内容</el-button>
-    </div>
-
-    <div v-if="draft.fields.length === 0" class="mr-hint">还没有字段。先导入一份 .md，例如团队的 Default.md。</div>
-
-    <div v-for="(field, index) in draft.fields" :key="field.id + index" class="tmpl-field">
-      <div class="tmpl-field-head">
-        <el-tag size="small" effect="plain">{{ typeLabel(field.type) }}</el-tag>
-        <span class="mono muted">{{ field.id }}</span>
-        <el-button link type="danger" @click="removeField(index)">删除</el-button>
+        <span v-if="draft.filename" class="mono muted tmpl-file">{{ draft.filename }}</span>
       </div>
-      <el-form label-width="72px" label-position="left" class="tmpl-form" @submit.prevent>
-        <el-form-item label="标题">
-          <el-input v-model="field.label" />
-        </el-form-item>
-        <el-form-item label="类型">
-          <el-select :model-value="field.type" @change="(v: MrTemplateFieldType) => onTypeChange(field, v)">
-            <el-option v-for="opt in typeOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
-          </el-select>
-        </el-form-item>
-        <el-form-item v-if="field.type !== 'markdown'" label="必填">
-          <el-switch v-model="field.required" />
-        </el-form-item>
-        <el-form-item v-if="field.type !== 'markdown'" label="说明">
-          <el-input v-model="field.help" type="textarea" :rows="2" placeholder="导入时从注释带出，开单时给填写人看" />
-        </el-form-item>
-        <el-form-item v-if="field.type === 'textarea'" label="占位">
-          <el-input v-model="field.placeholder" />
-        </el-form-item>
-        <el-form-item v-if="field.type === 'select'" label="选项">
-          <div class="tmpl-list">
-            <div v-for="(_opt, oi) in field.options" :key="oi" class="tmpl-list-row">
-              <el-input v-model="field.options![oi]" />
-              <el-button link @click="removeOption(field, oi)">删</el-button>
+      <div class="tmpl-head-row">
+        <el-button :loading="parsing" @click="fileInput?.click()">导入 Markdown</el-button>
+        <el-button @click="pasteOpen = !pasteOpen">粘贴导入</el-button>
+        <el-button type="primary" :loading="settings.saving" :disabled="!dirty" @click="save">保存规范</el-button>
+        <el-button :disabled="!dirty" @click="syncFromSaved">放弃修改</el-button>
+        <el-button :disabled="!saved" @click="clearTemplate">清除</el-button>
+        <input
+          ref="fileInput"
+          type="file"
+          accept=".md,.markdown,text/markdown,text/plain"
+          class="file-hidden"
+          @change="onPickFile"
+        />
+      </div>
+    </header>
+
+    <div v-if="pasteOpen" class="tmpl-paste-bar">
+      <el-input class="gc-grow-input" v-model="pasteText" type="textarea" :rows="4" placeholder="粘贴 MR 模板 Markdown" />
+      <el-button type="primary" :loading="parsing" @click="importPaste">识别</el-button>
+    </div>
+
+    <div class="tmpl-split">
+      <section class="pane">
+        <div class="pane-head">
+          <span>结构</span>
+          <el-button link type="primary" @click="addField">添加</el-button>
+        </div>
+        <div class="pane-body">
+          <p v-if="draft.fields.length === 0" class="muted">还没有章节。导入一份 .md，或点右上角添加。</p>
+          <article v-for="(field, index) in draft.fields" :key="field.id + index" class="tmpl-field">
+            <div class="tmpl-field-head">
+              <el-select
+                :model-value="field.type"
+                class="tmpl-type"
+                @change="(v: MrTemplateFieldType) => onTypeChange(field, v)"
+              >
+                <el-option v-for="opt in typeOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+              </el-select>
+              <el-input v-model="field.label" class="tmpl-title" placeholder="标题" />
+              <el-checkbox v-if="field.type !== 'markdown'" v-model="field.required">必填</el-checkbox>
+              <span class="mono muted tmpl-id">{{ field.id }}</span>
+              <el-button link type="danger" @click="removeField(index)">删除</el-button>
             </div>
-            <el-button link type="primary" @click="addOption(field)">添加选项</el-button>
-          </div>
-        </el-form-item>
-        <el-form-item v-if="field.type === 'checkboxes'" label="条目">
-          <div class="tmpl-list">
-            <div v-for="(item, ii) in field.items" :key="item.id" class="tmpl-list-row">
-              <el-input v-model="item.label" />
-              <el-checkbox v-model="item.required">必勾</el-checkbox>
-              <el-button link @click="removeItem(field, ii)">删</el-button>
+            <el-input
+              v-if="field.type !== 'markdown'"
+              v-model="field.help"
+              type="textarea"
+              :rows="2"
+              placeholder="说明（开单时给填写人看）"
+            />
+            <el-input v-if="field.type === 'textarea'" v-model="field.placeholder" placeholder="占位" />
+            <div v-if="field.type === 'select'" class="tmpl-list">
+              <div v-for="(_opt, oi) in field.options" :key="oi" class="tmpl-list-row">
+                <el-input v-model="field.options![oi]" placeholder="选项" />
+                <el-button link @click="removeOption(field, oi)">删</el-button>
+              </div>
+              <el-button link type="primary" @click="addOption(field)">添加选项</el-button>
             </div>
-            <el-button link type="primary" @click="addItem(field)">添加条目</el-button>
-          </div>
-        </el-form-item>
-        <el-form-item v-if="field.type === 'markdown'" label="正文">
-          <el-input v-model="field.content" type="textarea" :rows="5" />
-        </el-form-item>
-      </el-form>
-    </div>
+            <div v-if="field.type === 'checkboxes'" class="tmpl-list">
+              <div v-for="(item, ii) in field.items" :key="item.id" class="tmpl-list-row">
+                <el-input v-model="item.label" placeholder="条目" />
+                <el-checkbox v-model="item.required">必勾</el-checkbox>
+                <el-button link @click="removeItem(field, ii)">删</el-button>
+              </div>
+              <el-button link type="primary" @click="addItem(field)">添加条目</el-button>
+            </div>
+            <el-input
+              v-if="field.type === 'markdown'"
+              v-model="field.content"
+              type="textarea"
+              :rows="6"
+              placeholder="说明正文"
+            />
+          </article>
+        </div>
+      </section>
 
-    <div v-if="draft.fields.length > 0" class="tmpl-actions">
-      <el-button @click="addField">添加字段</el-button>
+      <section class="pane">
+        <div class="pane-head">
+          <span>预览</span>
+          <el-button
+            link
+            type="primary"
+            :disabled="draft.fields.length === 0"
+            :loading="previewing"
+            @click="refreshPreview"
+          >
+            刷新
+          </el-button>
+        </div>
+        <pre v-if="preview" class="pane-body preview-body">{{ preview }}</pre>
+        <p v-else class="pane-body muted">导入或修改字段后，这里显示渲染出的 MR 正文。</p>
+      </section>
     </div>
-
-    <div v-if="preview" class="tmpl-preview">
-      <div class="tmpl-preview-label">渲染预览</div>
-      <pre class="tmpl-preview-body">{{ preview }}</pre>
-    </div>
-
-    <div class="tmpl-actions">
-      <el-button type="primary" :loading="settings.saving" :disabled="!dirty" @click="save">保存规范</el-button>
-      <el-button :disabled="!dirty" @click="syncFromSaved">放弃修改</el-button>
-      <el-button :disabled="!saved" @click="clearTemplate">清除</el-button>
-    </div>
-  </el-card>
+  </div>
 </template>
 
 <style scoped>
-.card-head {
+.tmpl {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: var(--gc-gap);
 }
-.mr-hint {
-  margin: 0 0 var(--gc-gap);
+.tmpl-head {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gc-gap);
+}
+.tmpl-head-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gc-gap);
+  min-height: var(--gc-line);
+}
+.tmpl-label {
   font-size: var(--gc-text);
-  line-height: 1.5;
-  color: var(--el-text-color-secondary);
+  color: var(--el-text-color-regular);
+}
+.tmpl-fill {
+  margin-left: 8px;
+}
+.tmpl-file {
+  margin-left: auto;
 }
 .muted {
+  margin: 0;
+  font-size: var(--gc-text);
   color: var(--el-text-color-secondary);
-}
-.tmpl-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--gc-gap) 24px;
-  margin-bottom: var(--gc-gap);
-}
-.tmpl-switch,
-.tmpl-fill {
-  margin-bottom: 0;
-}
-.tmpl-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--gc-gap);
-  margin: var(--gc-gap) 0;
 }
 .file-hidden {
   display: none;
 }
-.tmpl-paste {
-  margin-top: var(--gc-gap);
+.tmpl-paste-bar {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--gc-gap);
+}
+.tmpl-split {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: var(--gc-gap);
+}
+.pane {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: var(--gc-radius);
+  background: var(--el-bg-color);
+}
+.pane-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gc-gap);
+  min-height: var(--gc-line);
+  padding: 0 var(--gc-pad);
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  font-size: var(--gc-text);
+}
+.pane-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--gc-pad);
+}
+.preview-body {
+  margin: 0;
+  font-size: var(--gc-text);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  color: var(--el-text-color-regular);
 }
 .tmpl-field {
-  border-top: 1px solid var(--el-border-color-lighter);
-  padding: var(--gc-gap) 0;
+  padding-bottom: var(--gc-pad);
+  margin-bottom: var(--gc-pad);
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gc-gap);
+}
+.tmpl-field:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
 }
 .tmpl-field-head {
   display: flex;
   align-items: center;
   gap: var(--gc-gap);
   min-height: var(--gc-line);
-  margin-bottom: var(--gc-gap);
 }
-.tmpl-form {
-  max-width: 640px;
+.tmpl-type {
+  width: 120px;
+  flex: none;
+}
+.tmpl-title {
+  flex: 1;
+  min-width: 0;
+}
+.tmpl-id {
+  flex: none;
 }
 .tmpl-list {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  width: 100%;
 }
 .tmpl-list-row {
   display: flex;
   align-items: center;
   gap: var(--gc-gap);
-}
-.tmpl-preview-label {
-  font-size: var(--gc-text);
-  color: var(--el-text-color-secondary);
-  margin-bottom: 6px;
-}
-.tmpl-preview-body {
-  margin: 0;
-  padding: var(--gc-pad);
-  font-size: var(--gc-text);
-  line-height: 1.5;
-  white-space: pre-wrap;
-  background: var(--el-fill-color-lighter);
-  color: var(--el-text-color-regular);
 }
 </style>

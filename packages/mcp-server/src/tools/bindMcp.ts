@@ -8,6 +8,14 @@ import type { Runtime } from '../runtime.ts';
 import { formatResultForMcp } from './format.ts';
 import { executeTool } from './handlers.ts';
 
+const HIDE_FILES_ON_MCP = new Set(['git_apply_resolve', 'git_merge_continue', 'git_rebase_continue']);
+
+function mcpInputSchema(def: Capability): unknown {
+  if (!HIDE_FILES_ON_MCP.has(def.name)) return def.schema;
+  const schema = def.schema as { omit?: (mask: { files: true }) => unknown };
+  return typeof schema.omit === 'function' ? schema.omit({ files: true }) : def.schema;
+}
+
 export function bindMcpTools(server: McpServer, runtime: Runtime, capabilities: readonly Capability[]): void {
   for (const def of capabilities) {
     const register = server.registerTool.bind(server) as unknown as (
@@ -18,7 +26,7 @@ export function bindMcpTools(server: McpServer, runtime: Runtime, capabilities: 
 
     register(
       def.name,
-      { description: def.description, inputSchema: def.schema },
+      { description: def.description, inputSchema: mcpInputSchema(def) },
       async (args: unknown) => {
         const exec = await executeTool(def, (args ?? {}) as Record<string, unknown>, {
           runtime,

@@ -27,9 +27,14 @@ export * from './jobEngine.ts';
 export * from './db.ts';
 export {
   branchNameForMr,
+  classifyMergePair,
   defaultTempBranchName,
+  isMergeTempRef,
   isSameBranchForMr,
+  parseLandedMergeMessage,
   buildCreateMrUrl,
+  buildMergePageUrl,
+  evaluateMrMergeGate,
   pickRemoteName,
   toHttpsRemoteUrl
 } from './merge.ts';
@@ -68,7 +73,9 @@ export {
   MAX_MR_TEMPLATE_MD,
   normalizeMrTemplate,
   parseMrTemplateMarkdown,
+  publicMrTemplate,
   renderMrTemplate,
+  resolveMrCreateBody,
   validateMrTemplateFields
 } from './mrTemplate.ts';
 export { maskToken, validateMrToken, validateGithubTokenFormat, validateGitlabTokenFormat } from './mrToken.ts';

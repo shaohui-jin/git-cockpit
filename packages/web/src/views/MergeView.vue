@@ -9,10 +9,12 @@ import { useBranchesStore } from '@/stores/branches';
 import { useMergeSessionStore } from '@/stores/mergeSession';
 import { useToolAction } from '@/composables/useToolAction';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
+import MrCreateDialog from '@/components/MrCreateDialog.vue';
 import BranchTreeSelect from '@/components/BranchTreeSelect.vue';
 import ConflictResolvePanel from '@/components/ConflictResolvePanel.vue';
 import MatrixView from '@/views/MatrixView.vue';
 import type { ApplyResolveResult, BranchInfo, CreateMrResult, MergePreviewResult, PrepareMrResult, ToolExecResult } from '@/api/types';
+import { copyToClipboard } from '@/utils/clipboard';
 
 const repos = useReposStore();
 const branchStore = useBranchesStore();
@@ -31,9 +33,12 @@ const preview = ref<MergePreviewResult | null>(null);
 const applyResult = ref<ApplyResolveResult | null>(null);
 const prResult = ref<CreateMrResult | null>(null);
 const mrPrep = ref<PrepareMrResult | null>(null);
-const mrReviewers = ref<string[]>([]);
 const lastWriteTool = ref<'git_apply_resolve' | 'git_mr_create' | 'git_push' | null>(null);
 const pendingMrPair = ref<{ into: string; from: string } | null>(null);
+const mrDialogVisible = ref(false);
+const mrDialogInto = ref('');
+const mrDialogFrom = ref('');
+const mrDialogSource = ref('');
 const resolvePanel = ref<{ buildFiles: () => Array<{ path: string; resolvedContent: string }> } | null>(null);
 const resolvePending = ref(0);
 const redoRecorded = ref(false);
@@ -53,28 +58,56 @@ const truncatedConflicts = computed(() =>
   (preview.value?.conflictFiles ?? []).some((f) => (f.conflictContent ?? '').includes('超出展示上限'))
 );
 
+const situation = computed(() => preview.value?.situation ?? preview.value?.outcome ?? '');
+
 const outcomeType = computed(() => {
-  const o = preview.value?.outcome;
-  if (o === 'clean') return 'success';
-  if (o === 'unrelated') return 'warning';
-  if (o === 'conflicts') return 'danger';
+  const s = situation.value;
+  if (s === 'conflicts') return 'danger';
+  if (s === 'unrelated') return 'warning';
+  if (s === 'temp_local' || s === 'looking_at_temp') return 'info';
+  if (s === 'already_merged') return 'info';
+  if (s === 'clean' || s === 'temp_remote') return 'success';
   return 'info';
 });
 
 const outcomeLabel = computed(() => {
-  const o = preview.value?.outcome;
-  if (o === 'clean') return '可干净合并';
-  if (o === 'unrelated') return '无关历史';
-  if (o === 'conflicts') return '存在冲突';
+  const s = situation.value;
+  if (s === 'looking_at_temp') return '这是落盘临时分支';
+  if (s === 'temp_remote') return '临时分支已在远程';
+  if (s === 'temp_local') return '临时分支在本地';
+  if (s === 'already_merged') return '没有新提交';
+  if (s === 'clean') return '可干净合并';
+  if (s === 'unrelated') return '无关历史';
+  if (s === 'conflicts') return '存在冲突';
   return '';
 });
 
 const canApply = computed(() => {
   if (!canRun.value || !preview.value) return false;
   if (truncatedConflicts.value) return false;
+  const s = situation.value;
+  if (s === 'looking_at_temp' || s === 'temp_remote' || s === 'temp_local' || s === 'already_merged') return false;
   if (preview.value.outcome === 'unrelated' && preview.value.conflictFiles.length === 0) return false;
   if (preview.value.clean) return true;
   return preview.value.outcome === 'conflicts' && resolvePending.value === 0;
+});
+
+const canPushTemp = computed(() => {
+  const p = preview.value;
+  if (!p || !hasRemote.value) return false;
+  if (situation.value === 'temp_local') return Boolean(p.pairTempBranch?.name);
+  if (situation.value === 'looking_at_temp') return Boolean(p.pairTempBranch?.local && !p.pairTempBranch.remote);
+  return false;
+});
+
+const canOpenMr = computed(() => {
+  const p = preview.value;
+  if (!p) return false;
+  if (situation.value === 'temp_remote') return Boolean(p.pairTempBranch?.name);
+  if (situation.value === 'looking_at_temp') {
+    return Boolean(p.pairTempBranch?.remote && p.recoveredPair?.into);
+  }
+  return false;
 });
 
 const busy = computed(() => loading.value || matrixLoading.value);
@@ -84,35 +117,41 @@ function queryBranch(key: string): string {
   return typeof v === 'string' ? v : '';
 }
 
+function selectableBranches(list: BranchInfo[]): BranchInfo[] {
+  return list.filter((b) => !isMergeTempBranchName(b.name));
+}
+
 function pickDefaultInto(list: BranchInfo[]): string {
-  const remotesOnly = list.filter((b) => b.remote);
+  const remotesOnly = selectableBranches(list).filter((b) => b.remote);
   const prefer = ['origin/main', 'origin/master', 'origin/develop'];
   for (const name of prefer) {
     if (remotesOnly.some((b) => b.name === name)) return name;
   }
   if (remotesOnly[0]) return remotesOnly[0].name;
-  const cur = list.find((b) => b.current);
-  return cur?.name ?? list[0]?.name ?? '';
+  const cur = selectableBranches(list).find((b) => b.current);
+  return cur?.name ?? selectableBranches(list)[0]?.name ?? '';
 }
 
 function pickDefaultFrom(list: BranchInfo[], intoName: string): string {
-  const cur = list.find((b) => b.current && !b.remote);
+  const pool = selectableBranches(list);
+  const cur = pool.find((b) => b.current && !b.remote);
   if (cur && cur.name !== intoName) return cur.name;
-  const local = list.find((b) => !b.remote && b.name !== intoName);
+  const local = pool.find((b) => !b.remote && b.name !== intoName);
   return local?.name ?? '';
 }
 
 function applyDefaults(list: BranchInfo[]): void {
+  const pool = selectableBranches(list);
   const qInto = queryBranch('into');
   const qFrom = queryBranch('from');
-  if (qInto && list.some((b) => b.name === qInto)) {
+  if (qInto && pool.some((b) => b.name === qInto) && !isMergeTempBranchName(qInto)) {
     pairInto.value = qInto;
-  } else if (!pairInto.value || !list.some((b) => b.name === pairInto.value)) {
+  } else if (!pairInto.value || !pool.some((b) => b.name === pairInto.value) || isMergeTempBranchName(pairInto.value)) {
     pairInto.value = pickDefaultInto(list);
   }
-  if (qFrom && list.some((b) => b.name === qFrom)) {
+  if (qFrom && pool.some((b) => b.name === qFrom) && !isMergeTempBranchName(qFrom)) {
     pairFrom.value = qFrom;
-  } else if (!pairFrom.value || !list.some((b) => b.name === pairFrom.value)) {
+  } else if (!pairFrom.value || !pool.some((b) => b.name === pairFrom.value) || isMergeTempBranchName(pairFrom.value)) {
     pairFrom.value = pickDefaultFrom(list, pairInto.value);
   }
 }
@@ -178,30 +217,58 @@ async function runApply(): Promise<void> {
   if (!ok) lastWriteTool.value = null;
 }
 
-async function runCreatePr(): Promise<void> {
-  if (!applyResult.value) return;
-  pendingMrPair.value = { into: pairInto.value, from: pairFrom.value };
-  lastWriteTool.value = 'git_mr_create';
-  const ok = await previewAndConfirm('git_mr_create', {
-    into: pairInto.value,
-    from: pairFrom.value,
-    sourceBranch: applyResult.value.tempBranch,
-    reviewers: mrReviewers.value
-  });
-  if (!ok) {
-    lastWriteTool.value = null;
-    pendingMrPair.value = null;
+function openMrDialog(opts: { into: string; from: string; sourceBranch?: string }): void {
+  if (repoId() == null) {
+    ElMessage.warning('请先选择仓库');
+    return;
   }
+  mrDialogInto.value = opts.into;
+  mrDialogFrom.value = opts.from;
+  mrDialogSource.value = opts.sourceBranch ?? '';
+  mrDialogVisible.value = true;
 }
 
-async function onMatrixCreateMr(payload: { into: string; from: string; sourceBranch: string }): Promise<void> {
-  pendingMrPair.value = { into: payload.into, from: payload.from };
-  lastWriteTool.value = 'git_mr_create';
-  const ok = await previewAndConfirm('git_mr_create', {
-    into: payload.into,
-    from: payload.from,
-    sourceBranch: payload.sourceBranch
+function runCreatePr(): void {
+  if (applyResult.value) {
+    openMrDialog({
+      into: pairInto.value,
+      from: pairFrom.value,
+      sourceBranch: applyResult.value.tempBranch
+    });
+    return;
+  }
+  const p = preview.value;
+  if (!p || !canOpenMr.value) return;
+  const recovered = p.recoveredPair;
+  openMrDialog({
+    into: recovered?.into ?? pairInto.value,
+    from: recovered?.from ?? pairFrom.value,
+    sourceBranch: p.pairTempBranch?.name
   });
+}
+
+function runPushTempFromPreview(): void {
+  const name = preview.value?.pairTempBranch?.name;
+  if (!name) return;
+  void onMatrixPushTemp({ into: pairInto.value, from: pairFrom.value, branch: name });
+}
+
+function restoreRecoveredPair(): void {
+  const recovered = preview.value?.recoveredPair;
+  if (!recovered) return;
+  pairInto.value = recovered.into;
+  pairFrom.value = recovered.from;
+  void runPreview();
+}
+
+function onMatrixCreateMr(payload: { into: string; from: string; sourceBranch: string }): void {
+  openMrDialog(payload);
+}
+
+async function onMrCreateSubmit(payload: Record<string, unknown>): Promise<void> {
+  pendingMrPair.value = { into: String(payload.into ?? ''), from: String(payload.from ?? '') };
+  lastWriteTool.value = 'git_mr_create';
+  const ok = await previewAndConfirm('git_mr_create', payload);
   if (!ok) {
     lastWriteTool.value = null;
     pendingMrPair.value = null;
@@ -233,7 +300,6 @@ async function onConfirmed(): Promise<void> {
     applyResult.value = exec.result as ApplyResolveResult;
     prResult.value = null;
     mrPrep.value = null;
-    mrReviewers.value = [];
     session.markPairDone({ into: pairInto.value, from: pairFrom.value });
     ElMessage.success(
       fromMatrix.value || !applyResult.value.pushed
@@ -266,9 +332,23 @@ async function onConfirmed(): Promise<void> {
     pendingMrPair.value = null;
     session.markPairMr(pair, { url: prResult.value.url, via });
     ElMessage.success(
-      via === 'token' || via === 'gh' || via === 'glab' ? '已创建 PR/MR' : '已返回浏览器创建页'
+      via === 'token' || via === 'gh' || via === 'glab'
+        ? '已创建 PR/MR'
+        : prResult.value.body?.trim()
+          ? '已返回浏览器创建页，请复制正文后粘贴'
+          : '已返回浏览器创建页'
     );
   }
+}
+
+async function copyPrBody(): Promise<void> {
+  const text = prResult.value?.body?.trim() ?? '';
+  if (!text) {
+    ElMessage.warning('没有可复制的正文');
+    return;
+  }
+  const ok = await copyToClipboard(text);
+  ElMessage[ok ? 'success' : 'error'](ok ? '已复制正文' : '复制失败，请手动选择正文');
 }
 
 function trailGo(delta: number): void {
@@ -406,11 +486,11 @@ watch([pairInto, pairFrom], () => {
         <div class="filter-bar">
           <div class="field">
             <span class="field-label">合入目标 into（线上 / ours）</span>
-            <BranchTreeSelect v-model="pairInto" remote-first placeholder="选择合入目标" />
+            <BranchTreeSelect v-model="pairInto" remote-first exclude-merge-temp placeholder="选择合入目标" />
           </div>
           <div class="field">
             <span class="field-label">我的分支 from（theirs）</span>
-            <BranchTreeSelect v-model="pairFrom" placeholder="选择我的分支" />
+            <BranchTreeSelect v-model="pairFrom" exclude-merge-temp placeholder="选择我的分支" />
           </div>
           <div class="field field-switch">
             <span class="field-label">先 fetch</span>
@@ -440,7 +520,7 @@ watch([pairInto, pairFrom], () => {
         </p>
       </el-card>
 
-      <el-card v-if="preview" shadow="never" class="preview-card">
+      <el-card v-if="preview && !applyResult" shadow="never" class="preview-card gc-card-fill">
         <template #header>
           <div class="result-head">
             <el-tag :type="outcomeType" effect="dark">{{ outcomeLabel }}</el-tag>
@@ -449,10 +529,35 @@ watch([pairInto, pairFrom], () => {
             <el-button v-if="canApply" type="primary" @click="runApply">
               {{ fromMatrix ? '完成冲突处理' : '落盘并推送' }}
             </el-button>
+            <el-button v-if="canPushTemp" type="primary" @click="runPushTempFromPreview">推送临时分支</el-button>
+            <el-button v-if="canOpenMr" type="primary" @click="runCreatePr">申请 MR</el-button>
+            <el-button v-if="preview.recoveredPair && situation === 'looking_at_temp'" @click="restoreRecoveredPair">
+              切回原 pair
+            </el-button>
           </div>
         </template>
 
-        <p v-if="preview.outcome === 'conflicts'" class="tip tip-inline">
+        <p v-if="situation === 'looking_at_temp'" class="tip tip-inline">
+          合入目标是上次 worktree 落盘留下的临时分支，不是线上目标。
+          <template v-if="preview.recoveredPair">
+            原方向：{{ preview.recoveredPair.from }} → {{ preview.recoveredPair.into }}。
+          </template>
+          已推送则可申请 MR；不要再落盘。
+        </p>
+        <p v-else-if="situation === 'temp_remote'" class="tip tip-inline">
+          这对分支已有远程临时枝
+          <span class="mono">{{ preview.pairTempBranch?.name }}</span>
+          ，无需再落盘，直接申请 MR。
+        </p>
+        <p v-else-if="situation === 'temp_local'" class="tip tip-inline">
+          选边已记在本地临时枝
+          <span class="mono">{{ preview.pairTempBranch?.name }}</span>
+          。推送后即可申请 MR，无需再落盘。
+        </p>
+        <p v-else-if="situation === 'already_merged'" class="tip tip-inline">
+          「我的分支」已经包含在合入目标里，没有可合并的新提交，无需操作。
+        </p>
+        <p v-else-if="preview.outcome === 'conflicts'" class="tip tip-inline">
           {{ truncatedConflicts
             ? '冲突文件超过展示上限，无法在网页选边。请缩小范围或提高 maxFiles。'
             : fromMatrix
@@ -469,7 +574,7 @@ watch([pairInto, pairFrom], () => {
         </p>
 
         <ConflictResolvePanel
-          v-if="preview.outcome === 'conflicts' && preview.conflictFiles.length"
+          v-if="situation === 'conflicts' && preview.conflictFiles.length"
           ref="resolvePanel"
           :files="preview.conflictFiles"
           :repo-id="repoId()"
@@ -477,55 +582,95 @@ watch([pairInto, pairFrom], () => {
           :from="pairFrom"
           @progress="resolvePending = $event.pending"
         />
-        <el-empty v-else-if="preview.clean" description="没有冲突文件" />
+        <el-empty
+          v-else-if="situation === 'already_merged'"
+          description="没有可合并的新提交，无需操作"
+        />
+        <el-empty v-else-if="preview.clean && canApply" description="没有冲突文件" />
       </el-card>
 
-      <el-card v-if="applyResult" shadow="never" class="apply-card">
-        <template #header>落盘结果</template>
-        <p class="tip">临时分支 <span class="mono">{{ applyResult.tempBranch }}</span> · 提交 <span class="mono">{{ applyResult.commitSha.slice(0, 7) }}</span></p>
-        <p v-if="applyResult.createMrUrl" class="tip">
+      <el-card v-if="applyResult" shadow="never" class="apply-card gc-card-fill">
+        <template #header>
+          <div class="result-head">
+            <el-tag type="success" effect="dark">已落盘</el-tag>
+            <span class="mono sha">{{ applyResult.tempBranch }}</span>
+            <el-tag v-if="applyResult.pushed" type="success" effect="plain" size="small">已推送</el-tag>
+            <el-tag v-else type="info" effect="plain" size="small">仅本地</el-tag>
+          </div>
+        </template>
+        <dl class="apply-meta">
+          <div>
+            <dt>临时分支</dt>
+            <dd class="mono">{{ applyResult.tempBranch }}</dd>
+          </div>
+          <div>
+            <dt>提交</dt>
+            <dd class="mono">{{ applyResult.commitSha.slice(0, 7) }}</dd>
+          </div>
+        </dl>
+        <p v-if="applyResult.createMrUrl" class="apply-link">
           <a :href="applyResult.createMrUrl" target="_blank" rel="noreferrer">打开创建 MR/PR 页面</a>
         </p>
-        <p v-if="mrPrep?.cliError && !mrPrep.cli" class="tip">{{ mrPrep.cliError }}</p>
-        <p v-if="mrPrep?.cliInstallUrl && !mrPrep.cli" class="tip">
+        <el-alert
+          v-if="mrPrep?.cliError && !mrPrep.cli"
+          type="warning"
+          :closable="false"
+          :title="mrPrep.cliError"
+        />
+        <p v-if="mrPrep?.cliInstallUrl && !mrPrep.cli" class="apply-link">
           官方下载：
           <a :href="mrPrep.cliInstallUrl" target="_blank" rel="noreferrer">{{ mrPrep.cliInstallUrl }}</a>
         </p>
-        <div class="tip">
-          <span class="field-label">审核人</span>
-          <el-select
-            v-model="mrReviewers"
-            multiple
-            filterable
-            allow-create
-            default-first-option
-            placeholder="可选，回车添加用户名"
-            style="min-width: 240px"
-          >
-            <el-option
-              v-for="c in mrPrep?.candidates ?? []"
-              :key="c.username"
-              :label="c.name ? `${c.username}（${c.name}）` : c.username"
-              :value="c.username"
-            />
-          </el-select>
+        <div class="apply-actions gc-gap-btns">
+          <el-button type="primary" @click="runCreatePr">创建 PR/MR</el-button>
+          <el-button @click="runPreview">重新预演</el-button>
         </div>
-        <p class="tip">
-          <el-button type="primary" size="small" @click="runCreatePr">创建 PR/MR</el-button>
-          <el-button size="small" @click="router.push({ path: '/settings' })">MR 配置</el-button>
-        </p>
-        <p v-if="prResult?.url" class="tip">
+      </el-card>
+
+      <el-card v-if="prResult" shadow="never" class="apply-card">
+        <template #header>
+          <div class="result-head">
+            <el-tag :type="prResult.via === 'browser' ? 'info' : 'success'" effect="dark">
+              {{ prResult.via === 'browser' ? '浏览器创建页' : '已开单' }}
+            </el-tag>
+            <span class="mono sha">{{ prResult.sourceBranch }} → {{ prResult.targetBranch }}</span>
+          </div>
+        </template>
+        <el-alert
+          v-for="(msg, i) in prResult.messages"
+          :key="i"
+          class="mb"
+          :type="msg.includes('建议') ? 'warning' : 'info'"
+          :closable="false"
+          :title="msg"
+        />
+        <p v-if="prResult.url" class="apply-link">
           <a :href="prResult.url" target="_blank" rel="noreferrer">{{
             prResult.via === 'browser' ? '打开创建页' : `已创建${prResult.number != null ? ' #' + prResult.number : ''}`
           }}</a>
         </p>
-        <p v-if="prResult?.cliInstallUrl" class="tip">
+        <p v-if="prResult.cliInstallUrl" class="apply-link">
           未检测到本机 CLI，请自行安装：
           <a :href="prResult.cliInstallUrl" target="_blank" rel="noreferrer">{{ prResult.cliInstallUrl }}</a>
         </p>
+        <div v-if="prResult.via === 'browser' && prResult.body?.trim()" class="pr-body">
+          <header>
+            <strong>待粘贴正文</strong>
+            <el-button size="small" @click="copyPrBody">复制正文</el-button>
+          </header>
+          <pre>{{ prResult.body }}</pre>
+        </div>
       </el-card>
     </template>
 
+    <MrCreateDialog
+      v-model="mrDialogVisible"
+      :repo-id="repoId()"
+      :into="mrDialogInto"
+      :from="mrDialogFrom"
+      :source-branch="mrDialogSource || undefined"
+      @submit="onMrCreateSubmit"
+    />
     <ConfirmDialog
       v-model:visible="confirmVisible"
       :tool="pending?.tool ?? ''"
@@ -593,25 +738,44 @@ watch([pairInto, pairFrom], () => {
 .filter-card {
   flex-shrink: 0;
 }
-.preview-card {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-.preview-card :deep(.el-card__body) {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-.preview-card :deep(.el-card__header) {
-  flex-shrink: 0;
-}
+.preview-card,
 .apply-card {
-  flex-shrink: 0;
+  flex: 1;
+  min-height: 0;
+}
+.apply-meta {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gc-gap);
+}
+.apply-meta > div {
+  display: flex;
+  align-items: baseline;
+  gap: var(--gc-pad);
+  min-height: var(--gc-line);
+}
+.apply-meta dt {
+  flex: none;
+  width: 64px;
+  color: var(--el-text-color-secondary);
+}
+.apply-meta dd {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.apply-link {
+  margin: var(--gc-gap) 0 0;
+  font-size: var(--gc-text);
+}
+.apply-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--gc-gap);
+  margin-top: var(--gc-pad);
 }
 .filter-bar {
   display: flex;
@@ -653,5 +817,29 @@ watch([pairInto, pairFrom], () => {
 .sha {
   font-size: var(--gc-text);
   color: var(--el-text-color-secondary);
+}
+.mb { margin-bottom: var(--gc-gap); }
+.pr-body {
+  margin-top: var(--gc-pad);
+  padding: var(--gc-gap) var(--gc-pad);
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--gc-radius);
+  background: var(--el-fill-color-lighter);
+}
+.pr-body header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--gc-gap);
+}
+.pr-body pre {
+  margin: 0;
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: var(--gc-text);
+  line-height: 1.5;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 </style>

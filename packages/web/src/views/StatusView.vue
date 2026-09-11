@@ -754,7 +754,7 @@ onUnmounted(() => {
 
     <div v-else class="status-layout">
       <!-- 左：分支树 -->
-      <el-card v-if="contentMode === 'workspace'" shadow="never" class="branch-panel">
+      <el-card v-if="contentMode === 'workspace'" shadow="never" class="branch-panel gc-card-fill gc-card-fill--tight">
         <template #header>
           <div class="panel-head">
             <span class="panel-title">分支 Branch</span>
@@ -774,7 +774,7 @@ onUnmounted(() => {
               node-key="key"
               default-expand-all
               :indent="14"
-              class="branch-tree"
+              class="branch-tree gc-tree gc-tree-compact"
             >
               <template #default="{ data }">
                 <span v-if="!data.branch" class="tree-dir" :title="data.fullName || data.label">{{ data.label }}</span>
@@ -834,7 +834,7 @@ onUnmounted(() => {
         <!-- 工具栏 -->
         <el-card shadow="never" class="toolbar-card">
           <div class="toolbar">
-            <div class="toolbar-group">
+            <div class="toolbar-group gc-gap-btns">
               <el-button type="primary" @click="commitVisible = true">提交 Commit</el-button>
               <el-button plain @click="stageAll">暂存全部</el-button>
               <el-button plain :disabled="(status?.staged.length ?? 0) === 0" @click="unstageAll">取消暂存全部</el-button>
@@ -904,18 +904,18 @@ onUnmounted(() => {
         />
 
         <!-- 更改文件 -->
-        <el-card shadow="never" class="changes-card">
+        <el-card shadow="never" class="changes-card gc-card-fill gc-card-fill--flush">
           <template #header>
             <div class="card-head">
               <span class="card-title">更改 Changes</span>
-              <div class="card-actions">
+              <div class="card-actions gc-gap-btns">
                 <el-tag v-if="checkedCount" size="small" type="primary" effect="plain">已选 {{ checkedCount }}</el-tag>
                 <el-button size="small" text @click="checkAllCurrentTab">全选本组</el-button>
                 <el-button v-if="checkedCount" size="small" text type="danger" @click="clearChecked">清除选择</el-button>
               </div>
             </div>
           </template>
-          <el-tabs v-model="activeTab" class="changes-tabs">
+          <el-tabs v-model="activeTab" class="changes-tabs gc-tabs-fill">
             <el-tab-pane v-for="t in tabs" :key="t.key" :name="t.key">
               <template #label>
                 <span class="tab-label">
@@ -932,10 +932,10 @@ onUnmounted(() => {
                 node-key="key"
                 default-expand-all
                 :indent="12"
-                class="change-tree"
+                class="change-tree gc-tree gc-tree-files"
               >
                 <template #default="{ data }">
-                  <div v-if="data.file" class="change-file">
+                  <div v-if="data.file" class="change-file gc-gap-btns">
                     <el-checkbox :model-value="isChecked(data.file.path)" @click.stop @change="toggleChecked(data.file.path)" />
                     <span class="file-status" :class="statusClass(data.file)">{{ statusLetter(data.file) }}</span>
                     <span class="file-path mono" :title="data.file.path">{{ data.label }}</span>
@@ -961,17 +961,17 @@ onUnmounted(() => {
           </el-tabs>
         </el-card>
 
-        <el-card shadow="never" class="history-card">
+        <el-card shadow="never" class="history-card gc-card-fill gc-card-fill--flush">
           <template #header>
             <div class="card-head">
               <span class="card-title">记录 Records</span>
-              <div class="card-actions">
+              <div class="card-actions gc-gap-btns">
                 <el-button size="small" text @click="openWorktreeDialog">添加 worktree</el-button>
                 <el-button size="small" text @click="loadStashes(); loadWorktrees(); loadBackupsAndReflog()">刷新</el-button>
               </div>
             </div>
           </template>
-          <el-tabs v-model="historyTab" class="history-tabs">
+          <el-tabs v-model="historyTab" class="history-tabs gc-tabs-fill">
             <el-tab-pane name="stash">
               <template #label>Stash（{{ stashes.length }}）</template>
               <div v-if="stashes.length === 0" class="file-empty">没有暂存的更改</div>
@@ -1175,13 +1175,13 @@ onUnmounted(() => {
       <div v-if="stashCandidates.length" class="stash-files">
         <div class="stash-files-head">
           <span class="stash-files-title">选择文件（已选 {{ checkedCount }}）</span>
-          <div class="card-actions">
+          <div class="card-actions gc-gap-btns">
             <el-button size="small" text @click="checkAllCandidates">全选</el-button>
             <el-button size="small" text @click="clearChecked">清除选择</el-button>
           </div>
         </div>
         <div class="file-list compact">
-          <div v-for="p in stashCandidates" :key="p" class="file-row">
+          <div v-for="p in stashCandidates" :key="p" class="file-row gc-gap-btns">
             <el-checkbox :model-value="isChecked(p)" @change="toggleChecked(p)" />
             <span class="file-status" :class="status?.untracked.includes(p) ? 'new' : 'mod'">
               {{ status?.untracked.includes(p) ? '?' : 'M' }}
@@ -1338,13 +1338,6 @@ onUnmounted(() => {
   flex-direction: column;
   height: 100%;
 }
-.branch-panel :deep(.el-card__body) {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  padding: var(--gc-gap);
-}
 .panel-head {
   display: flex;
   justify-content: space-between;
@@ -1370,20 +1363,6 @@ onUnmounted(() => {
 /* 分支树（el-tree）紧凑适配 */
 .branch-tree {
   background: transparent;
-  --el-tree-node-hover-bg-color: var(--el-fill-color-extra-light);
-}
-.branch-tree :deep(.el-tree-node__content) {
-  height: var(--gc-control);
-  padding-right: 4px;
-}
-.branch-tree :deep(.el-tree-node__expand-icon) {
-  font-size: 11px;
-  flex: none;
-}
-.branch-tree :deep(.branch-node),
-.branch-tree :deep(.tree-dir) {
-  flex: 1;
-  min-width: 0;
 }
 .tree-dir {
   font-size: var(--gc-text);
@@ -1500,23 +1479,11 @@ onUnmounted(() => {
   align-items: center;
   gap: var(--gc-gap);
 }
-.toolbar-group :deep(.el-button + .el-button) {
-  margin-left: 0;
-}
 
 /* 更改卡片：弹性占位，Tab 内容内部滚动 */
 .changes-card {
   flex: 1 1 0;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-.changes-card :deep(.el-card__body) {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  padding: 0 var(--gc-pad) var(--gc-gap);
 }
 .card-head {
   display: flex;
@@ -1532,27 +1499,9 @@ onUnmounted(() => {
   align-items: center;
   gap: var(--gc-gap);
 }
-.card-actions :deep(.el-button + .el-button) {
-  margin-left: 0;
-}
 .changes-tabs {
   flex: 1;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-.changes-tabs :deep(.el-tabs__header) {
-  flex: none;
-}
-.changes-tabs :deep(.el-tabs__content) {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-.changes-tabs :deep(.el-tab-pane) {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
 }
 .tab-label {
   display: inline-flex;
@@ -1582,20 +1531,6 @@ onUnmounted(() => {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  background: transparent;
-  --el-tree-node-hover-bg-color: var(--el-fill-color-extra-light);
-}
-.change-tree :deep(.el-tree-node__content) {
-  height: var(--gc-line);
-  padding-right: var(--gc-pad);
-}
-.change-tree :deep(.el-tree-node__expand-icon) {
-  font-size: 11px;
-  flex: none;
-  padding: 0 2px;
-}
-.change-tree :deep(.el-tree-node__expand-icon.is-leaf) {
-  visibility: hidden;
 }
 .change-file,
 .change-dir {
@@ -1605,9 +1540,6 @@ onUnmounted(() => {
   align-items: center;
   gap: var(--gc-gap);
   height: var(--gc-line);
-}
-.change-file :deep(.el-button + .el-button) {
-  margin-left: 0;
 }
 .dir-name {
   flex: 1;
@@ -1635,9 +1567,6 @@ onUnmounted(() => {
   height: var(--gc-line);
   padding: 0 var(--gc-pad);
   border-bottom: 1px solid var(--el-border-color-lighter);
-}
-.file-row :deep(.el-button + .el-button) {
-  margin-left: 0;
 }
 .file-row:last-child {
   border-bottom: none;
@@ -1680,34 +1609,10 @@ onUnmounted(() => {
 .history-card {
   flex: 1 1 0;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-.history-card :deep(.el-card__body) {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  padding: 0 var(--gc-pad) var(--gc-gap);
 }
 .history-tabs {
   flex: 1;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-.history-tabs :deep(.el-tabs__header) {
-  flex: none;
-}
-.history-tabs :deep(.el-tabs__content) {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-.history-tabs :deep(.el-tab-pane) {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
 }
 .stash-list {
   flex: 1;

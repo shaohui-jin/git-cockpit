@@ -8,7 +8,7 @@ export const mergeCapabilities: Capability[] = [
   {
     name: 'git_merge_preview',
     description:
-      '用 git merge-tree 预演把 from 合入 into（不改工作区）。into=合入目标/线上/ours，from=我的分支/theirs。返回是否可干净合并及冲突文件列表。禁止用 git_merge 做预演。Git >= 2.38。',
+      '用 git merge-tree 预演把 from 合入 into（不改工作区）。into=合入目标/线上/ours，from=我的分支/theirs。有冲突时带 webUrl 给网页选边；Agent 不要选边、不要传 files、不要 git_mr_create。禁止用 git_merge 做预演。Git >= 2.38。',
     risk: 'readonly',
     schema: S.GitMergePreviewSchema,
     handler: async (args: Args, ctx) =>
@@ -23,7 +23,7 @@ export const mergeCapabilities: Capability[] = [
   {
     name: 'git_merge_rehearse',
     description:
-      '完整合并预演：冲突文件 + diff3 冲突正文 + ours/theirs/base（仍不改工作区）。MCP 默认只回路径摘要；要正文请带 path 或 detail=true。选边后把 files 交给 git_apply_resolve。into/from 同 git_merge_preview。',
+      '完整合并预演：冲突文件 + diff3 冲突正文 + ours/theirs/base（仍不改工作区）。MCP 默认只回路径摘要；要正文请带 path 或 detail=true。有冲突只给人网页选边，Agent 不要选边、不要把 files 交给 git_apply_resolve。into/from 同 git_merge_preview。',
     risk: 'readonly',
     schema: S.GitMergeRehearseSchema,
     handler: async (args: Args, ctx) => {
@@ -50,7 +50,7 @@ export const mergeCapabilities: Capability[] = [
   {
     name: 'git_merge_blame',
     description:
-      '对单个冲突文件两侧 tip 跑 git blame（不改工作区）。返回红块相关区间的作者/说明/时间，供选边参考。不是自动选边。into/from 同 git_merge_preview。',
+      '对单个冲突文件两侧 tip 跑 git blame（不改工作区）。返回红块相关区间的作者/说明/时间，给人看。不是选边，Agent 不要据此改文件。into/from 同 git_merge_preview。',
     risk: 'readonly',
     schema: S.GitMergeBlameSchema,
     handler: async (args: Args, ctx) =>
@@ -107,7 +107,7 @@ export const mergeCapabilities: Capability[] = [
   },
   {
     name: 'git_merge',
-    description: '把指定分支合并到当前分支（普通合并）。产生冲突时会提示解决。支持 dry_run 预览。',
+    description: '把指定分支合并到当前分支（普通合并）。产生冲突时停止，不要选边、不要用本工具冒充预演。支持 dry_run 预览。',
     risk: 'write',
     schema: S.GitMergeSchema,
     handler: async (args: Args, ctx) =>
@@ -124,7 +124,7 @@ export const mergeCapabilities: Capability[] = [
   {
     name: 'git_merge_continue',
     description:
-      '继续当前工作区 merge。可把 files[{path,resolvedContent}] 写入工作区并 git add 后再 continue。不是 git_apply_resolve。',
+      '继续当前工作区 merge。冲突须人先在编辑器或网页解决；Agent 不要传 files / resolvedContent。不是 git_apply_resolve。',
     risk: 'write',
     schema: S.GitMergeContinueSchema,
     handler: async (args: Args, ctx) =>
@@ -136,7 +136,7 @@ export const mergeCapabilities: Capability[] = [
   {
     name: 'git_apply_resolve',
     description:
-      '在独立 git worktree 中把 from 合入 into 并提交到临时分支（主工作区不切换）。干净合并 files 可空；有冲突必须提供 files。默认 push 临时分支。不要用工作区 git_merge 代替本工具。',
+      '在独立 git worktree 中把 from 合入 into 并提交到临时分支（主工作区不切换）。仅干净合并可落盘；有冲突不要调用，把 preview 的 webUrl 给人在网页选边。Agent 禁止传 files / resolvedContent。默认 push 临时分支。不要用工作区 git_merge 代替本工具。',
     risk: 'write',
     schema: S.GitApplyResolveSchema,
     handler: async (args: Args, ctx) =>

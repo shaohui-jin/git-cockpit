@@ -265,7 +265,7 @@ onMounted(() => {
       </div>
     </el-card>
 
-    <el-card shadow="never" class="list-card">
+    <el-card shadow="never" class="list-card gc-card-fill">
       <template #header>
         <div class="list-header">
           <div class="summary-chips">
@@ -359,18 +359,6 @@ onMounted(() => {
 .list-card {
   flex: 1;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-.list-card :deep(.el-card__header) {
-  flex: none;
-}
-.list-card :deep(.el-card__body) {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
 }
 .open-row {
   display: flex;

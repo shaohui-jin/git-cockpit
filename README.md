@@ -113,21 +113,21 @@ git-cockpit start
 **2. 合不合得进去，以及写进仓库**  
 先看工作区是不是已经卡在 merge / rebase 里。卡住了走第 3 条，不要走这条。
 
-问能不能合进去时，只做预演，**不要**在当前工作区执行 merge。`into` 是要合进去的目标（线上），`from` 是你的分支。有冲突时把正文给人看、人选边，不要让模型自动选。
+问能不能合进去时，只做预演，**不要**在当前工作区执行 merge。`into` 是要合进去的目标（线上），`from` 是你的分支。有冲突时把 `webUrl` 给人打开合并页（`/#/merge?into=&from=&preview=1`），然后停止。不要选边，不要传 `files` / `resolvedContent`，不要在冲突时 `git_mr_create`（含 dry_run）。
 
-看完要写进仓库：用独立目录落盘，不要切走你正在干活的分支。
+看完要写进仓库：仅干净合并才用独立目录落盘，不要切走你正在干活的分支。人口头说解决了不算：用原来的 into/from 再预演，认这一对的 `merge/<from>-into-<into>`（或 `origin/merge/…`）。别人的 `merge/*` 当噪音。
 
-对应工具：`git_merge_preview` / `git_merge_rehearse`（冲突行是谁改的用 `git_merge_blame`）→ `git_apply_resolve`。禁止用 `git_merge` 冒充预演。
+对应工具：`git_merge_preview` / `git_merge_rehearse`（冲突行是谁改的用 `git_merge_blame`，只读）。干净才 `git_apply_resolve`。禁止用 `git_merge` 冒充预演。
 
 **3. 工作区已经卡在 merge 或 rebase 里**  
-这是另一回事：冲突已经发生在当前目录了。看状态，然后继续或放弃。不要用第 2 条的「预演落盘」去收尾。
+这是另一回事：冲突已经发生在当前目录了。看状态。人先在编辑器或网页解决，再继续或放弃。不要传 `files`，不要用第 2 条的「预演落盘」去收尾。
 
-对应工具：`git_status`（看 `operation`）→ `git_merge_continue` / `git_rebase_continue` 或 abort。禁止用 `git_apply_resolve`。
+对应工具：`git_status`（看 `operation`）→ `git_merge_continue` / `git_rebase_continue`（不要带 `files`）或 abort。禁止用 `git_apply_resolve`。
 
 **4. 开 Pull Request / Merge Request**  
-先准备标题和目标分支等信息，再创建。登录用的 Token 写在网页设置里，不要塞进工具参数。
+先 `git_merge_preview`。有冲突不要 `git_mr_create`（含 dry_run），把 `webUrl` 给人在网页选边。干净则落盘并推送临时枝，再 `git_mr_prepare`；只有 `mergeGate.ok` 才 `git_mr_create`，且只 dry_run 预览正文，不要把干跑当确认开单。登录用的 Token 写在网页设置里，不要塞进工具参数。
 
-对应工具：`git_mr_prepare` → `git_mr_create`。
+对应工具：`git_merge_preview` →（冲突则停）`git_apply_resolve` / `git_push` → `git_mr_prepare` → `git_mr_create`（只 dry_run）。
 
 宿主可插入这四条 Prompt（名字：`safe_commit` / `merge_preview_apply` / `workspace_continue` / `open_mr`），正文即上面四段。只读状态也可读 Resource：`git-cockpit://repos`、`git-cockpit://repo/current`、`git-cockpit://jobs`、`git-cockpit://jobs/{id}`。
 

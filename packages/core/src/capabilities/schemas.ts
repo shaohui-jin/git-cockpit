@@ -219,7 +219,7 @@ const continueFiles = z
     })
   )
   .optional()
-  .describe('已解决冲突的文件；写入工作区并 git add 后再 continue。已在编辑器解决并可为空');
+  .describe('仅网页传入已解决文件。MCP/Agent 禁止填写');
 
 export const GitMergeAbortSchema = z.object({ ...writeBase });
 export type GitMergeAbortArgs = z.infer<typeof GitMergeAbortSchema>;
@@ -322,7 +322,7 @@ export const GitApplyResolveSchema = z.object({
       })
     )
     .optional()
-    .describe('已解决冲突的文件。干净合并可省略或传空数组'),
+    .describe('仅网页传入已解决文件。MCP/Agent 禁止填写；有冲突请给人网页选边'),
   push: z.boolean().optional().describe('是否推送临时分支，缺省 true'),
   keepLocal: z.boolean().optional().describe('推送失败时仍保留本地临时分支'),
   tempBranch: z.string().optional().describe('自定义临时分支名；缺省 merge/<from>-into-<into>')
@@ -346,7 +346,11 @@ export const GitMrCreateSchema = z.object({
   ...writeBase,
   ...mrIntoFrom,
   title: z.string().optional().describe('PR 标题；缺省 Merge <source> into <target>'),
-  body: z.string().optional().describe('PR 正文'),
+  body: z.string().optional().describe('PR 正文。启用正文规范时忽略，改走 fields'),
+  fields: z
+    .record(z.unknown())
+    .optional()
+    .describe('正文规范字段（id → 值）。设置里启用规范时必填，由服务端渲染 body'),
   reviewers: z.array(z.string()).optional().describe('审核人/指派人用户名；GitLab 会解析成数字 id。Token 不在此传入')
 });
 export type GitMrCreateArgs = z.infer<typeof GitMrCreateSchema>;

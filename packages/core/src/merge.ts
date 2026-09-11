@@ -6,7 +6,7 @@ import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { GitOperationError } from './types.ts';
-import type { ConflictFile, GitCommandResult } from './types.ts';
+import type { ConflictFile, GitCommandResult, MergeOutcome, MergePairSituation, MrMergeGate, TempBranchState } from './types.ts';
 
 const MAX_CHARS = 24_000;
 const HUNK_END = '>>>>>>>';
@@ -125,6 +125,105 @@ function slugRef(ref: string, remotes: string[] = ['origin']): string {
 /** 落盘用临时分支名：`merge/<from>-into-<into>` */
 export function defaultTempBranchName(into: string, from: string, remotes: string[] = ['origin']): string {
   return `merge/${slugRef(from, remotes)}-into-${slugRef(into, remotes)}`;
+}
+
+/** 本地 `merge/…` 或远程 `origin/merge/…`（worktree 落盘留下的枝，不是线上目标） */
+export function isMergeTempRef(ref: string, remotes: string[] = ['origin']): boolean {
+  return branchNameForMr(ref, remotes).startsWith('merge/');
+}
+
+/** 落盘提交说明：`merge: from into into via temp` / `resolve: merge from into into via temp` */
+export function parseLandedMergeMessage(
+  body: string
+): { from: string; into: string; tempBranch: string } | null {
+  const text = body.replace(/\r\n/g, '\n').trim();
+  const resolve = text.match(/^resolve: merge (.+) into (.+) via (.+)$/m);
+  if (resolve?.[1] && resolve[2] && resolve[3]) {
+    return { from: resolve[1].trim(), into: resolve[2].trim(), tempBranch: resolve[3].trim() };
+  }
+  const clean = text.match(/^merge: (.+) into (.+) via (.+)$/m);
+  if (!clean?.[1] || !clean[2] || !clean[3]) return null;
+  return { from: clean[1].trim(), into: clean[2].trim(), tempBranch: clean[3].trim() };
+}
+
+export function classifyMergePair(input: {
+  outcome: MergeOutcome;
+  alreadyUpToDate: boolean;
+  intoIsTemp: boolean;
+  fromIsTemp: boolean;
+  tempBranch?: TempBranchState | null;
+  tempStale?: boolean;
+}): MergePairSituation {
+  if (input.intoIsTemp || input.fromIsTemp) return 'looking_at_temp';
+  if (input.tempBranch && !input.tempStale) {
+    return input.tempBranch.remote ? 'temp_remote' : 'temp_local';
+  }
+  if (input.alreadyUpToDate) return 'already_merged';
+  return input.outcome;
+}
+
+/** 合并页人工选边地址（hash 路由）。 */
+export function buildMergePageUrl(into: string, from: string, origin?: string): string {
+  const host = process.env.GIT_COCKPIT_HOST?.trim() || 'localhost';
+  const port = process.env.GIT_COCKPIT_PORT?.trim() || '3000';
+  const base = (origin || `http://${host}:${port}`).replace(/\/+$/, '');
+  const q = new URLSearchParams({ into, from, preview: '1', mode: 'pair' });
+  return `${base}/#/merge?${q.toString()}`;
+}
+
+/**
+ * 开单闸：冲突 / 未落盘 / 临时枝未推 都不能 git_mr_create（含 dryRun）。
+ * looking_at_temp 且临时枝未在远程 → 与网页 canOpenMr 一致，先推送。
+ */
+export function evaluateMrMergeGate(input: {
+  situation: MergePairSituation | 'unknown';
+  into: string;
+  from: string;
+  pairTempBranch?: TempBranchState | null;
+}): MrMergeGate {
+  const webUrl = buildMergePageUrl(input.into, input.from);
+  const base = { situation: input.situation, webUrl };
+  const remoteTemp = Boolean(input.pairTempBranch?.remote);
+  switch (input.situation) {
+    case 'temp_remote':
+      return { ok: true, code: 'OK', message: '临时枝已推送，可以开单', ...base };
+    case 'looking_at_temp':
+      if (remoteTemp) {
+        return { ok: true, code: 'OK', message: '临时枝已推送，可以开单', ...base };
+      }
+      return {
+        ok: false,
+        code: 'TEMP_NOT_PUSHED',
+        message: '选边已记在本地临时枝，请先推送再开单',
+        ...base
+      };
+    case 'temp_local':
+      return {
+        ok: false,
+        code: 'TEMP_NOT_PUSHED',
+        message: '选边已记在本地临时枝，请先推送再开单',
+        ...base
+      };
+    case 'already_merged':
+      return { ok: false, code: 'ALREADY_MERGED', message: '没有可合并的新提交，无需开单', ...base };
+    case 'clean':
+      return { ok: false, code: 'NOT_LANDED', message: '可干净合并，请先落盘再开单', ...base };
+    case 'conflicts':
+    case 'unrelated':
+      return {
+        ok: false,
+        code: 'CONFLICTS_UNRESOLVED',
+        message: '有冲突：请在网页选边，或告知已解决冲突的分支后再预演',
+        ...base
+      };
+    default:
+      return {
+        ok: false,
+        code: 'CONFLICTS_UNRESOLVED',
+        message: '尚未确认能否合入，请先 git_merge_preview',
+        ...base
+      };
+  }
 }
 
 /**

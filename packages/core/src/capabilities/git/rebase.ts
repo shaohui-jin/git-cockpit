@@ -6,7 +6,7 @@ type Args = Record<string, unknown> & { repoPath?: string; dryRun?: boolean };
 export const rebaseCapabilities: Capability[] = [
   {
     name: 'git_rebase',
-    description: '把当前分支变基到指定分支（重写提交历史，高风险，产生冲突需手动解决后 git rebase --continue）。',
+    description: '把当前分支变基到指定分支（重写提交历史，高风险）。产生冲突时停止，Agent 不要选边。',
     risk: 'dangerous',
     schema: S.GitRebaseSchema,
     handler: async (args: Args, ctx) =>
@@ -21,7 +21,7 @@ export const rebaseCapabilities: Capability[] = [
   },
   {
     name: 'git_rebase_continue',
-    description: '继续当前工作区 rebase。可把 files 写入工作区并 git add 后再 continue。冲突须先解决。',
+    description: '继续当前工作区 rebase。冲突须人先在编辑器或网页解决；Agent 不要传 files / resolvedContent。',
     risk: 'write',
     schema: S.GitRebaseContinueSchema,
     handler: async (args: Args, ctx) =>

@@ -51,8 +51,7 @@ describe('summarizeForAgent', () => {
     ) as { conflictFiles: Array<{ conflictContent?: string; path: string }>; next: unknown[] };
     expect(out.conflictFiles[0]?.conflictContent).toBeUndefined();
     expect(out.conflictFiles[0]?.path).toBe('a.ts');
-    expect(out.next?.[0]).toMatchObject({ tool: 'git_merge_rehearse', args: { path: 'a.ts' } });
-    expect(out.next?.[1]).toMatchObject({ tool: 'git_apply_resolve' });
+    expect(out.next).toBeUndefined();
   });
 
   it('git_status 脏工作区附 next git_add', () => {

@@ -53,13 +53,13 @@ git-cockpit version # 输出版本号
 **1. 提交** — 先看改了什么，再暂存、再提交。写之前先 `dry_run=true`。  
 `git_status` → `git_diff` → 按需 `git_add` → `git_commit`。
 
-**2. 合不合得进去，以及写进仓库** — 先看工作区是不是已经卡在 merge / rebase 里（卡住了走第 3 条）。问能不能合时只做预演，不要在当前目录 merge。`into` 是线上目标，`from` 是你的分支。人选边，模型不要自动选。写进仓库用独立目录落盘（`git_apply_resolve`），不要用 `git_merge` 冒充预演。
+**2. 合不合得进去，以及写进仓库** — 先看工作区是不是已经卡在 merge / rebase 里（卡住了走第 3 条）。问能不能合时只做预演，不要在当前目录 merge。`into` 是线上目标，`from` 是你的分支。有冲突把 `webUrl` 给人打开合并页，然后停止。不要选边，不要传 `files`。不要 `git_mr_create`（含 dry_run）。仅干净合并才 `git_apply_resolve`。不要用 `git_merge` 冒充预演。人口头说解决了不算：用原来的 into/from 再预演，认这一对的 `merge/<from>-into-<into>`。
 
-**3. 工作区已经卡在 merge 或 rebase 里** — 看状态，然后继续或放弃。不要用第 2 条的落盘去收尾。  
-`git_status` → `git_merge_continue` / `git_rebase_continue` 或 abort。禁止 `git_apply_resolve`。
+**3. 工作区已经卡在 merge 或 rebase 里** — 看状态。人先解决，再继续或放弃。不要传 `files`。不要用第 2 条的落盘去收尾。  
+`git_status` → `git_merge_continue` / `git_rebase_continue`（不要带 `files`）或 abort。禁止 `git_apply_resolve`。
 
-**4. 开 Pull Request / Merge Request** — 先准备信息再创建。Token 在网页设置里，不要塞进工具参数。  
-`git_mr_prepare` → `git_mr_create`。
+**4. 开 Pull Request / Merge Request** — 先预演。有冲突则停。干净则落盘并推送临时枝，再 `git_mr_prepare`；只有 `mergeGate.ok` 才 `git_mr_create`，且只 dry_run。Token 在网页设置里，不要塞进工具参数。  
+`git_merge_preview` → `git_apply_resolve` / `git_push` → `git_mr_prepare` → `git_mr_create`（只 dry_run）。
 
 宿主可插入这四条 Prompt（`safe_commit` / `merge_preview_apply` / `workspace_continue` / `open_mr`），正文即上面四段。只读状态也可读 Resource：`git-cockpit://repos`、`git-cockpit://repo/current`、`git-cockpit://jobs`、`git-cockpit://jobs/{id}`。
 

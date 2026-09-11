@@ -37,16 +37,22 @@ import type {
   ApplyResolveFile,
   ApplyResolveResult,
   ConflictFile,
-  PrepareMrResult
+  PrepareMrResult,
+  TempBranchState
 } from './types.ts';
 import {
   assertMergeTreeVersion,
   branchNameForMr,
   buildConflictContent,
   buildCreateMrUrl,
+  classifyMergePair,
   defaultTempBranchName,
   EMPTY_TREE_SHA,
+  evaluateMrMergeGate,
+  buildMergePageUrl,
+  isMergeTempRef,
   isSameBranchForMr,
+  parseLandedMergeMessage,
   parseClassicMergeTree,
   parseGitVersion,
   parseModernMergeTree,
@@ -707,8 +713,8 @@ export class GitService extends EventEmitter {
 
   /** 两分支 merge-base 与两侧独有提交数（不改工作区） */
   async buildBranchLineage(into: string, from: string): Promise<BranchLineage> {
-    const intoSha = await this.ensureRev(into);
-    const fromSha = await this.ensureRev(from);
+    const intoSha = (await this.resolveMergeRef(into)).sha;
+    const fromSha = (await this.resolveMergeRef(from)).sha;
     const base = await this.tryMergeBase(intoSha, fromSha);
     if (!base) {
       return {
@@ -1571,6 +1577,32 @@ export class GitService extends EventEmitter {
     return r.stdout.trim();
   }
 
+  /**
+   * 预演/落盘用：原样 rev-parse，失败再试 `{remote}/{name}`。
+   * 短名只有 origin/ 跟踪枝时也能预演。
+   */
+  async resolveMergeRef(rev: string, remote = 'origin'): Promise<{ sha: string; gitRef: string }> {
+    const trimmed = rev.trim();
+    if (!trimmed) throw new GitOperationError('引用不能为空', 'INVALID_REF');
+    const remoteName = remote.trim() || 'origin';
+    const candidates = [trimmed];
+    if (!trimmed.startsWith('refs/') && !trimmed.startsWith(`${remoteName}/`)) {
+      candidates.push(`${remoteName}/${trimmed}`);
+    }
+    const tried: string[] = [];
+    for (const c of candidates) {
+      tried.push(c);
+      const r = await this.runAllowFail(['rev-parse', '--verify', `${c}^{commit}`]);
+      if (r.code === 0 && r.stdout.trim()) {
+        return { sha: r.stdout.trim(), gitRef: c };
+      }
+    }
+    throw new GitOperationError(
+      `无法解析引用「${trimmed}」（已试：${tried.join('、')}）`,
+      'REV_NOT_FOUND'
+    );
+  }
+
   /** 两条提交的共同祖先；无关历史时返回 null（不抛） */
   async tryMergeBase(a: string, b: string): Promise<string | null> {
     const r = await this.runAllowFail(['merge-base', a, b]);
@@ -1597,8 +1629,9 @@ export class GitService extends EventEmitter {
     if (options.fetch === true) {
       await this.fetchQuiet(options.remote?.trim() || 'origin');
     }
-    const intoSha = await this.ensureRev(into);
-    const fromSha = await this.ensureRev(from);
+    const remote = options.remote?.trim() || 'origin';
+    const intoSha = (await this.resolveMergeRef(into, remote)).sha;
+    const fromSha = (await this.resolveMergeRef(from, remote)).sha;
     const base = (await this.tryMergeBase(intoSha, fromSha)) || EMPTY_TREE_SHA;
     const hunks = await this.blameSides(intoSha, fromSha, base, filePath);
     return { path: filePath, into, from, hunks };
@@ -1760,8 +1793,10 @@ export class GitService extends EventEmitter {
       if (!fr.ok) fetchError = fr.error;
     }
 
-    const intoSha = await this.ensureRev(into);
-    const fromSha = await this.ensureRev(from);
+    const intoHit = await this.resolveMergeRef(into, remote);
+    const fromHit = await this.resolveMergeRef(from, remote);
+    const intoSha = intoHit.sha;
+    const fromSha = fromHit.sha;
     const bySha = await this.previewMergeBySha(intoSha, fromSha);
 
     let conflictFiles = bySha.conflictFiles;
@@ -1773,6 +1808,30 @@ export class GitService extends EventEmitter {
     const messages = [...bySha.messages];
     if (shouldFetch && !fetched) {
       messages.unshift(`fetch ${remote} 未成功，使用本地已有引用继续预演。${fetchError ? `原因：${fetchError}` : ''}`);
+    }
+
+    const remoteNames = remotes.length ? remotes : ['origin'];
+    const intoGit = intoHit.gitRef;
+    const fromGit = fromHit.gitRef;
+    const intoMr = branchNameForMr(intoGit, remoteNames);
+    const fromMr = branchNameForMr(fromGit, remoteNames);
+    const webUrl = buildMergePageUrl(into, from);
+    const meta = await this.attachPairSituation({
+      into,
+      from,
+      intoSha: bySha.intoSha,
+      fromSha: bySha.fromSha,
+      outcome: bySha.outcome,
+      remotes: remoteNames
+    });
+    if (meta.situation === 'already_merged') {
+      messages.push(`「${from}」已包含在「${into}」中，没有可合并的新提交，无需落盘。`);
+    } else if (meta.situation === 'looking_at_temp') {
+      messages.push('选中的是落盘临时分支（merge/…），不是线上目标。');
+    } else if (meta.situation === 'temp_remote') {
+      messages.push(`这对分支已有远程临时枝 ${meta.pairTempBranch?.name}，无需再落盘。`);
+    } else if (meta.situation === 'temp_local') {
+      messages.push(`这对分支已有本地临时枝 ${meta.pairTempBranch?.name}，推送后即可申请 MR。`);
     }
 
     return {
@@ -1790,7 +1849,84 @@ export class GitService extends EventEmitter {
       messages,
       unrelatedHistories: bySha.unrelatedHistories,
       outcome: bySha.outcome,
-      resultTree: bySha.resultTree
+      resultTree: bySha.resultTree,
+      intoGit,
+      fromGit,
+      intoMr,
+      fromMr,
+      webUrl,
+      ...meta
+    };
+  }
+
+  private async isAncestor(ancestorSha: string, descendantSha: string): Promise<boolean> {
+    const r = await this.runAllowFail(['merge-base', '--is-ancestor', ancestorSha, descendantSha]);
+    return r.code === 0;
+  }
+
+  private async attachPairSituation(options: {
+    into: string;
+    from: string;
+    intoSha: string;
+    fromSha: string;
+    outcome: MergePreviewResult['outcome'];
+    remotes: string[];
+  }): Promise<{
+    alreadyUpToDate: boolean;
+    intoIsTempBranch: boolean;
+    fromIsTempBranch: boolean;
+    pairTempBranch: TempBranchState | null;
+    tempStale: boolean;
+    recoveredPair: { into: string; from: string } | null;
+    situation: MergePreviewResult['situation'];
+  }> {
+    const alreadyUpToDate = await this.isAncestor(options.fromSha, options.intoSha);
+    const intoIsTempBranch = isMergeTempRef(options.into, options.remotes);
+    const fromIsTempBranch = isMergeTempRef(options.from, options.remotes);
+    const temps = await this.loadTempBranches(options.remotes);
+    const expected = defaultTempBranchName(options.into, options.from, options.remotes);
+    let pairTempBranch = temps.get(expected) ?? null;
+    if (!pairTempBranch && intoIsTempBranch) {
+      pairTempBranch = temps.get(branchNameForMr(options.into, options.remotes)) ?? {
+        name: branchNameForMr(options.into, options.remotes),
+        local: !options.into.includes('/'),
+        remote: options.into.startsWith('origin/') || options.into.includes('/merge/')
+      };
+    }
+
+    let recoveredPair: { into: string; from: string } | null = null;
+    let tempStale = false;
+    const inspectRef = intoIsTempBranch ? options.into : pairTempBranch?.name;
+    if (inspectRef) {
+      const log = await this.runAllowFail(['log', '-1', '--format=%B', inspectRef]);
+      const parsed = parseLandedMergeMessage(log.stdout);
+      if (parsed) recoveredPair = { into: parsed.into, from: parsed.from };
+    }
+    if (pairTempBranch && !intoIsTempBranch && !fromIsTempBranch) {
+      const tempRef = pairTempBranch.local ? pairTempBranch.name : `${options.remotes[0]}/${pairTempBranch.name}`;
+      const tempSha = await this.ensureRev(tempRef).catch(() => '');
+      if (tempSha) {
+        const fromInTemp = await this.isAncestor(options.fromSha, tempSha);
+        const intoInTemp = await this.isAncestor(options.intoSha, tempSha);
+        tempStale = !fromInTemp || !intoInTemp;
+      }
+    }
+
+    return {
+      alreadyUpToDate,
+      intoIsTempBranch,
+      fromIsTempBranch,
+      pairTempBranch,
+      tempStale,
+      recoveredPair,
+      situation: classifyMergePair({
+        outcome: options.outcome,
+        alreadyUpToDate,
+        intoIsTemp: intoIsTempBranch,
+        fromIsTemp: fromIsTempBranch,
+        tempBranch: pairTempBranch,
+        tempStale
+      })
     };
   }
 
@@ -1987,7 +2123,7 @@ export class GitService extends EventEmitter {
 
   /**
    * 完整预演：冲突文件列表 + diff3 冲突正文（仍不改工作区）。
-   * 宿主 Agent 选边后把 files 交给 git_apply_resolve。
+   * 选边只在网页；不要把 files 交给 Agent。
    */
   async rehearseMerge(options: {
     into: string;
@@ -2070,8 +2206,20 @@ export class GitService extends EventEmitter {
         'SAME_BRANCH'
       );
     }
+    if (isMergeTempRef(into, remoteNames) || isMergeTempRef(from, remoteNames)) {
+      const hit = isMergeTempRef(into, remoteNames) ? into : from;
+      throw new GitOperationError(
+        `「${hit}」是落盘临时分支，不能再当作合入目标或来源落盘。请改选真正的线上分支；已推送的临时枝请申请 MR。`,
+        'TEMP_BRANCH_AS_PAIR'
+      );
+    }
 
     const remote = options.remote ?? 'origin';
+    const intoSha = (await this.resolveMergeRef(into, remote)).sha;
+    const fromSha = (await this.resolveMergeRef(from, remote)).sha;
+    if (await this.isAncestor(fromSha, intoSha)) {
+      throw new GitOperationError(`没有可合并的新提交（${from} → ${into}），无需落盘。`, 'NOTHING_TO_MERGE');
+    }
     const doPush = options.push !== false;
     const keepLocal = options.keepLocal === true || !doPush;
     const tempBranch = options.tempBranch?.trim() || defaultTempBranchName(into, from, remoteNames);
@@ -2104,8 +2252,6 @@ export class GitService extends EventEmitter {
       );
     }
 
-    const intoSha = await this.ensureRev(into);
-    const fromSha = await this.ensureRev(from);
     const parent = await mkdtemp(path.join(tmpdir(), 'git-cockpit-resolve-'));
     const wtPath = path.join(parent, 'wt');
     const messages: string[] = [];
@@ -2138,7 +2284,7 @@ export class GitService extends EventEmitter {
         if (files.length === 0) {
           await wt('merge', '--abort');
           throw new GitOperationError(
-            '合并存在冲突，请先完成选边（网页三栏或把 files 交给 git_apply_resolve）',
+            '合并存在冲突，请先在网页三栏完成选边',
             'HAS_CONFLICTS'
           );
         }
@@ -2173,7 +2319,7 @@ export class GitService extends EventEmitter {
         const detail = (commitRun.stderr || commitRun.stdout).trim();
         const mergeText = `${mergeRun.stdout}\n${mergeRun.stderr}`;
         if (/nothing to commit|no changes added/i.test(detail) || /Already up to date/i.test(mergeText)) {
-          throw new GitOperationError(`没有可合并的新提交（${from} → ${into}），无需推送临时分支`, 'NOTHING_TO_MERGE');
+          throw new GitOperationError(`没有可合并的新提交（${from} → ${into}），无需落盘。`, 'NOTHING_TO_MERGE');
         }
         throw new GitOperationError(`提交失败（主工作区未改动）：${detail}`, 'COMMIT_FAILED');
       }
@@ -2269,6 +2415,31 @@ export class GitService extends EventEmitter {
     }
 
     const platform = detectMrPlatform(remoteUrl || '');
+    const messages: string[] = [];
+    let mergeGate = evaluateMrMergeGate({ situation: 'unknown', into, from });
+    try {
+      const preview = await this.previewMerge({ into, from, fetch: false, remote });
+      mergeGate = evaluateMrMergeGate({
+        situation: preview.situation,
+        into,
+        from,
+        pairTempBranch: preview.pairTempBranch
+      });
+    } catch (e) {
+      if (e instanceof GitOperationError && e.code === 'SAME_BRANCH') throw e;
+      if (e instanceof GitOperationError) {
+        mergeGate = {
+          ok: false,
+          code: e.code === 'REV_NOT_FOUND' ? 'REV_NOT_FOUND' : 'CONFLICTS_UNRESOLVED',
+          situation: 'unknown',
+          message: e.message,
+          webUrl: buildMergePageUrl(into, from)
+        };
+      } else {
+        throw e;
+      }
+    }
+    if (!mergeGate.ok) messages.push(mergeGate.message);
 
     return {
       platform,
@@ -2280,8 +2451,60 @@ export class GitService extends EventEmitter {
       createMrUrl: remoteUrl ? buildCreateMrUrl(remoteUrl, sourceBranch, targetBranch) : null,
       cli: null,
       candidates: [],
-      messages: []
+      messages,
+      mergeGate
     };
+  }
+
+  /**
+   * 开单闸：冲突 / 未落盘 / 临时枝未推 一律拒绝（含 dryRun）。
+   * 显式 sourceBranch 且不是 from、不是 merge/* 时，按 DIY 源枝预演：干净或已包含可过，仍冲突则拒绝。
+   */
+  async assertMrOpenable(options: {
+    into: string;
+    from: string;
+    sourceBranch?: string;
+    remote?: string;
+  }): Promise<void> {
+    const into = options.into.trim();
+    const from = options.from.trim();
+    if (!into || !from) throw new GitOperationError('into / from 不能为空', 'INVALID_REF');
+    const remotes = (await this.listRemotes()).map((r) => r.name);
+    const remoteNames = remotes.length ? remotes : ['origin'];
+    const remote = pickRemoteName(into, remotes, options.remote);
+    const explicit = options.sourceBranch?.trim() || '';
+    const fromMr = branchNameForMr(from, remoteNames);
+    const diy =
+      Boolean(explicit) &&
+      explicit !== fromMr &&
+      explicit !== from &&
+      !isMergeTempRef(explicit, remoteNames);
+
+    const preview = await this.previewMerge({
+      into,
+      from: diy ? explicit : from,
+      fetch: false,
+      remote
+    });
+    const gate = evaluateMrMergeGate({
+      situation: preview.situation,
+      into,
+      from,
+      pairTempBranch: preview.pairTempBranch
+    });
+    const fail = (code: string, message: string) => {
+      throw new GitOperationError(
+        gate.webUrl ? `${message}\n选边：${gate.webUrl}` : message,
+        code
+      );
+    };
+    if (diy) {
+      if (preview.situation === 'conflicts' || preview.situation === 'unrelated') {
+        fail('CONFLICTS_UNRESOLVED', gate.message);
+      }
+      return;
+    }
+    if (!gate.ok) fail(gate.code, gate.message);
   }
 
   /** 提取 git 报错中用户可读的部分 */

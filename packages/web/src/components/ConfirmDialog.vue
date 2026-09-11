@@ -50,6 +50,17 @@ const riskText = computed(() =>
   risk.value === 'dangerous' ? { type: 'danger', label: '高风险' } : risk.value === 'write' ? { type: 'warning', label: '写操作' } : { type: 'info', label: '只读' }
 );
 
+const previewNote = computed(() => {
+  if (props.note) return props.note;
+  const p = props.preview as { note?: unknown } | null;
+  return typeof p?.note === 'string' ? p.note : '';
+});
+
+const previewBody = computed(() => {
+  const p = props.preview as { body?: unknown } | null;
+  return typeof p?.body === 'string' ? p.body : '';
+});
+
 function onConfirm(): void {
   emit('confirm');
 }
@@ -88,7 +99,11 @@ function onCancel(): void {
       </el-scrollbar>
     </div>
 
-    <div v-if="note" class="note-text">{{ note }}</div>
+    <div v-if="previewNote" class="note-text">{{ previewNote }}</div>
+    <div v-if="previewBody" class="body-box">
+      <div class="cmd-label">将提交的正文</div>
+      <pre class="cmd-pre">{{ previewBody }}</pre>
+    </div>
 
     <template #footer>
       <span class="risk-tag">
@@ -105,8 +120,15 @@ function onCancel(): void {
   margin-bottom: var(--gc-gap);
 }
 .cmd-box,
-.files-box {
+.files-box,
+.body-box {
   margin-bottom: var(--gc-gap);
+}
+.body-box .cmd-pre {
+  max-height: 220px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 .cmd-label {
   font-size: 12px;

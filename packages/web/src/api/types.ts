@@ -418,6 +418,12 @@ export interface ConflictBlameResult {
 }
 
 export type MergeOutcome = 'clean' | 'conflicts' | 'unrelated';
+export type MergePairSituation =
+  | 'looking_at_temp'
+  | 'temp_remote'
+  | 'temp_local'
+  | 'already_merged'
+  | MergeOutcome;
 
 export interface MergePreviewResult {
   repoRoot: string;
@@ -435,6 +441,18 @@ export interface MergePreviewResult {
   outcome: MergeOutcome;
   unrelatedHistories: boolean;
   resultTree?: string;
+  alreadyUpToDate?: boolean;
+  intoIsTempBranch?: boolean;
+  fromIsTempBranch?: boolean;
+  pairTempBranch?: { name: string; local: boolean; remote: boolean } | null;
+  tempStale?: boolean;
+  recoveredPair?: { into: string; from: string } | null;
+  situation?: MergePairSituation;
+  intoGit?: string;
+  fromGit?: string;
+  intoMr?: string;
+  fromMr?: string;
+  webUrl?: string;
 }
 
 export interface ApplyResolveResult {
@@ -453,8 +471,15 @@ export interface CreateMrResult {
   sourceBranch: string;
   targetBranch: string;
   title: string;
+  body?: string;
   messages: string[];
   cliInstallUrl?: string | null;
+}
+
+export interface PublicMrTemplate {
+  enabled: boolean;
+  agentFill: 'allow' | 'forbid';
+  fields: MrTemplateField[];
 }
 
 export interface PrepareMrResult {
@@ -470,6 +495,15 @@ export interface PrepareMrResult {
   cliInstallUrl?: string | null;
   candidates: Array<{ username: string; name?: string; role?: string }>;
   messages: string[];
+  template?: PublicMrTemplate | null;
+  mergeGate?: {
+    ok: boolean;
+    code: string;
+    situation: string;
+    message: string;
+    webUrl: string;
+  };
+  method?: 'cli' | 'token' | 'browser';
 }
 
 export type SurveyOutcome = 'clean' | 'conflicts' | 'unrelated' | 'same' | 'error';

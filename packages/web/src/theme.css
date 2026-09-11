@@ -8,7 +8,8 @@
    - 内边距：var(--gc-pad) 12px（卡片等上限）
    - 间距：var(--gc-gap) 8px（组件与组件间隙）
    - 提示条 / 表单：.el-alert .el-input .el-select 走同一套字号 / 内边距
-   - 浮层阴影：var(--gc-shadow-menu)（右键 / 下拉，与页面底拉开）
+   - 对话框：.el-dialog 上的 --el-dialog-* 接到 --gc（正文 12px、内边距 12px、阴影）
+   - 浮层阴影：var(--gc-shadow-menu)（右键 / 下拉 / 弹层，与页面底拉开）
 
    依赖：element-plus/theme-chalk/dark/css-vars.css（main.ts 已引入）+ html.dark
    ========================================================================== */
@@ -318,16 +319,65 @@ body,
   margin-left: var(--gc-gap);
 }
 
-/* ---- 对话框 / 抽屉 / 消息框：内边距上限 12px ---- */
+/* ---- 对话框 / 抽屉 / 消息框 ----
+   EP 把 --el-dialog-* / --el-messagebox-* 写在组件类上（正文 14px、内边距 16px、
+   关闭钮 48px、顶距 15vh）。:root 盖不住，必须在组件类上接到 --gc。
+   内边距已经在根节点（padding-primary），header/body/footer 不要再叠一层。 */
+.el-dialog {
+  --el-dialog-title-font-size: var(--el-font-size-extra-large);
+  --el-dialog-content-font-size: var(--gc-text);
+  --el-dialog-padding-primary: var(--gc-pad);
+  --el-dialog-margin-top: var(--gc-pad);
+  --el-dialog-box-shadow: var(--gc-shadow-menu);
+  --el-dialog-font-line-height: var(--gc-line);
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 48px);
+  overflow: hidden;
+  margin: var(--el-dialog-margin-top) auto var(--gc-pad);
+  padding: var(--el-dialog-padding-primary);
+  font-size: var(--gc-text);
+}
+.el-dialog.is-align-center {
+  margin: auto;
+}
+.el-dialog.is-fullscreen {
+  margin: 0;
+  max-height: 100%;
+}
 .el-dialog__header {
-  padding: var(--gc-pad) var(--gc-pad) 0;
+  flex: none;
+  padding-bottom: var(--gc-gap);
   margin-right: 0;
 }
+.el-dialog__header.show-close {
+  padding-right: var(--gc-line);
+}
+.el-dialog__title {
+  font-size: var(--el-dialog-title-font-size);
+  line-height: var(--gc-line);
+  font-weight: 600;
+}
+.el-dialog__headerbtn {
+  width: var(--gc-line);
+  height: var(--gc-line);
+  font-size: 14px;
+}
 .el-dialog__body {
-  padding: var(--gc-gap) var(--gc-pad);
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0;
+  font-size: var(--gc-text);
 }
 .el-dialog__footer {
-  padding: var(--gc-gap) var(--gc-pad) var(--gc-pad);
+  flex: none;
+  padding-top: var(--gc-gap);
+}
+.el-drawer {
+  --el-drawer-padding-primary: var(--gc-pad);
+  --el-drawer-bg-color: var(--el-bg-color);
+  box-shadow: var(--gc-shadow-menu);
 }
 .el-drawer__header {
   padding: 0 var(--gc-pad);
@@ -338,30 +388,56 @@ body,
   align-items: center;
 }
 .el-drawer__title {
-  font-size: var(--gc-text);
+  font-size: var(--el-font-size-extra-large);
   line-height: var(--gc-line);
-  font-weight: 500;
+  font-weight: 600;
   color: var(--el-text-color-primary);
 }
 .el-drawer__close-btn {
   margin: 0;
   height: var(--gc-line);
   width: var(--gc-line);
+  font-size: 14px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 .el-drawer__body {
   padding: var(--gc-gap) var(--gc-pad);
+  font-size: var(--gc-text);
+}
+.el-message-box {
+  --el-messagebox-font-size: var(--el-font-size-extra-large);
+  --el-messagebox-content-font-size: var(--gc-text);
+  --el-messagebox-padding-primary: var(--gc-pad);
+  --el-messagebox-border-radius: var(--gc-radius);
+  --el-messagebox-box-shadow: var(--gc-shadow-menu);
+  --el-messagebox-font-line-height: var(--gc-line);
+  padding: var(--el-messagebox-padding-primary);
+  font-size: var(--gc-text);
 }
 .el-message-box__header {
-  padding: var(--gc-pad) var(--gc-pad) 0;
+  padding-bottom: var(--gc-gap);
+}
+.el-message-box__header.show-close {
+  padding-right: var(--gc-line);
+}
+.el-message-box__title {
+  font-size: var(--el-messagebox-font-size);
+  line-height: var(--gc-line);
+  font-weight: 600;
+}
+.el-message-box__headerbtn {
+  width: var(--gc-line);
+  height: var(--gc-line);
+  font-size: 14px;
 }
 .el-message-box__content {
-  padding: var(--gc-gap) var(--gc-pad);
+  padding: 0;
+  font-size: var(--gc-text);
 }
 .el-message-box__btns {
-  padding: 0 var(--gc-pad) var(--gc-pad);
+  padding-top: var(--gc-gap);
 }
 
 /* ---- 下拉 / 右键菜单：行高 --gc-line，字号 --gc-text；阴影走 --gc-shadow-menu ---- */
@@ -685,6 +761,173 @@ body,
   line-height: 1.5;
   font-size: var(--gc-text);
   color: var(--el-text-color-primary);
+}
+
+/* ---- 铺满卡片：头/身 flex，body 内部滚动（合并预演、工作台列表、状态更改） ---- */
+.el-card.gc-card-fill {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.el-card.gc-card-fill > .el-card__header,
+.el-card.gc-card-fill > .el-card__footer {
+  flex: none;
+}
+.el-card.gc-card-fill > .el-card__body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.el-card.gc-card-fill--tight > .el-card__body {
+  padding: var(--gc-gap);
+}
+.el-card.gc-card-fill--flush > .el-card__body {
+  padding: 0 var(--gc-pad) var(--gc-gap);
+}
+
+/* ---- 铺满 Tabs ---- */
+.gc-tabs-fill {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.gc-tabs-fill > .el-tabs__header {
+  flex: none;
+}
+.gc-tabs-fill > .el-tabs__content {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.gc-tabs-fill .el-tab-pane {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.gc-tabs-fill.gc-tabs-scroll .el-tab-pane {
+  overflow: auto;
+}
+.gc-tabs-fill.gc-tabs-scroll .el-tab-pane:has(.gc-pane-fill) {
+  overflow: hidden;
+}
+.gc-pane-fill {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- 树：行高 / 展开图标 ---- */
+.gc-tree {
+  background: transparent;
+  --el-tree-node-hover-bg-color: var(--el-fill-color-extra-light);
+}
+.gc-tree .el-tree-node__content {
+  height: var(--gc-line);
+  padding-right: var(--gc-pad);
+}
+.gc-tree.gc-tree-compact .el-tree-node__content {
+  height: var(--gc-control);
+  padding-right: 4px;
+}
+.gc-tree .el-tree-node__expand-icon {
+  font-size: 11px;
+  flex: none;
+}
+.gc-tree.gc-tree-files .el-tree-node__expand-icon {
+  padding: 0 2px;
+}
+.gc-tree.gc-tree-files .el-tree-node__expand-icon.is-leaf {
+  visibility: hidden;
+}
+.gc-tree .el-tree-node__content > :last-child {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---- 父级已用 gap 排按钮：去掉 EP 相邻 margin ---- */
+.gc-gap-btns .el-button + .el-button {
+  margin-left: 0;
+}
+
+/* ---- 侧栏菜单：图标 + 角标同一行 ---- */
+.el-menu--vertical .el-menu-item {
+  display: flex;
+  align-items: center;
+}
+
+/* ---- 树选择多选标签 ---- */
+.el-tree-select .el-tag {
+  max-width: 160px;
+}
+
+/* ---- 表单字段标题旁 ? 提示 ---- */
+.gc-field-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+}
+.gc-field-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border-radius: 50%;
+  border: 1px solid var(--el-border-color);
+  color: var(--el-text-color-secondary);
+  font-size: 10px;
+  line-height: 1;
+  cursor: help;
+}
+.gc-help-tip {
+  max-width: var(--gc-select-width) !important;
+}
+.gc-help-tip .el-popper__content {
+  max-width: var(--gc-select-width);
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
+  font-size: var(--gc-text);
+}
+
+/* ---- 开单弹层勾选纵向 ---- */
+.el-checkbox-group.gc-check-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  /*gap: var(--gc-gap);*/
+}
+.el-checkbox-group.gc-check-col .el-checkbox {
+  margin-right: 0;
+  height: auto;
+  min-height: var(--gc-control);
+  white-space: normal;
+  align-items: flex-start;
+}
+
+/* ---- 设置 MR 表单：输入不要撑满 ---- */
+.gc-form-narrow .el-form-item__content {
+  flex-wrap: wrap;
+}
+.gc-form-narrow .el-input {
+  max-width: 420px;
+}
+.gc-radio-flush.el-radio,
+.gc-radio-flush .el-radio {
+  margin-right: 0;
+}
+
+/* ---- 粘贴栏输入吃剩余宽度 ---- */
+.gc-grow-input.el-textarea,
+.gc-grow-input .el-textarea {
+  flex: 1;
 }
 
 /* ---- 滚动条：暗色下更收敛 ---- */

@@ -341,6 +341,54 @@ describe('createPullOrMergeRequest', () => {
     if ('dryRun' in r) throw new Error('unexpected dryRun');
     expect(r.via).toBe('browser');
     expect(r.url).toContain('/compare/');
+    expect(r.body).toBe('');
+    expect(r.messages.join(' ')).toContain('未调用 Token / CLI');
+  });
+
+  it('method=browser 带回正文；规范启用时提示改用 Token/CLI', async () => {
+    const r = await createPullOrMergeRequest({
+      prep: fakePrep(),
+      mr: {
+        ...DEFAULT_CONFIG.mr,
+        method: 'browser',
+        template: {
+          enabled: true,
+          agentFill: 'allow',
+          filename: 't.md',
+          sourceMd: '',
+          fields: [{ id: 'purpose', type: 'textarea', label: '变更目的', required: true }]
+        }
+      },
+      cwd,
+      body: '## 变更目的\n说明原因'
+    });
+    if ('dryRun' in r) throw new Error('unexpected dryRun');
+    expect(r.via).toBe('browser');
+    expect(r.body).toBe('## 变更目的\n说明原因');
+    expect(r.messages.join(' ')).toContain('建议在设置 → MR 配置改用 Token 或本机 CLI');
+    expect(r.messages.join(' ')).toContain('请复制下面的正文');
+
+    const dry = await createPullOrMergeRequest({
+      prep: fakePrep(),
+      mr: {
+        ...DEFAULT_CONFIG.mr,
+        method: 'browser',
+        template: {
+          enabled: true,
+          agentFill: 'allow',
+          filename: 't.md',
+          sourceMd: '',
+          fields: [{ id: 'purpose', type: 'textarea', label: '变更目的', required: true }]
+        }
+      },
+      cwd,
+      body: '## 变更目的\n说明原因',
+      dryRun: true
+    });
+    if (!('dryRun' in dry)) throw new Error('expected dryRun');
+    expect(dry.note).toContain('不会把正文写到远程');
+    expect(dry.note).toContain('建议改用 Token 或本机 CLI');
+    expect(dry.body).toBe('## 变更目的\n说明原因');
   });
 
   it('method=token 时只用当前域名的 Token', async () => {

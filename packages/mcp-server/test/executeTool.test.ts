@@ -178,6 +178,29 @@ describe('git_merge_preview / git_apply_resolve', () => {
       disposeTestRuntime(runtime);
     }
   });
+
+  it('MCP 禁止带 files 选边', async () => {
+    const runtime = createTestRuntime();
+    try {
+      const sample = await createSampleRepo();
+      await runtime.repoManager.open(sample.dir);
+      const applyDef = TOOL_DEF_MAP.get('git_apply_resolve')!;
+      const exec = await executeTool(
+        applyDef,
+        {
+          into: 'main',
+          from: 'feature/x',
+          files: [{ path: 'a.txt', resolvedContent: 'resolved\n' }],
+          dryRun: true
+        },
+        { runtime, source: 'mcp' }
+      );
+      expect(exec.success).toBe(false);
+      expect(exec.error?.code).toBe('AGENT_NO_RESOLVE');
+    } finally {
+      disposeTestRuntime(runtime);
+    }
+  });
 });
 
 describe('git_merge_survey / git_merge_order', () => {
@@ -224,6 +247,36 @@ function bindRepoMrMethod(runtime: Runtime, repoPath: string, method: 'token' | 
   runtime.config = runtime.configStore.get();
 }
 
+/** 让 feature/x 相对 main 有独有提交，否则档位是 already_merged，落不了盘 */
+async function divergeFeature(sample: { dir: string; git: SimpleGit }): Promise<void> {
+  await sample.git.checkout('feature/x');
+  await commitFile(sample.git, sample.dir, 'c.txt', 'feature content\n', 'feat: feature c');
+  await sample.git.checkout('main');
+}
+
+/** 落盘这对分支，并写一条 origin/ 跟踪引用，让档位变成 temp_remote（测试里不必真 push） */
+async function landTempRemote(
+  runtime: Runtime,
+  sample: { dir: string; git: SimpleGit },
+  into = 'main',
+  from = 'feature/x'
+): Promise<string> {
+  await divergeFeature(sample);
+  const applyDef = TOOL_DEF_MAP.get('git_apply_resolve')!;
+  const applied = await executeTool(
+    applyDef,
+    { into, from, push: false, dryRun: false },
+    { runtime, source: 'mcp' }
+  );
+  if (!applied.success) {
+    throw new Error(applied.error?.message ?? 'git_apply_resolve 失败');
+  }
+  const temp = (applied.result as { tempBranch: string }).tempBranch;
+  const sha = (await sample.git.revparse([temp])).trim();
+  await sample.git.raw(['update-ref', `refs/remotes/origin/${temp}`, sha]);
+  return temp;
+}
+
 describe('git_mr_prepare / git_mr_create', () => {
   afterAll(() => cleanupTmp());
 
@@ -241,6 +294,10 @@ describe('git_mr_prepare / git_mr_create', () => {
       expect(exec.success).toBe(true);
       expect((exec.result as { platform: string; sourceBranch: string }).platform).toBe('unknown');
       expect((exec.result as { sourceBranch: string }).sourceBranch).toBe('feature/x');
+      expect((exec.result as { mergeGate?: { ok: boolean; code: string } }).mergeGate).toMatchObject({
+        ok: false,
+        code: 'ALREADY_MERGED'
+      });
     } finally {
       disposeTestRuntime(runtime);
     }
@@ -253,7 +310,17 @@ describe('git_mr_prepare / git_mr_create', () => {
       await sample.git.addRemote('origin', 'https://github.com/acme/app.git');
       await runtime.repoManager.open(sample.dir);
       bindRepoMrMethod(runtime, sample.dir, 'token');
+      await divergeFeature(sample);
       const def = TOOL_DEF_MAP.get('git_mr_create')!;
+      const blocked = await executeTool(
+        def,
+        { into: 'main', from: 'feature/x', dryRun: true },
+        { runtime, source: 'mcp' }
+      );
+      expect(blocked.success).toBe(false);
+      expect(blocked.error?.code).toBe('NOT_LANDED');
+
+      await landTempRemote(runtime, sample);
       const exec = await executeTool(
         def,
         { into: 'main', from: 'feature/x', dryRun: true },
@@ -266,12 +333,81 @@ describe('git_mr_prepare / git_mr_create', () => {
     }
   });
 
+  it('启用正文规范时 create 缺 fields 失败；齐了 dry-run 带渲染正文', async () => {
+    const runtime = createTestRuntime({
+      mr: {
+        template: {
+          enabled: true,
+          agentFill: 'allow',
+          filename: 't.md',
+          sourceMd: '',
+          fields: [{ id: 'purpose', type: 'textarea', label: '变更目的', required: true }]
+        }
+      }
+    });
+    try {
+      const sample = await createSampleRepo();
+      await sample.git.addRemote('origin', 'https://github.com/acme/app.git');
+      await runtime.repoManager.open(sample.dir);
+      await landTempRemote(runtime, sample);
+      const def = TOOL_DEF_MAP.get('git_mr_create')!;
+      const missing = await executeTool(
+        def,
+        { into: 'main', from: 'feature/x', dryRun: true },
+        { runtime, source: 'mcp' }
+      );
+      expect(missing.success).toBe(false);
+      expect(missing.error?.code).toBe('TEMPLATE_INCOMPLETE');
+
+      const ok = await executeTool(
+        def,
+        { into: 'main', from: 'feature/x', fields: { purpose: '说明原因' }, dryRun: true },
+        { runtime, source: 'mcp' }
+      );
+      expect(ok.success).toBe(true);
+      expect(String((ok.result as { body?: string }).body ?? '')).toContain('说明原因');
+      expect(String((ok.result as { note?: string }).note ?? '')).toContain('建议改用 Token 或本机 CLI');
+
+      const prepDef = TOOL_DEF_MAP.get('git_mr_prepare')!;
+      const prep = await executeTool(
+        prepDef,
+        { into: 'main', from: 'feature/x' },
+        { runtime, source: 'mcp' }
+      );
+      expect(prep.success).toBe(true);
+      expect((prep.result as { template?: { enabled: boolean } }).template?.enabled).toBe(true);
+      expect((prep.result as { method?: string }).method).toBe('browser');
+    } finally {
+      disposeTestRuntime(runtime);
+    }
+  });
+
+  it('未启用规范时 create 不挡空 body', async () => {
+    const runtime = createTestRuntime();
+    try {
+      const sample = await createSampleRepo();
+      await sample.git.addRemote('origin', 'https://github.com/acme/app.git');
+      await runtime.repoManager.open(sample.dir);
+      await landTempRemote(runtime, sample);
+      const def = TOOL_DEF_MAP.get('git_mr_create')!;
+      const exec = await executeTool(
+        def,
+        { into: 'main', from: 'feature/x', dryRun: true },
+        { runtime, source: 'mcp' }
+      );
+      expect(exec.success).toBe(true);
+    } finally {
+      disposeTestRuntime(runtime);
+    }
+  });
+
   it('auto 且未配 Token 时 dry-run 仍成功（回退浏览器或 CLI）', async () => {
     const runtime = createTestRuntime();
     try {
       const sample = await createSampleRepo();
       await sample.git.addRemote('origin', 'https://github.com/acme/app.git');
       await runtime.repoManager.open(sample.dir);
+      await landTempRemote(runtime, sample);
       const def = TOOL_DEF_MAP.get('git_mr_create')!;
       const exec = await executeTool(
         def,
@@ -303,10 +439,11 @@ describe('git_mr_prepare / git_mr_create', () => {
       await sample.git.addRemote('origin', 'https://github.com/acme/app.git');
       await runtime.repoManager.open(sample.dir);
       bindRepoMrMethod(runtime, sample.dir, 'token');
+      await landTempRemote(runtime, sample);
       const def = TOOL_DEF_MAP.get('git_mr_create')!;
       const exec = await executeTool(
         def,
-        { into: 'main', from: 'feature/x', sourceBranch: 'feature/x', dryRun: false },
+        { into: 'main', from: 'feature/x', dryRun: false },
         { runtime, source: 'mcp' }
       );
       expect(exec.success).toBe(true);
@@ -336,10 +473,11 @@ describe('git_mr_prepare / git_mr_create', () => {
       await sample.git.addRemote('origin', 'https://gitlab.com/acme/app.git');
       await runtime.repoManager.open(sample.dir);
       bindRepoMrMethod(runtime, sample.dir, 'token');
+      await landTempRemote(runtime, sample);
       const def = TOOL_DEF_MAP.get('git_mr_create')!;
       const exec = await executeTool(
         def,
-        { into: 'main', from: 'feature/x', sourceBranch: 'feature/x', dryRun: false },
+        { into: 'main', from: 'feature/x', dryRun: false },
         { runtime, source: 'mcp' }
       );
       expect(exec.success).toBe(true);

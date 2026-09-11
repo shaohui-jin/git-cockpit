@@ -23,19 +23,57 @@ describe('suggestNext', () => {
     ]);
   });
 
-  it('git_merge_rehearse 冲突 → 带 path 的 rehearse + 落盘', () => {
+  it('git_merge_rehearse 冲突 → 不给落盘、不开单', () => {
     const next = suggestNext(
       'git_merge_rehearse',
       { into: 'main', from: 'feat', clean: false, conflictFiles: [{ path: 'a.ts' }] },
       {}
     );
-    expect(next[0]).toEqual({ tool: 'git_merge_rehearse', args: { into: 'main', from: 'feat', path: 'a.ts' } });
-    expect(next[1]).toEqual({ tool: 'git_apply_resolve', args: { into: 'main', from: 'feat', dryRun: true } });
+    expect(next).toEqual([]);
   });
 
   it('git_merge_preview 干净 → git_apply_resolve', () => {
     expect(suggestNext('git_merge_preview', { into: 'main', from: 'feat', clean: true })).toEqual([
       { tool: 'git_apply_resolve', args: { into: 'main', from: 'feat', dryRun: true } }
+    ]);
+  });
+
+  it('git_merge_preview 已有临时枝 / 已包含时不落盘', () => {
+    expect(
+      suggestNext('git_merge_preview', {
+        into: 'main',
+        from: 'feat',
+        clean: true,
+        situation: 'already_merged'
+      })
+    ).toEqual([]);
+    expect(
+      suggestNext('git_merge_preview', {
+        into: 'main',
+        from: 'feat',
+        situation: 'temp_local',
+        pairTempBranch: { name: 'merge/feat-into-main', local: true, remote: false }
+      })
+    ).toEqual([{ tool: 'git_push', args: { branch: 'merge/feat-into-main', dryRun: true } }]);
+    expect(
+      suggestNext('git_merge_preview', {
+        into: 'origin/merge/x',
+        from: 'main',
+        situation: 'looking_at_temp',
+        pairTempBranch: { name: 'merge/x', remote: false },
+        recoveredPair: { into: 'main', from: 'feat' }
+      })
+    ).toEqual([{ tool: 'git_push', args: { branch: 'merge/x', dryRun: true } }]);
+    expect(
+      suggestNext('git_merge_preview', {
+        into: 'origin/merge/x',
+        from: 'main',
+        situation: 'looking_at_temp',
+        pairTempBranch: { name: 'merge/x', remote: true },
+        recoveredPair: { into: 'main', from: 'feat' }
+      })
+    ).toEqual([
+      { tool: 'git_mr_prepare', args: { into: 'main', from: 'feat', sourceBranch: 'merge/x' } }
     ]);
   });
 
@@ -50,17 +88,55 @@ describe('suggestNext', () => {
     ).toEqual([{ tool: 'git_merge_rehearse', args: { into: 'main', from: 'feat' } }]);
   });
 
-  it('git_apply_resolve 成功 → git_mr_prepare；git_mr_prepare → git_mr_create', () => {
+  it('git_apply_resolve 成功 → git_mr_prepare；mergeGate.ok 才 create；干跑不再确认开单', () => {
     expect(
       suggestNext('git_apply_resolve', { into: 'main', from: 'feat', tempBranch: 'merge/feat' }, { from: 'feat' })
     ).toEqual([
       { tool: 'git_mr_prepare', args: { into: 'main', from: 'feat', sourceBranch: 'merge/feat' } }
     ]);
-    expect(suggestNext('git_mr_prepare', {}, { into: 'main', from: 'feat', sourceBranch: 'merge/feat' })).toEqual([
+    expect(
+      suggestNext(
+        'git_mr_prepare',
+        { sourceBranch: 'merge/feat', mergeGate: { ok: false, code: 'TEMP_NOT_PUSHED' } },
+        { into: 'main', from: 'feat', sourceBranch: 'merge/feat' }
+      )
+    ).toEqual([{ tool: 'git_push', args: { branch: 'merge/feat', dryRun: true } }]);
+    expect(
+      suggestNext(
+        'git_mr_prepare',
+        { mergeGate: { ok: false, code: 'NOT_LANDED' } },
+        { into: 'main', from: 'feat' }
+      )
+    ).toEqual([{ tool: 'git_apply_resolve', args: { into: 'main', from: 'feat', dryRun: true } }]);
+    expect(
+      suggestNext(
+        'git_mr_prepare',
+        { mergeGate: { ok: false, code: 'CONFLICTS_UNRESOLVED' } },
+        { into: 'main', from: 'feat' }
+      )
+    ).toEqual([]);
+    expect(
+      suggestNext('git_mr_prepare', { mergeGate: { ok: true } }, { into: 'main', from: 'feat', sourceBranch: 'merge/feat' })
+    ).toEqual([
       {
         tool: 'git_mr_create',
         args: { into: 'main', from: 'feat', sourceBranch: 'merge/feat', dryRun: true }
       }
     ]);
+    expect(
+      suggestNext(
+        'git_mr_prepare',
+        { sourceBranch: 'merge/feat', template: { enabled: true, fields: [] }, mergeGate: { ok: true } },
+        { into: 'main', from: 'feat' }
+      )
+    ).toEqual([
+      {
+        tool: 'git_mr_create',
+        args: { into: 'main', from: 'feat', sourceBranch: 'merge/feat', dryRun: true, fields: {} }
+      }
+    ]);
+    expect(
+      suggestNext('git_mr_create', { dryRun: true, command: 'gh pr create' }, { into: 'main', from: 'feat', dryRun: true })
+    ).toEqual([]);
   });
 });

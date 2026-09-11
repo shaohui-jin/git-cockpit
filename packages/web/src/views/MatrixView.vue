@@ -255,11 +255,11 @@ function isActive(cell: MergeSurveyCell): boolean {
       <div class="filter-bar">
         <div class="field">
           <span class="field-label">合入目标 into（可多选）</span>
-          <BranchTreeSelect v-model="intos" multiple remote-first placeholder="选择线上目标" />
+          <BranchTreeSelect v-model="intos" multiple remote-first exclude-merge-temp placeholder="选择线上目标" />
         </div>
         <div class="field">
           <span class="field-label">我的分支 from（可多选）</span>
-          <BranchTreeSelect v-model="froms" multiple placeholder="选择待合入分支" />
+          <BranchTreeSelect v-model="froms" multiple exclude-merge-temp placeholder="选择待合入分支" />
         </div>
         <div class="field field-switch">
           <span class="field-label">先 fetch</span>

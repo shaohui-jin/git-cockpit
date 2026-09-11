@@ -176,10 +176,6 @@ onUnmounted(() => {
   margin: 6px 16px;
   background: var(--el-border-color-lighter);
 }
-.nav-menu :deep(.el-menu-item) {
-  display: flex;
-  align-items: center;
-}
 .menu-icon {
   margin-right: 8px;
   color: var(--el-color-primary);

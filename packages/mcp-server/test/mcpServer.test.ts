@@ -77,8 +77,10 @@ describe('createMcpServer Prompt / Resource', () => {
       expect(merge.messages[0]?.content.text).toContain('禁止用 `git_merge` 冒充预演');
       const ws = await reg.workspace_continue!.callback({});
       expect(ws.messages[0]?.content.text).toContain('禁止用 `git_apply_resolve`');
+      expect(ws.messages[0]?.content.text).toContain('不要传 files');
       const mr = await reg.open_mr!.callback({});
       expect(mr.messages[0]?.content.text).toContain('不要塞进工具参数');
+      expect(merge.messages[0]?.content.text).toContain('不要选边');
     } finally {
       disposeTestRuntime(runtime);
     }

@@ -4,7 +4,8 @@ import type {
   MrTemplateCheckboxItem,
   MrTemplateField,
   MrTemplateFieldType,
-  MrTemplateValues
+  MrTemplateValues,
+  PublicMrTemplate
 } from './types.ts';
 import { GitOperationError } from './types.ts';
 
@@ -454,4 +455,35 @@ export function assertMrTemplateMarkdownSize(markdown: string): void {
   if (markdown.length > MAX_MR_TEMPLATE_MD) {
     throw new GitOperationError(`模板超过 ${MAX_MR_TEMPLATE_MD} 字符上限`, 'TEMPLATE_TOO_LARGE');
   }
+}
+
+export function publicMrTemplate(template: MrTemplate | null | undefined): PublicMrTemplate | null {
+  if (!template) return null;
+  return {
+    enabled: template.enabled,
+    agentFill: template.agentFill,
+    fields: template.fields
+  };
+}
+
+/** 启用规范时必须交 fields；成功则渲染 body，忽略传入的裸 body */
+export function resolveMrCreateBody(
+  template: MrTemplate | null | undefined,
+  fields: unknown,
+  body?: string
+): string {
+  if (!template?.enabled) return typeof body === 'string' ? body : '';
+  if (fields == null || typeof fields !== 'object' || Array.isArray(fields)) {
+    throw new GitOperationError(
+      '已启用正文规范，请按 fields 填写，不要只传 body',
+      'TEMPLATE_INCOMPLETE'
+    );
+  }
+  const values = fields as MrTemplateValues;
+  const check = validateMrTemplateFields(template, values);
+  if (!check.ok) {
+    const labels = check.missing.map((m) => m.label).join('、') || '必填字段';
+    throw new GitOperationError(`正文规范未填完整：${labels}`, 'TEMPLATE_INCOMPLETE');
+  }
+  return renderMrTemplate(template, values);
 }

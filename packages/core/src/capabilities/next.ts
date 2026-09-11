@@ -64,18 +64,29 @@ export function suggestNext(
     case 'git_merge_rehearse': {
       const into = row?.into ?? args.into;
       const from = row?.from ?? args.from;
+      const situation = typeof row?.situation === 'string' ? row.situation : '';
+      const temp = asRecord(row?.pairTempBranch) ?? asRecord(row?.tempBranch);
+      const recovered = asRecord(row?.recoveredPair);
+      if (situation === 'already_merged') return [];
+      if (situation === 'temp_local' || (situation === 'looking_at_temp' && temp?.remote !== true)) {
+        return [{ tool: 'git_push', args: compact({ branch: temp?.name, dryRun: true }) }];
+      }
+      if (situation === 'temp_remote' || situation === 'looking_at_temp') {
+        return [
+          {
+            tool: 'git_mr_prepare',
+            args: compact({
+              into: recovered?.into ?? into,
+              from: recovered?.from ?? from,
+              sourceBranch: temp?.name
+            })
+          }
+        ];
+      }
       if (row?.clean === true) {
         return [{ tool: 'git_apply_resolve', args: compact({ into, from, dryRun: true }) }];
       }
-      const files = Array.isArray(row?.conflictFiles) ? row.conflictFiles : [];
-      const firstPath = asRecord(files[0])?.path;
-      const pathArg = typeof args.path === 'string' ? args.path.trim() : '';
-      const steps: NextStep[] = [];
-      if (!pathArg && typeof firstPath === 'string' && firstPath) {
-        steps.push({ tool: 'git_merge_rehearse', args: compact({ into, from, path: firstPath }) });
-      }
-      steps.push({ tool: 'git_apply_resolve', args: compact({ into, from, dryRun: true }) ?? {} });
-      return steps;
+      return [];
     }
     case 'git_merge_survey': {
       if (typeof row?.jobId === 'string' && row.jobId) {
@@ -106,7 +117,23 @@ export function suggestNext(
           })
         }
       ];
-    case 'git_mr_prepare':
+    case 'git_mr_prepare': {
+      const gate = asRecord(row?.mergeGate);
+      if (gate?.ok !== true) {
+        if (gate?.code === 'TEMP_NOT_PUSHED') {
+          return [{ tool: 'git_push', args: compact({ branch: args.sourceBranch ?? row?.sourceBranch, dryRun: true }) }];
+        }
+        if (gate?.code === 'NOT_LANDED') {
+          return [
+            {
+              tool: 'git_apply_resolve',
+              args: compact({ into: args.into ?? row?.targetBranch, from: args.from, dryRun: true })
+            }
+          ];
+        }
+        return [];
+      }
+      const tmpl = asRecord(row?.template);
       return [
         {
           tool: 'git_mr_create',
@@ -114,12 +141,13 @@ export function suggestNext(
             into: args.into ?? row?.into,
             from: args.from ?? row?.from,
             sourceBranch: args.sourceBranch ?? row?.sourceBranch,
-            dryRun: true
+            dryRun: true,
+            ...(tmpl?.enabled ? { fields: {} } : {})
           })
         }
       ];
+    }
     case 'git_mr_create':
-      if (dryRun) return confirmWrite(tool, args);
       return [];
     case 'git_job_list': {
       const jobs = Array.isArray(row?.jobs) ? row.jobs : [];

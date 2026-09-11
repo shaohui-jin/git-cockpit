@@ -11,8 +11,10 @@ const props = withDefaults(
     /** true：远程组在前（合入目标） */
     remoteFirst?: boolean;
     multiple?: boolean;
+    /** 合并页：不列出 worktree 落盘留下的 merge/… */
+    excludeMergeTemp?: boolean;
   }>(),
-  { placeholder: '选择分支', scope: 'all', remoteFirst: false, multiple: false }
+  { placeholder: '选择分支', scope: 'all', remoteFirst: false, multiple: false, excludeMergeTemp: false }
 );
 
 const emit = defineEmits<{
@@ -20,20 +22,25 @@ const emit = defineEmits<{
 }>();
 
 const branches = useBranchesStore();
-const data = computed(() => panesToSelectTree(buildBranchPanes(branches.list, props.scope), props.remoteFirst));
+const data = computed(() =>
+  panesToSelectTree(
+    buildBranchPanes(branches.list, props.scope, { excludeMergeTemp: props.excludeMergeTemp }),
+    props.remoteFirst
+  )
+);
 
 const selectedTitle = computed(() =>
   Array.isArray(props.modelValue) ? props.modelValue.filter(Boolean).join(', ') : props.modelValue
 );
 
-function optionLabel(data: { label?: string; value?: string; fullName?: string }): string {
-  return data.fullName || data.label || data.value || '';
-}
-
-function filterNode(query: string, node: { label?: string; value?: string }): boolean {
+function filterNode(query: string, node: { label?: string; value?: string; fullName?: string }): boolean {
   if (!query) return true;
   const q = query.toLowerCase();
-  return (node.label ?? '').toLowerCase().includes(q) || (node.value ?? '').toLowerCase().includes(q);
+  return (
+    (node.label ?? '').toLowerCase().includes(q) ||
+    (node.value ?? '').toLowerCase().includes(q) ||
+    (node.fullName ?? '').toLowerCase().includes(q)
+  );
 }
 
 function onUpdate(v: string | string[] | null): void {
@@ -64,8 +71,8 @@ function onUpdate(v: string | string[] | null): void {
     @update:model-value="onUpdate"
   >
     <template #default="{ data: node }">
-      <el-tooltip :content="optionLabel(node)" placement="top" :show-after="400" :enterable="false">
-        <span class="branch-option">{{ optionLabel(node) }}</span>
+      <el-tooltip :content="node.fullName || node.label" placement="top" :show-after="400" :enterable="false">
+        <span class="branch-option">{{ node.label }}</span>
       </el-tooltip>
     </template>
   </el-tree-select>
@@ -75,9 +82,6 @@ function onUpdate(v: string | string[] | null): void {
 .branch-tree-select {
   width: var(--gc-select-width);
   flex: none;
-}
-.branch-tree-select :deep(.el-tag) {
-  max-width: 160px;
 }
 .branch-option {
   display: block;

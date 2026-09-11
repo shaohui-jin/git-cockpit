@@ -25,6 +25,13 @@ export function filterBranches(list: BranchInfo[], scope: BranchScope = 'all'): 
   return list;
 }
 
+/** 落盘留下的 `merge/…` 或 `origin/merge/…`，不是线上目标 */
+export function isMergeTempBranchName(name: string): boolean {
+  const n = name.replace(/^refs\/heads\//, '').replace(/^refs\/remotes\/[^/]+\//, '');
+  if (n.startsWith('merge/')) return true;
+  return /^[^/]+\/merge\//.test(n);
+}
+
 function sortTree(nodes: BranchTreeNode[]): void {
   nodes.sort((a, b) => {
     const ad = a.branch ? 1 : 0;
@@ -70,8 +77,14 @@ function buildPathTree(entries: { path: string; branch: BranchInfo }[], keyPrefi
 }
 
 /** 本地一组 + 每个 remote 一组，组内按 / 分层。状态页侧栏与下拉树共用。 */
-export function buildBranchPanes(list: BranchInfo[], scope: BranchScope = 'all'): BranchPane[] {
-  const filtered = filterBranches(list, scope);
+export function buildBranchPanes(
+  list: BranchInfo[],
+  scope: BranchScope = 'all',
+  opts?: { excludeMergeTemp?: boolean }
+): BranchPane[] {
+  const filtered = filterBranches(list, scope).filter((b) =>
+    opts?.excludeMergeTemp ? !isMergeTempBranchName(b.name) : true
+  );
   const locals = filtered.filter((b) => !b.remote);
   const remotes = filtered.filter((b) => b.remote);
   const remoteMap = new Map<string, { path: string; branch: BranchInfo }[]>();

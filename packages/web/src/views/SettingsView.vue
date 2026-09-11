@@ -415,7 +415,7 @@ onMounted(async () => {
     <p v-if="repos.serverVersion" class="page-version">服务 {{ repos.serverVersion }}</p>
     <el-alert v-if="settings.error" :title="settings.error" type="error" :closable="false" show-icon class="mb" />
 
-    <el-tabs v-model="activeTab" class="settings-tabs">
+    <el-tabs v-model="activeTab" class="settings-tabs gc-tabs-fill gc-tabs-scroll">
       <el-tab-pane label="MR 配置" name="mr">
         <el-card shadow="never" class="mb">
           <div class="remote-bar">
@@ -455,7 +455,7 @@ onMounted(async () => {
           @keydown.enter.prevent="selectMethod(opt.id)"
         >
           <div class="mr-option-head">
-            <el-radio :model-value="method" :value="opt.id" :disabled="settings.saving" @change="selectMethod(opt.id)" @click.stop>
+            <el-radio class="gc-radio-flush" :model-value="method" :value="opt.id" :disabled="settings.saving" @change="selectMethod(opt.id)" @click.stop>
               {{ opt.title }}
             </el-radio>
             <el-tag size="small" :type="opt.ready ? 'success' : 'warning'" effect="plain">
@@ -509,7 +509,7 @@ onMounted(async () => {
                 }}</p>
               </template>
               <template v-else>
-                <el-form class="mr-form" label-width="100px" label-position="left" @submit.prevent>
+                <el-form class="mr-form gc-form-narrow" label-width="100px" label-position="left" @submit.prevent>
                   <el-form-item label="Token">
                     <div class="mr-field">
                       <p v-if="tokenStatusText" class="token-title-status" :class="tokenStatusClass">{{ tokenStatusText }}</p>
@@ -568,7 +568,12 @@ onMounted(async () => {
               </template>
             </div>
 
-            <p v-if="opt.id === 'browser'" class="mr-hint">确认后只返回浏览器创建页，不调用 Token 或本机 CLI。</p>
+            <p v-if="opt.id === 'browser'" class="mr-hint">
+              确认后只返回浏览器创建页，不调用 Token 或本机 CLI。
+              <template v-if="settings.mr?.template?.enabled">
+                已启用正文规范时，平台创建页不会写入正文，请复制后粘贴，或改用 Token / 本机 CLI。
+              </template>
+            </p>
           </div>
         </div>
 
@@ -594,7 +599,9 @@ onMounted(async () => {
         </el-card>
       </el-tab-pane>
       <el-tab-pane label="正文规范" name="template">
-        <MrTemplateSettings />
+        <div class="template-pane gc-pane-fill">
+          <MrTemplateSettings />
+        </div>
       </el-tab-pane>
       <el-tab-pane label="Git 操作" name="git">
         <el-card shadow="never" class="mb">
@@ -687,9 +694,19 @@ onMounted(async () => {
 
 <style scoped>
 .page {
-  overflow: auto;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.page-title,
+.page-version,
+.page > .el-alert {
+  flex: none;
 }
 .settings-tabs {
+  flex: 1;
   min-height: 0;
 }
 .form-tip {
@@ -771,9 +788,6 @@ onMounted(async () => {
   height: var(--gc-line);
   gap: var(--gc-gap);
 }
-.mr-option-head :deep(.el-radio) {
-  margin-right: 0;
-}
 .mr-panel {
   display: flex;
   flex-direction: column;
@@ -810,12 +824,6 @@ onMounted(async () => {
 }
 .mr-form {
   width: 100%;
-}
-.mr-form :deep(.el-form-item__content) {
-  flex-wrap: wrap;
-}
-.mr-form :deep(.el-input) {
-  max-width: 420px;
 }
 .mr-inline {
   display: flex;

@@ -6,6 +6,7 @@ import {
   normalizeMrConfig,
   parseMrTemplateMarkdown,
   renderMrTemplate,
+  resolveMrCreateBody,
   validateMrTemplateFields
 } from '../src/index.ts';
 
@@ -75,6 +76,37 @@ describe('render / validate', () => {
     expect(body).toContain('- 风险等级：低');
     expect(body).toContain('- [x] 单元测试已通过');
     expect(body).toContain('| `low` |');
+  });
+});
+
+describe('resolveMrCreateBody', () => {
+  it('未启用时用传入的 body', () => {
+    expect(resolveMrCreateBody(null, undefined, 'hello')).toBe('hello');
+    const t = parseMrTemplateMarkdown(fixture, 'Default.md');
+    t.enabled = false;
+    expect(resolveMrCreateBody(t, undefined, 'plain')).toBe('plain');
+  });
+
+  it('启用时缺 fields 或必填则拒绝，齐了则渲染', () => {
+    const t = parseMrTemplateMarkdown(fixture, 'Default.md');
+    expect(() => resolveMrCreateBody(t, undefined)).toThrow(/fields/);
+    expect(() => resolveMrCreateBody(t, {})).toThrow(/未填完整/);
+    const values = {
+      purpose: '修导入',
+      changes: '- 解析 MD',
+      self_review: '低',
+      review_notes: '看解析',
+      preflight: {
+        preflight_1: true,
+        preflight_2: true,
+        preflight_3: true,
+        preflight_4: true,
+        preflight_5: true
+      }
+    };
+    const body = resolveMrCreateBody(t, values, '应被忽略');
+    expect(body).toContain('修导入');
+    expect(body).not.toContain('应被忽略');
   });
 });
 
