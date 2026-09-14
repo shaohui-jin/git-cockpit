@@ -90,8 +90,6 @@ jobs:
 
       - name: Package
         run: pnpm --filter @shaohui_jin/git-cockpit-desktop pack:win
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

@@ -2,12 +2,13 @@
   "name": "@shaohui_jin/git-cockpit-desktop",
   "version": "0.1.21",
   "private": true,
+  "author": "Git Cockpit",
   "description": "Git Cockpit 桌面窗壳：拉起或复用本机 daemon，窗口加载现有 Web",
   "main": "main.cjs",
   "scripts": {
     "dev": "electron .",
     "prepare:runtime": "node scripts/prepare-runtime.mjs",
-    "pack:win": "node scripts/prepare-runtime.mjs && electron-builder --win zip nsis --x64"
+    "pack:win": "node scripts/pack-win.mjs"
   },
   "devDependencies": {
     "electron": "^37.2.0",
@@ -27,7 +28,9 @@
         "from": "runtime",
         "to": "mcp-server",
         "filter": [
-          "**/*"
+          "**/*",
+          "!**/*.map",
+          "!**/*.d.ts"
         ]
       }
     ],
@@ -40,6 +43,8 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
-    }
+    },
+    "forceCodeSigning": false,
+    "publish": "never"
   }
 }
