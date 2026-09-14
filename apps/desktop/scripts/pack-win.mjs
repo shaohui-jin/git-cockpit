@@ -29,8 +29,11 @@ if (!process.env.GITHUB_ACTIONS && runningDesktopElectron()) {
 
 execSync('node scripts/prepare-runtime.mjs', { cwd: desktopRoot, stdio: 'inherit' });
 execSync('node scripts/clean-release.mjs', { cwd: desktopRoot, stdio: 'inherit' });
-// 安装包由 workflow 挂到 GitHub Release，不要让 electron-builder 在 CI 里隐式 publish。
+const env = { ...process.env };
+delete env.GH_TOKEN;
+delete env.GITHUB_TOKEN;
 execSync('pnpm exec electron-builder --win zip nsis --x64 --publish never', {
   cwd: desktopRoot,
-  stdio: 'inherit'
+  stdio: 'inherit',
+  env
 });
