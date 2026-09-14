@@ -2,7 +2,7 @@
 
 基于 MCP（Model Context Protocol）的 Git 可视化操作工具：Web 端界面 + 供宿主 Agent 调用的 MCP 工具，支持多仓库管理与安全的 Git 操作。
 
-> 完整设计见 [设计文档.md](docs/设计文档.md)。本产品 **不做** Cursor/VS Code 扩展，也不内置聊天或选边模型。
+> 完整设计见 [设计文档.md](docs/设计文档.md)。本产品 **不做** Cursor/VS Code 扩展，也不做冲突自动选边。可选聊天（同一 Web + `/api/chat` + Electron 宿主）见 [docs/聊天壳方案.md](docs/聊天壳方案.md)。在 Cursor 里配 MCP **不会**打开聊天页。
 
 ## Monorepo 结构
 
@@ -169,3 +169,14 @@ core 作为 mcp-server 的运行时依赖（`workspace:^`），发布 mcp-server
 ## 开发
 
 日常 Git、合并预演、矩阵、开 PR/MR、工作台、MCP 摘要输出、通用后台任务均已落地。已落地行为见 [docs/设计文档.md](docs/设计文档.md)。
+
+可选聊天：`pnpm start` 后打开设置「模型」填 API Key（可填 OpenAI 兼容 Base URL；保存会探活）。开发可用环境变量 `GIT_COCKPIT_LLM_API_KEY` / `GIT_COCKPIT_LLM_MODEL` / `GIT_COCKPIT_LLM_BASE_URL` 覆盖，不写进设置文件。侧栏进「聊天」。写操作会先干跑，确认条展示真实 git 命令后再执行。模型 Key 与 MR Token 一样只在设置里，不进 MCP 工具参数。Cursor 直连 `/mcp` **不经**聊天确认闸。
+
+桌面窗开发：先起带聊天的前端，再开 Electron。窗口标题会带当前地址（应是 `http://127.0.0.1:5173`）。若标题是 `:3000` 或侧栏没有「聊天」，先关掉**所有** Git Cockpit 窗口，再重新 `pnpm desktop:dev`。
+
+```bash
+pnpm start                 # 终端 1：daemon :3000 + Vite :5173
+pnpm desktop:dev           # 终端 2：窗口；侧栏「工作台」下面应有「聊天」
+```
+
+形态与分期见 [docs/聊天壳方案.md](docs/聊天壳方案.md)。

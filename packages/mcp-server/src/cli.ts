@@ -22,6 +22,9 @@ function printHelp(): void {
   GIT_COCKPIT_DATA_DIR        数据目录（默认 ~/.git-cockpit）
   GIT_COCKPIT_PORT            端口（默认 3000）
   GIT_COCKPIT_HOST            监听地址（默认 localhost）
+  GIT_COCKPIT_LLM_API_KEY     开发可选：覆盖设置里的模型 Key，不写回 config.json
+  GIT_COCKPIT_LLM_MODEL       开发可选：覆盖模型名
+  GIT_COCKPIT_LLM_BASE_URL    开发可选：覆盖 OpenAI 兼容 Base URL
 `);
 }
 

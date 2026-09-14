@@ -11,7 +11,8 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild",
-      "vue-demi"
+      "vue-demi",
+      "electron"
     ]
   },
   "scripts": {
@@ -21,6 +22,7 @@
     "start": "pnpm --parallel --filter @shaohui_jin/git-cockpit-mcp-server --filter @shaohui_jin/git-cockpit-web start",
     "test": "pnpm -r --filter './packages/**' test",
     "test:e2e": "pnpm --filter @shaohui_jin/git-cockpit-e2e test:e2e",
+    "desktop:dev": "pnpm --filter @shaohui_jin/git-cockpit-desktop dev",
     "typecheck": "pnpm -r --filter './packages/**' typecheck",
     "lint": "eslint .",
     "clean": "pnpm -r exec tsc --build --clean"

@@ -19,11 +19,16 @@ const route = useRoute();
 const router = useRouter();
 const { bump, revision } = useRevision();
 
-const menuWork = [
+const menuChat = { path: '/chat', label: '聊天', icon: '✎' };
+const menuWorkRest = [
   { path: '/dashboard', label: '工作台', icon: '▤' },
   { path: '/status', label: '状态', icon: '◧' },
   { path: '/merge', label: '合并', icon: '⇄' }
 ];
+/** 配了模型 Key 才把聊天置顶；没配时仍可见，只排在干活区末尾。 */
+const menuWork = computed(() =>
+  settings.llm?.tokenSet ? [menuChat, ...menuWorkRest] : [...menuWorkRest, menuChat]
+);
 const menuSystem = [
   { path: '/jobs', label: '任务', icon: '↻' },
   { path: '/logs', label: '操作日志', icon: '≡' },

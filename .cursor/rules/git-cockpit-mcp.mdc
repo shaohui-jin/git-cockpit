@@ -5,18 +5,37 @@ alwaysApply: true
 
 # Git Cockpit MCP
 
-本仓库的 git 事实走 **Git Cockpit MCP**（`user-git-cockpit`），不要另起一套终端 git 来代替预演/落盘/开 MR。
+本仓库的 git 事实走 **Git Cockpit MCP**（`user-git-cockpit`），不要另起一套终端 git 来代替预演 / 落盘 / 开 MR。
+
+## 整体流程（先读）
+
+人要「发合并请求 / 看 MR 正文 / 选人 / 先不真开」时，走这一条，中途不要自己改步骤：
+
+1. **预演** `git_merge_preview`（只回答合不合得进；不改仓库）
+2. 有冲突 → 把 `webUrl` 给人网页选边，**停止**。不要选边、不要开单。
+3. 干净 → **落盘** `git_apply_resolve`（独立 worktree，主区不切换）
+4. **推送** 临时枝 `git_push`（`merge/<from>-into-<into>`）
+5. **看闸和规范** `git_mr_prepare`（`mergeGate.ok`、`template`、候选人）
+6. **看正文** `git_mr_create` 且 **必须** `dry_run=true`（启用规范时传 `fields`；只把返回的 `##` Markdown 给人）
+7. **真开单** 只在人明确说「现在开 / 去掉 dry_run」之后，再跑一次不带 dry_run 的 `git_mr_create`
+
+词义（不要混）：
+
+| 人说的 | 做到哪一步 | 不是 |
+|--------|------------|------|
+| 合不合得进 / 先预演 | 停在 1 | 不是落盘，不是开单 |
+| 发合并请求 / 看正文 / 选人 / **不真开** | 做到 6 | 不是跳过 3、4；不是平台建 PR |
+| 现在开 / 真开 | 做到 7 | — |
+
+写操作可先 `dry_run=true` 看一眼；步骤 3、4 预览通过后 **必须真执行**。不要因为「不真开」把落盘/推送停在 dry_run。`NOT_LANDED` / `TEMP_NOT_PUSHED` = 回去做 3 或 4，禁止手写字段表交差。高风险工具默认禁用。Token 不进工具参数，在网页设置里。
 
 ## 什么时候调 MCP
 
 - 日常状态、暂存、提交、抓取、推送、stash、分支、worktree：`git_status` / `git_add` / `git_commit` / `git_fetch` / `git_pull` / `git_push` / `git_worktree_list` 等。
-- 问「合不合得进去」、看冲突内容：`git_merge_preview` / `git_merge_rehearse` / `git_merge_blame`（只读）。有冲突把 `webUrl` 给人在网页选边，然后停止。
+- 问「合不合得进去」、看冲突内容：`git_merge_preview` / `git_merge_rehearse` / `git_merge_blame`（只读）。
 - 多分支扫描、合入顺序：`git_merge_survey` / `git_merge_order`。
 - 两分支分叉（merge-base / 独有提交数）：`git_branch_graph` 并传 `into` 与 `from`。
-- 工作区已经在 merge/rebase 冲突里：先 `git_status` 看 `operation`。人先在编辑器或网页解决，再 `git_merge_continue` / `git_rebase_continue`（不要带 `files`）或 abort。不要用预演工具冒充收尾。
-- 开 PR/MR：先 `git_merge_preview`。有冲突不要 `git_mr_create`（含 dry_run），把 `webUrl` 给人在网页选边。干净则落盘并推送临时枝，再 `git_mr_prepare`（看 `mergeGate.ok`）→ `git_mr_create` 只 `dry_run`。Token 不进工具参数，在网页设置里。
-
-写操作先 `dry_run=true`。高风险工具默认禁用。
+- 工作区已经在 merge/rebase 冲突里：先 `git_status` 看 `operation`。人先在编辑器或网页解决，再 `git_merge_continue` / `git_rebase_continue`（不要带 `files`）或 abort。不要用预演工具冒充收尾。这是另一条路，不要和工作区未卡住时的「预演 → 落盘」混用。
 
 ## 硬规则
 
@@ -25,4 +44,5 @@ alwaysApply: true
 - **不要选边**：禁止传 `files` / `resolvedContent`，禁止自己改冲突文件后冒充已解决。`git_merge_blame` 只给人看作者，不是选边。
 - 落盘 `git_apply_resolve` 只用于**干净合并**。有冲突不要调用。
 - 工作区 continue/abort 只结束已经开始的 merge/rebase，**禁止**用 `git_apply_resolve` 收尾工作区冲突，continue **不要带 files**。
+- 规范正文只用步骤 6 返回的 Markdown。禁止把 `template.fields` 画成表格交差。
 - 口头「完成」不算数：用原来的 `into`/`from` 再 preview，认这一对的 `merge/<from>-into-<into>`（或 `origin/merge/…`）。别人的 `merge/*` 当噪音。

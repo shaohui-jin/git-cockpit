@@ -95,7 +95,9 @@ export class McpHttpHandler {
 
     // 新会话：创建 transport + server 并连接
     const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => randomUUID()
+      sessionIdGenerator: () => randomUUID(),
+      enableDnsRebindingProtection: true,
+      allowedHosts: ['127.0.0.1', 'localhost', '[::1]']
     });
     const server = createMcpServer(this.runtime);
     await server.connect(transport);

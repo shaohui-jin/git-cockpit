@@ -79,5 +79,14 @@ export {
   validateMrTemplateFields
 } from './mrTemplate.ts';
 export { maskToken, validateMrToken, validateGithubTokenFormat, validateGitlabTokenFormat } from './mrToken.ts';
+export {
+  normalizeLlmConfig,
+  publicLlmConfig,
+  validateLlmApiKeyFormat,
+  applyLlmEnvOverrides,
+  llmBaseUrl,
+  shouldProbeLlm,
+  probeLlmEndpoint
+} from './llm.ts';
 export { trustSystemCa, describeFetchError } from './trustSystemCa.ts';
 export { crossPairs, clearMergeSurveyCache, MAX_SURVEY_PAIRS, parseTempBranches } from './survey.ts';

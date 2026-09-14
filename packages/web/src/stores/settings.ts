@@ -1,11 +1,12 @@
 import { defineStore } from 'pinia';
 import * as api from '@/api/client';
-import type { MrCurrentHost, MrSettings, MrTemplate, PermissionsPayload, RemoteInfo, ToolSummary } from '@/api/types';
+import type { MrCurrentHost, MrSettings, MrTemplate, PermissionsPayload, PublicLlmConfig, RemoteInfo, ToolSummary } from '@/api/types';
 
 interface State {
   permissions: PermissionsPayload | null;
   tools: ToolSummary[];
   mr: MrSettings | null;
+  llm: PublicLlmConfig | null;
   allowedRepos: string[];
   loading: boolean;
   saving: boolean;
@@ -133,6 +134,7 @@ export const useSettingsStore = defineStore('settings', {
     permissions: null,
     tools: [],
     mr: null,
+    llm: null,
     allowedRepos: [],
     loading: false,
     saving: false,
@@ -151,6 +153,13 @@ export const useSettingsStore = defineStore('settings', {
         this.tools = data.tools;
         this.allowedRepos = data.git?.allowedRepos ?? [];
         this.mr = attachRepoRemotes(normalizeMr(data.mr), remotes);
+        this.llm = data.llm ?? {
+          provider: 'openai',
+          model: 'gpt-4.1',
+          baseUrl: '',
+          tokenSet: false,
+          tokenPreview: ''
+        };
       } catch (err) {
         this.error = err instanceof Error ? err.message : String(err);
       } finally {
@@ -168,6 +177,9 @@ export const useSettingsStore = defineStore('settings', {
         }
         if (body.git?.allowedRepos) {
           this.allowedRepos = body.git.allowedRepos;
+        }
+        if (res.llm) {
+          this.llm = res.llm;
         }
         if (res.mr) {
           const incoming = normalizeMr(res.mr);

@@ -16,17 +16,29 @@ function mcpInputSchema(def: Capability): unknown {
   return typeof schema.omit === 'function' ? schema.omit({ files: true }) : def.schema;
 }
 
+function mcpAnnotations(def: Capability): {
+  readOnlyHint: boolean;
+  destructiveHint: boolean;
+  openWorldHint: boolean;
+} {
+  return {
+    readOnlyHint: def.risk === 'readonly',
+    destructiveHint: def.risk === 'dangerous',
+    openWorldHint: false
+  };
+}
+
 export function bindMcpTools(server: McpServer, runtime: Runtime, capabilities: readonly Capability[]): void {
   for (const def of capabilities) {
     const register = server.registerTool.bind(server) as unknown as (
       name: string,
-      config: { title?: string; description?: string; inputSchema?: unknown },
+      config: { title?: string; description?: string; inputSchema?: unknown; annotations?: unknown },
       cb: (args: unknown, extra: unknown) => Promise<unknown>
     ) => unknown;
 
     register(
       def.name,
-      { description: def.description, inputSchema: mcpInputSchema(def) },
+      { description: def.description, inputSchema: mcpInputSchema(def), annotations: mcpAnnotations(def) },
       async (args: unknown) => {
         const exec = await executeTool(def, (args ?? {}) as Record<string, unknown>, {
           runtime,

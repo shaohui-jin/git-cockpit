@@ -289,6 +289,55 @@ describe('Web API', () => {
     expect(after.json().mr.hosts).toEqual([]);
   });
 
+  it('GET/PUT /api/settings 保存模型 Key，明文不回显；无 Key / 无仓时 /api/chat 拒绝', async () => {
+    const before = await server.app.inject({ method: 'GET', url: '/api/settings' });
+    if (!before.json().llm?.tokenSet) {
+      const noKey = await server.app.inject({
+        method: 'POST',
+        url: '/api/chat',
+        payload: { messages: [{ role: 'user', content: 'hi' }], repoPath: repoDir }
+      });
+      expect(noKey.statusCode).toBe(400);
+      expect(noKey.json().code).toBe('LLM_NOT_CONFIGURED');
+    }
+
+    const key = 'sk-abcdefghijklmnopqrstuvwxyz012345';
+    const put = await server.app.inject({
+      method: 'PUT',
+      url: '/api/settings',
+      payload: { llm: { provider: 'openai', model: 'gpt-4.1', apiKey: key } }
+    });
+    expect(put.statusCode).toBe(200);
+    expect(JSON.stringify(put.json())).not.toContain(key);
+    expect(put.json().llm.tokenSet).toBe(true);
+    expect(put.json().llm.tokenPreview).toContain('••••');
+    expect(put.json().llm.baseUrl).toBe('');
+
+    const get = await server.app.inject({ method: 'GET', url: '/api/settings' });
+    expect(get.json().llm.tokenSet).toBe(true);
+    expect(JSON.stringify(get.json())).not.toContain(key);
+
+    const noRepo = await server.app.inject({
+      method: 'POST',
+      url: '/api/chat',
+      payload: { messages: [{ role: 'user', content: 'hi' }], sessionId: 't-norepo' }
+    });
+    expect(noRepo.statusCode).toBe(400);
+    expect(noRepo.json().code).toBe('NO_ACTIVE_REPO');
+
+    const notOpen = await server.app.inject({
+      method: 'POST',
+      url: '/api/chat',
+      payload: {
+        messages: [{ role: 'user', content: 'hi' }],
+        repoPath: path.join(repoDir, '..', 'not-a-repo-chat'),
+        sessionId: 't-notopen'
+      }
+    });
+    expect(notOpen.statusCode).toBe(400);
+    expect(notOpen.json().code).toBe('REPO_NOT_OPEN');
+  });
+
   it('GET/PUT /api/settings 按域名保存 Token，明文不回显', async () => {
     const tokenA = `glpat-${'A'.repeat(20)}`;
     const tokenB = `glpat-${'B'.repeat(20)}`;

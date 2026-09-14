@@ -34,3 +34,8 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+
+# Electron pack output
+apps/desktop/release/
+apps/desktop/runtime/
+/.cursor/skills/

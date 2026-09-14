@@ -250,7 +250,7 @@ export interface ToolSummary {
 
 export interface ToolExecResult {
   tool: string;
-  source: 'mcp' | 'web' | 'cli';
+  source: 'mcp' | 'web' | 'cli' | 'chat';
   dryRun: boolean;
   success: boolean;
   result?: unknown;
@@ -371,11 +371,22 @@ export interface MrSettings {
   template: MrTemplate | null;
 }
 
+export type LlmProvider = 'openai';
+
+export interface PublicLlmConfig {
+  provider: LlmProvider;
+  model: string;
+  baseUrl: string;
+  tokenSet: boolean;
+  tokenPreview: string;
+}
+
 export interface SettingsData {
   permissions: PermissionsPayload;
   tools: ToolSummary[];
   mr: MrSettings;
   git?: { allowedRepos: string[] };
+  llm?: PublicLlmConfig;
 }
 
 export interface HealthInfo {

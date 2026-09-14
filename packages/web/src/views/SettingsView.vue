@@ -16,11 +16,11 @@ const GH_INSTALL_URL = 'https://cli.github.com/';
 const GLAB_INSTALL_URL = 'https://gitlab.com/gitlab-org/cli/-/releases';
 const GH_TOKEN_CREATE_URL = 'https://github.com/settings/tokens/new?scopes=repo&description=Git%20Cockpit';
 
-type SettingsTab = 'git' | 'mr' | 'template';
+type SettingsTab = 'git' | 'mr' | 'template' | 'llm';
 const activeTab = computed<SettingsTab>({
   get: () => {
     const tab = route.query.tab;
-    if (tab === 'git' || tab === 'template') return tab;
+    if (tab === 'git' || tab === 'template' || tab === 'llm') return tab;
     return 'mr';
   },
   set: (name) => {
@@ -45,6 +45,9 @@ const loaded = ref(false);
 const method = ref<MrMethod>('browser');
 const selectedRemote = ref('origin');
 const tokenInput = ref('');
+const llmKeyInput = ref('');
+const llmModel = ref('gpt-4.1');
+const llmBaseUrl = ref('');
 const apiBaseUrl = ref('');
 const showAdvanced = ref(false);
 const validatingToken = ref(false);
@@ -216,7 +219,15 @@ async function reloadSettings(opts?: { validateToken?: boolean }): Promise<void>
     method.value = coerceMethod(settings.mr?.method ?? method.value);
     selectedRemote.value = current.value?.remote || selectedRemote.value;
   }
+  syncLlmForm();
 }
+
+onMounted(async () => {
+  await reloadSettings();
+  syncGitDraft();
+  syncMrForm();
+  syncLlmForm();
+});
 
 watch(
   () => [settings.permissions] as const,
@@ -402,11 +413,50 @@ async function redetectCli(): Promise<void> {
   ElMessage.success('已重新检测本机 gh / glab');
 }
 
-onMounted(async () => {
-  await reloadSettings();
-  syncGitDraft();
-  syncMrForm();
-});
+function syncLlmForm(): void {
+  llmModel.value = settings.llm?.model || 'gpt-4.1';
+  llmBaseUrl.value = settings.llm?.baseUrl || '';
+  llmKeyInput.value = '';
+}
+
+async function saveLlm(): Promise<void> {
+  try {
+    await settings.save(
+      {
+        llm: {
+          provider: 'openai',
+          model: llmModel.value.trim() || 'gpt-4.1',
+          baseUrl: llmBaseUrl.value.trim(),
+          ...(llmKeyInput.value.trim() ? { apiKey: llmKeyInput.value.trim() } : {})
+        }
+      },
+      repoId()
+    );
+    llmKeyInput.value = '';
+    ElMessage.success('已保存模型配置');
+  } catch (err) {
+    ElMessage.error(err instanceof Error ? err.message : String(err));
+  }
+}
+
+async function clearLlmKey(): Promise<void> {
+  try {
+    await ElMessageBox.confirm('清除已保存的模型 API Key？聊天将无法调用模型。', '确认', {
+      confirmButtonText: '清除',
+      cancelButtonText: '取消',
+      type: 'warning'
+    });
+  } catch {
+    return;
+  }
+  try {
+    await settings.save({ llm: { clearKey: true } }, repoId());
+    llmKeyInput.value = '';
+    ElMessage.success('已清除');
+  } catch (err) {
+    ElMessage.error(err instanceof Error ? err.message : String(err));
+  }
+}
 </script>
 
 <template>
@@ -602,6 +652,47 @@ onMounted(async () => {
         <div class="template-pane gc-pane-fill">
           <MrTemplateSettings />
         </div>
+      </el-tab-pane>
+      <el-tab-pane label="模型" name="llm">
+        <el-card shadow="never" class="mb">
+          <p class="mr-hint">
+            聊天页调用大模型用。Key 与 MR Token 一样只存在本机设置里，不进 MCP 工具参数，页面不回填明文。浏览器和桌面同一套配置。
+          </p>
+          <el-form label-width="120px" label-position="left" class="mr-form">
+            <el-form-item label="供应商">
+              <el-select model-value="openai" disabled style="width: 220px">
+                <el-option label="OpenAI 兼容" value="openai" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="模型名">
+              <el-input v-model="llmModel" placeholder="gpt-4.1" style="max-width: 280px" />
+            </el-form-item>
+            <el-form-item label="Base URL">
+              <el-input
+                v-model="llmBaseUrl"
+                placeholder="空 = https://api.openai.com/v1 ；兼容网关填到 /v1"
+                style="max-width: 420px"
+              />
+            </el-form-item>
+            <el-form-item label="API Key">
+              <el-input
+                v-model="llmKeyInput"
+                type="password"
+                show-password
+                :placeholder="
+                  settings.llm?.tokenSet
+                    ? `已保存 ${settings.llm.tokenPreview}，输入新 Key 覆盖`
+                    : 'sk-…'
+                "
+                style="max-width: 420px"
+              />
+            </el-form-item>
+          </el-form>
+          <div class="action-bar">
+            <el-button type="primary" :loading="settings.saving" @click="saveLlm">保存</el-button>
+            <el-button :disabled="!settings.llm?.tokenSet || settings.saving" @click="clearLlmKey">清除 Key</el-button>
+          </div>
+        </el-card>
       </el-tab-pane>
       <el-tab-pane label="Git 操作" name="git">
         <el-card shadow="never" class="mb">

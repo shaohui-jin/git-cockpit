@@ -11,7 +11,7 @@ export type ToolExecutionResult = ExecutionResult;
 
 export interface ToolExecutionContext {
   runtime: Runtime;
-  source: 'mcp' | 'web' | 'cli';
+  source: 'mcp' | 'web' | 'cli' | 'chat';
   /** 上层已解析的仓库（Web 路由提供 repoId，MCP 可通过 tool args 的 repoPath 提供） */
   repoId?: number;
   repoPath?: string;

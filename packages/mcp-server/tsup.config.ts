@@ -21,6 +21,8 @@ export default {
     '@fastify/swagger',
     '@fastify/swagger-ui',
     'zod',
-    'zod-to-json-schema'
+    'zod-to-json-schema',
+    'ai',
+    '@ai-sdk/openai'
   ]
 };

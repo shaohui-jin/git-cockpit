@@ -5,6 +5,7 @@ import MergeView from '@/views/MergeView.vue';
 import JobsView from '@/views/JobsView.vue';
 import LogsView from '@/views/LogsView.vue';
 import SettingsView from '@/views/SettingsView.vue';
+import ChatView from '@/views/ChatView.vue';
 
 export const router = createRouter({
   // 使用 hash 历史模式：后端 SPA fallback 与文件托管下均无需服务端改写
@@ -16,6 +17,7 @@ export const router = createRouter({
     { path: '/repos', redirect: '/dashboard' },
     { path: '/status', name: 'status', component: StatusView, meta: { title: '状态' } },
     { path: '/merge', name: 'merge', component: MergeView, meta: { title: '合并' } },
+    { path: '/chat', name: 'chat', component: ChatView, meta: { title: '聊天' } },
     { path: '/matrix', redirect: { path: '/merge', query: { mode: 'matrix' } } },
     { path: '/logs', name: 'logs', component: LogsView, meta: { title: '操作日志' } },
     { path: '/settings', name: 'settings', component: SettingsView, meta: { title: '设置' } }

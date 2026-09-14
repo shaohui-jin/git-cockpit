@@ -1,0 +1,45 @@
+{
+  "name": "@shaohui_jin/git-cockpit-desktop",
+  "version": "0.1.21",
+  "private": true,
+  "description": "Git Cockpit 桌面窗壳：拉起或复用本机 daemon，窗口加载现有 Web",
+  "main": "main.cjs",
+  "scripts": {
+    "dev": "electron .",
+    "prepare:runtime": "node scripts/prepare-runtime.mjs",
+    "pack:win": "node scripts/prepare-runtime.mjs && electron-builder --win zip nsis --x64"
+  },
+  "devDependencies": {
+    "electron": "^37.2.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.shaohui.git-cockpit",
+    "productName": "Git Cockpit",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.cjs"
+    ],
+    "extraResources": [
+      {
+        "from": "runtime",
+        "to": "mcp-server",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        "zip",
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

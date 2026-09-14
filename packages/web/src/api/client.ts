@@ -18,6 +18,7 @@ import type {
   MrTemplate,
   OpenedRepo,
   PermissionsPayload,
+  PublicLlmConfig,
   ReflogEntry,
   RemoteInfo,
   RepoOverview,
@@ -359,6 +360,13 @@ export function updateSettings(
   body: {
     permissions?: Partial<PermissionsPayload>;
     git?: { allowedRepos?: string[] };
+    llm?: {
+      provider?: PublicLlmConfig['provider'];
+      model?: string;
+      baseUrl?: string;
+      apiKey?: string;
+      clearKey?: boolean;
+    };
     mr?: {
       method?: MrSettings['method'];
       defaultRemote?: string;
@@ -373,7 +381,7 @@ export function updateSettings(
     };
   },
   repoId?: number | null
-): Promise<{ ok: boolean; mr?: MrSettings }> {
+): Promise<{ ok: boolean; mr?: MrSettings; llm?: PublicLlmConfig }> {
   const q = repoId != null ? `?repoId=${repoId}` : '';
   return request('PUT', `/api/settings${q}`, body);
 }
@@ -394,6 +402,90 @@ export function previewMrTemplate(
 
 export function getHealth(): Promise<HealthInfo> {
   return request('GET', '/api/health');
+}
+
+export interface ChatSseHandlers {
+  onDelta?: (text: string) => void;
+  onConfirm?: (payload: { token: string; tool: string; preview: { command: string; affectedFiles: string[]; args?: string[]; note?: string } }) => void;
+  onTool?: (payload: { tool: string; success: boolean }) => void;
+  onError?: (message: string) => void;
+  onDone?: () => void;
+}
+
+export async function streamChat(
+  body: { messages: Array<{ role: 'user' | 'assistant'; content: string }>; repoPath: string; sessionId: string },
+  handlers: ChatSseHandlers,
+  signal?: AbortSignal
+): Promise<void> {
+  const res = await fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+    body: JSON.stringify(body),
+    signal
+  });
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`;
+    try {
+      const j = (await res.json()) as { error?: string };
+      if (j.error) msg = j.error;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(msg);
+  }
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error('无法读取对话流');
+  const decoder = new TextDecoder();
+  let buf = '';
+  let event = 'message';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const parts = buf.split('\n');
+    buf = parts.pop() ?? '';
+    for (const line of parts) {
+      if (line.startsWith('event:')) {
+        event = line.slice(6).trim();
+        continue;
+      }
+      if (line.startsWith('data:')) {
+        const raw = line.slice(5).trim();
+        if (!raw) continue;
+        let data: unknown = raw;
+        try {
+          data = JSON.parse(raw);
+        } catch {
+          /* keep string */
+        }
+        if (event === 'delta' && data && typeof data === 'object' && 'text' in data) {
+          handlers.onDelta?.(String((data as { text: string }).text));
+        } else if (event === 'confirm' && data && typeof data === 'object') {
+          handlers.onConfirm?.(data as { token: string; tool: string; preview: { command: string; affectedFiles: string[] } });
+        } else if (event === 'tool' && data && typeof data === 'object') {
+          handlers.onTool?.(data as { tool: string; success: boolean });
+        } else if (event === 'error' && data && typeof data === 'object' && 'error' in data) {
+          handlers.onError?.(String((data as { error: string }).error));
+        } else if (event === 'done') {
+          handlers.onDone?.();
+        }
+        event = 'message';
+      }
+    }
+  }
+  handlers.onDone?.();
+}
+
+export function confirmChat(
+  token: string,
+  opts?: { cancel?: boolean }
+): Promise<{
+  ok: boolean;
+  error?: string;
+  tool?: string;
+  preview?: { command: string; affectedFiles: string[] };
+}> {
+  return request('POST', '/api/chat/confirm', { token, cancel: Boolean(opts?.cancel) });
 }
 
 /** SSE：订阅仓库变化事件。返回取消函数。 */

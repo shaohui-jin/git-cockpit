@@ -6,7 +6,7 @@
 export type RiskLevel = 'readonly' | 'write' | 'dangerous';
 
 /** Git 工具动作来源 */
-export type OperationSource = 'mcp' | 'web' | 'cli';
+export type OperationSource = 'mcp' | 'web' | 'cli' | 'chat';
 
 /** 操作结果 */
 export type OperationResult = 'success' | 'error' | 'denied';
@@ -622,6 +622,26 @@ export interface CreateMrResult {
   cliInstallUrl?: string | null;
 }
 
+/** 对话模型：Key 与 MR Token 同级，不进工具参数。GET 只回掩码。 */
+export type LlmProvider = 'openai';
+
+export interface LlmConfig {
+  provider: LlmProvider;
+  model: string;
+  apiKey: string;
+  /** OpenAI 兼容网关根，空则用官方 `https://api.openai.com/v1` */
+  baseUrl: string;
+}
+
+/** 给设置页的公开视图，不含明文 */
+export interface PublicLlmConfig {
+  provider: LlmProvider;
+  model: string;
+  baseUrl: string;
+  tokenSet: boolean;
+  tokenPreview: string;
+}
+
 /** 全局配置（对应 config.json） */
 export interface GitCockpitConfig {
   server: ServerConfig;
@@ -630,6 +650,7 @@ export interface GitCockpitConfig {
   permissions: PermissionsConfig;
   logging: LoggingConfig;
   mr: MrConfig;
+  llm: LlmConfig;
 }
 
 export const DEFAULT_CONFIG: GitCockpitConfig = {
@@ -647,14 +668,15 @@ export const DEFAULT_CONFIG: GitCockpitConfig = {
     requireApprovalFor: ['git_reset_hard', 'git_clean', 'git_push_force', 'git_branch_delete_force', 'git_rebase'],
     dryRunDefault: false
   },
-  logging: { level: 'info', redact: ['password', 'token', 'authorization'] },
+  logging: { level: 'info', redact: ['password', 'token', 'authorization', 'apikey', 'api_key'] },
   mr: {
     method: 'browser',
     defaultRemote: 'origin',
     hosts: [],
     repoMethods: {},
     template: null
-  }
+  },
+  llm: { provider: 'openai', model: 'gpt-4.1', apiKey: '', baseUrl: '' }
 };
 
 /** Git 操作相关错误（携带用户友好信息） */

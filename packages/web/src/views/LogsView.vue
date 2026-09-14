@@ -27,8 +27,11 @@ function formatTime(iso: string): string {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
 }
 
-function sourceTag(src: string): 'primary' | 'success' | 'warning' {
-  return src === 'mcp' ? 'primary' : src === 'web' ? 'success' : 'warning';
+function sourceTag(src: string): 'primary' | 'success' | 'warning' | 'info' {
+  if (src === 'mcp') return 'primary';
+  if (src === 'web') return 'success';
+  if (src === 'chat') return 'info';
+  return 'warning';
 }
 
 function parseParams(p: unknown): string {
@@ -66,7 +69,7 @@ onMounted(() => {
           <el-option label="最近 100 条" :value="100" />
         </el-select>
         <el-button :loading="logs.loading" @click="logs.load">刷新</el-button>
-        <span class="tip">记录来源：Web / MCP / CLI 全部写入操作（只读操作不记录）</span>
+        <span class="tip">记录来源：Web / MCP / CLI / Chat 全部写入操作（只读操作不记录）</span>
       </div>
     </el-card>
 

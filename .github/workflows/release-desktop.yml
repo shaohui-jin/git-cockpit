@@ -1,0 +1,122 @@
+# 桌面安装包：与 npm 发布拆开，失败不得拖死 core / mcp-server。
+# 只在 Release（npm）成功结束后跑；本流水再闸：必须已有 mcp-server-v*，且尚未打 desktop-v*。
+# 第一期只打 Windows。产物挂到 GitHub Release 附件。不签名。
+name: Release desktop
+
+on:
+  workflow_run:
+    workflows: ['Release']
+    types: [completed]
+  workflow_dispatch:
+
+jobs:
+  gate:
+    name: 是否该打桌面包
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    outputs:
+      should_release: ${{ steps.gate.outputs.should_release }}
+      version: ${{ steps.gate.outputs.version }}
+      tag: ${{ steps.gate.outputs.tag }}
+      sha: ${{ steps.gate.outputs.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Decide whether to pack desktop
+        id: gate
+        run: |
+          DESKTOP_VERSION="$(jq -r .version apps/desktop/package.json)"
+          MCP_VERSION="$(jq -r .version packages/mcp-server/package.json)"
+          if [ -z "$DESKTOP_VERSION" ] || [ "$DESKTOP_VERSION" = "null" ]; then
+            echo "::error::无法读取 apps/desktop/package.json 的 version"
+            exit 1
+          fi
+          if [ -z "$MCP_VERSION" ] || [ "$MCP_VERSION" = "null" ]; then
+            echo "::error::无法读取 packages/mcp-server/package.json 的 version"
+            exit 1
+          fi
+          MCP_TAG="mcp-server-v${MCP_VERSION}"
+          DESKTOP_TAG="desktop-v${DESKTOP_VERSION}"
+          SHA="$(git rev-parse HEAD)"
+          echo "version=${DESKTOP_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${DESKTOP_TAG}" >> "$GITHUB_OUTPUT"
+          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
+
+          if ! git ls-remote --exit-code --tags origin "refs/tags/${MCP_TAG}" >/dev/null 2>&1; then
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            echo "${MCP_TAG} 还不存在：npm 尚未发布该版 mcp-server，跳过桌面。"
+            exit 0
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/${DESKTOP_TAG}" >/dev/null 2>&1; then
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            echo "${DESKTOP_TAG} 已打过，跳过。要发新桌面包请提高 apps/desktop/package.json 的 version。"
+            exit 0
+          fi
+          echo "should_release=true" >> "$GITHUB_OUTPUT"
+          echo "npm 已有 ${MCP_TAG}，尚未有 ${DESKTOP_TAG}，开始打 Windows 包。"
+
+  windows:
+    name: Windows zip / nsis
+    needs: gate
+    if: needs.gate.outputs.should_release == 'true'
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.gate.outputs.sha }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.13.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build web + mcp-server
+        run: |
+          pnpm --filter @shaohui_jin/git-cockpit-core build
+          pnpm --filter @shaohui_jin/git-cockpit-web build
+          pnpm --filter @shaohui_jin/git-cockpit-mcp-server build
+
+      - name: Package
+        run: pnpm --filter @shaohui_jin/git-cockpit-desktop pack:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: git-cockpit-desktop-win
+          path: |
+            apps/desktop/release/*.zip
+            apps/desktop/release/*.exe
+
+      - name: Create desktop tag
+        env:
+          TAG: ${{ needs.gate.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${TAG}" -m "Release ${TAG}"
+          git push origin "${TAG}"
+          echo "已推送 tag ${TAG}"
+
+      - name: Attach to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.gate.outputs.tag }}
+          files: |
+            apps/desktop/release/*.zip
+            apps/desktop/release/*.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

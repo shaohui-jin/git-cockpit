@@ -8,6 +8,8 @@
 #
 # tag 一律在发布成功之后才打，代表「已发布」而非「试过了」，
 # 任何一步失败都能原样重试（重新 push 或手动重跑），不浪费版本号。
+# 桌面包在独立流水 release-desktop.yml：等本 workflow 成功结束后才启动，
+# 失败不影响已发布的 npm 包。
 # Secret: NPM_TOKEN（npm Automation token）
 # 版本号分别在 packages/core 与 packages/mcp-server 的 package.json 中维护。
 name: Release

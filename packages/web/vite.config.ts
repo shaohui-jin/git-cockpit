@@ -3,7 +3,7 @@ import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 
 const backendPort = process.env.GIT_COCKPIT_PORT ?? '3000';
-const backendHost = process.env.GIT_COCKPIT_HOST ?? 'localhost';
+const backendHost = process.env.GIT_COCKPIT_HOST ?? '127.0.0.1';
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -14,7 +14,9 @@ export default defineConfig({
     }
   },
   server: {
+    host: '127.0.0.1',
     port: 5173,
+    strictPort: true,
     proxy: {
       '/api': {
         target: `http://${backendHost}:${backendPort}`,

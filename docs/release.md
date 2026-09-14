@@ -72,6 +72,8 @@ GitHub Actions 页 → 对应 workflow → **Run workflow**（`workflow_dispatch
 4. 构建 web，再 `pnpm publish` mcp-server（`prepublishOnly` 复制 `dist/web`）
 5. 打 `mcp-server-vX` 并推送
 
+桌面包 **不** 写在本 workflow 里。`.github/workflows/release-desktop.yml` 用 `workflow_run` 监听本流水名为 `Release` 的 run：`conclusion == success` 才启动。桌面闸再要求远程已有 `mcp-server-v{mcp-server version}`，且尚无 `desktop-v{desktop version}`。npm 已发出去之后桌面打包失败，只需重跑 **Release desktop**，不必重发 npm。
+
 ## 5. 版本管理要点
 
 - core 与 mcp-server **版本号各自独立**。改动互不影响，按需单独发版
@@ -116,5 +118,6 @@ dry-run 会打印 tarball 文件清单，重点核对：
 ## 9. 相关文件
 
 - `.github/workflows/release.yml`：先发 core 再发 mcp-server
+- `.github/workflows/release-desktop.yml`：等 Release 成功后再打 Windows 安装包
 - `packages/mcp-server/scripts/copy-web.mjs`：web 产物内嵌脚本（`prepublishOnly` 调用）
 - `packages/core/package.json` / `packages/mcp-server/package.json`：版本与发布配置

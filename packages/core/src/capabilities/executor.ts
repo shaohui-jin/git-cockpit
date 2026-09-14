@@ -68,7 +68,7 @@ export async function executeCapability(
       return { tool: def.name, source: ctx.source, dryRun, success: false, error: e, durationMs: Date.now() - t0 };
     }
 
-    if (ctx.source === 'mcp' && Array.isArray(args.files) && args.files.length > 0) {
+    if ((ctx.source === 'mcp' || ctx.source === 'chat') && Array.isArray(args.files) && args.files.length > 0) {
       if (
         def.name === 'git_apply_resolve' ||
         def.name === 'git_merge_continue' ||

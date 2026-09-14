@@ -35,7 +35,13 @@ import {
   toHttpsRemoteUrl,
   upsertMrHost,
   maskToken,
-  validateMrToken
+  validateMrToken,
+  normalizeLlmConfig,
+  publicLlmConfig,
+  validateLlmApiKeyFormat,
+  applyLlmEnvOverrides,
+  probeLlmEndpoint,
+  shouldProbeLlm
 } from '@shaohui_jin/git-cockpit-core';
 import type { MrTemplate } from '@shaohui_jin/git-cockpit-core';
 import { collectRepoOverviews } from './overview.ts';
@@ -46,6 +52,7 @@ import { McpHttpHandler } from './mcpServer.ts';
 import { executeTool } from './tools/handlers.ts';
 import { TOOL_DEF_MAP, toolSummaries } from './tools/index.ts';
 import { registerApiDocs } from './openapi.ts';
+import { registerChatRoutes } from './chat/chatRoute.ts';
 import { version } from '../package.json';
 
 export interface WebServerHandle {
@@ -96,12 +103,24 @@ export async function createWebServer(
   const app = Fastify({ logger: false, bodyLimit: 2 * 1024 * 1024 });
 
   await app.register(cors, {
-    origin: true,
+    origin: (origin, cb) => {
+      if (!origin) {
+        cb(null, true);
+        return;
+      }
+      try {
+        const host = new URL(origin).hostname;
+        cb(null, host === 'localhost' || host === '127.0.0.1');
+      } catch {
+        cb(null, false);
+      }
+    },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Mcp-Session-Id', 'Authorization']
   });
 
   await registerApiDocs(app);
+  registerChatRoutes(app, runtime);
 
   const staticDir = options.staticDir !== undefined ? options.staticDir : resolveWebDist();
   if (staticDir && fs.existsSync(staticDir)) {
@@ -544,7 +563,7 @@ export async function createWebServer(
         limit: q.limit ? Number(q.limit) : undefined,
         offset: q.offset ? Number(q.offset) : undefined,
         tool: q.tool,
-        source: (q.source as 'mcp' | 'web' | 'cli' | undefined) ?? undefined
+        source: (q.source as 'mcp' | 'web' | 'cli' | 'chat' | undefined) ?? undefined
       })
     };
   });
@@ -585,6 +604,7 @@ export async function createWebServer(
       git: {
         allowedRepos: runtime.config.git.allowedRepos
       },
+      llm: publicLlmConfig(applyLlmEnvOverrides(runtime.configStore.get().llm)),
       mr: await mrClientView(runtime, Number.isInteger(repoId) ? repoId : undefined, {
         validateToken: req.query.validateToken === '1' || req.query.validateToken === 'true'
       }),
@@ -602,6 +622,7 @@ export async function createWebServer(
     Body: {
       permissions?: { disabledTools?: string[]; requireApprovalFor?: string[]; dryRunDefault?: boolean };
       git?: { allowedRepos?: string[] };
+      llm?: { provider?: string; model?: string; apiKey?: string; baseUrl?: string; clearKey?: boolean };
       mr?: {
         method?: 'cli' | 'token' | 'browser' | 'auto';
         defaultRemote?: string;
@@ -618,8 +639,13 @@ export async function createWebServer(
     };
   }>('/api/settings', async (req, reply) => {
     const patch = req.body ?? {};
-    if (patch.permissions === undefined && patch.mr === undefined && patch.git === undefined) {
-      return reply.code(400).send({ error: '仅支持更新 permissions、git 或 mr 段' });
+    if (
+      patch.permissions === undefined &&
+      patch.mr === undefined &&
+      patch.git === undefined &&
+      patch.llm === undefined
+    ) {
+      return reply.code(400).send({ error: '仅支持更新 permissions、git、mr 或 llm 段' });
     }
     let pendingTokenStatus: MrTokenStatus | undefined;
     const repoIdForMr =
@@ -692,6 +718,25 @@ export async function createWebServer(
         runtime.configStore.save();
       }
     }
+    if (patch.llm !== undefined) {
+      const next = normalizeLlmConfig(runtime.configStore.get().llm);
+      if (patch.llm.provider) next.provider = normalizeLlmConfig({ ...next, provider: patch.llm.provider }).provider;
+      if (typeof patch.llm.model === 'string' && patch.llm.model.trim()) next.model = patch.llm.model.trim();
+      if (typeof patch.llm.baseUrl === 'string') next.baseUrl = patch.llm.baseUrl.trim().replace(/\/+$/, '');
+      if (patch.llm.clearKey) {
+        next.apiKey = '';
+      } else if (typeof patch.llm.apiKey === 'string' && patch.llm.apiKey.trim()) {
+        const formatErr = validateLlmApiKeyFormat(patch.llm.apiKey, next.provider);
+        if (formatErr) return reply.code(400).send({ error: formatErr });
+        next.apiKey = patch.llm.apiKey.trim();
+      }
+      const probing = applyLlmEnvOverrides(next);
+      if (probing.apiKey.trim() && shouldProbeLlm()) {
+        const probeErr = await probeLlmEndpoint(probing);
+        if (probeErr) return reply.code(400).send({ error: probeErr });
+      }
+      runtime.configStore.update({ llm: next });
+    }
     runtime.config = runtime.configStore.get();
     runtime.permissions = new PermissionManager(runtime.config);
     return {
@@ -700,7 +745,8 @@ export async function createWebServer(
       mr: await mrClientView(runtime, repoIdForMr, {
         tokenStatus: pendingTokenStatus,
         tokenStatusHost: patch.mr?.upsertHost?.host
-      })
+      }),
+      llm: publicLlmConfig(applyLlmEnvOverrides(runtime.configStore.get().llm))
     };
   });
 

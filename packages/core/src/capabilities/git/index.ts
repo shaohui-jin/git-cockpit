@@ -30,6 +30,6 @@ export const TOOL_DEFS: Capability[] = [
 
 export const TOOL_DEF_MAP: ReadonlyMap<string, Capability> = new Map(TOOL_DEFS.map((d) => [d.name, d]));
 
-export function toolSummaries(): { name: string; description: string }[] {
-  return TOOL_DEFS.map((d) => ({ name: d.name, description: d.description }));
+export function toolSummaries(): { name: string; description: string; risk: Capability['risk'] }[] {
+  return TOOL_DEFS.map((d) => ({ name: d.name, description: d.description, risk: d.risk }));
 }
