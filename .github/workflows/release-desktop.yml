@@ -102,12 +102,17 @@ jobs:
       - name: Create desktop tag
         env:
           TAG: ${{ needs.gate.outputs.tag }}
+        shell: bash
         run: |
+          if [ -z "$TAG" ]; then
+            echo "::error::gate 未给出 tag"
+            exit 1
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "${TAG}" -m "Release ${TAG}"
-          git push origin "${TAG}"
-          echo "已推送 tag ${TAG}"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "refs/tags/$TAG"
+          echo "已推送 tag $TAG"
 
       - name: Attach to GitHub Release
         uses: softprops/action-gh-release@v2
