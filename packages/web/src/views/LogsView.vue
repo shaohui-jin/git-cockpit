@@ -103,11 +103,11 @@ onMounted(() => {
 
 <style scoped>
 .logs-page {
-  height: 100%;
   min-height: 0;
   display: flex;
   flex-direction: column;
   gap: var(--gc-pad);
+  overflow: hidden;
 }
 .bar {
   flex: none;

@@ -439,6 +439,7 @@ defineExpose({ buildFiles });
   border: 1px solid var(--el-border-color-lighter);
   border-radius: var(--gc-radius);
   overflow: hidden;
+  background: color-mix(in srgb, var(--el-bg-color) 82%, transparent);
 }
 .file-list {
   width: 220px;

@@ -75,6 +75,9 @@ function spawnDaemon() {
   spawnLog = '';
   if (entry) {
     env.ELECTRON_RUN_AS_NODE = '1';
+    if (runtimeRoot) {
+      env.NODE_PATH = path.join(runtimeRoot, 'node_modules');
+    }
     child = spawn(process.execPath, [entry, 'start'], {
       env,
       stdio: ['ignore', 'pipe', 'pipe'],

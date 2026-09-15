@@ -25,6 +25,6 @@ test('单对冲突预演 → 选线上 → 落盘（无 remote 不 push）', asy
   await acceptOurs(page);
   await page.getByRole('button', { name: '落盘并推送' }).click();
   await confirmWrite(page, /worktree add/);
-  await expect(page.getByText('落盘结果')).toBeVisible();
-  await expect(page.locator('.apply-card')).toContainText('临时分支');
+  await expect(page.getByText(/已落盘/)).toBeVisible();
+  await expect(page.locator('.apply-meta')).toContainText('临时分支');
 });

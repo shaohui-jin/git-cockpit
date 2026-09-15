@@ -93,62 +93,53 @@ defineExpose({ refresh: loadLog, loading });
   <div class="pane">
     <el-alert v-if="loadError" :title="loadError" type="error" :closable="false" show-icon class="mb" />
 
-    <el-card shadow="never" class="filter-card">
-      <div class="filter-bar">
-        <el-radio-group v-model="mode">
-          <el-radio-button value="head">当前分支（{{ currentBranch }}）</el-radio-button>
-          <el-radio-button value="all">全部分支</el-radio-button>
-          <el-radio-button value="branch">指定分支</el-radio-button>
-        </el-radio-group>
-        <BranchTreeSelect
-          v-if="mode === 'branch'"
-          v-model="selectedBranch"
-          placeholder="选择分支"
-        />
-        <el-input v-model="pathFilter" clearable placeholder="按路径过滤（可选）" class="path-input" @keyup.enter="loadLog" />
-        <el-select v-model="maxCount" class="count-select">
-          <el-option label="20 条" :value="20" />
-          <el-option label="50 条" :value="50" />
-          <el-option label="100 条" :value="100" />
-        </el-select>
-        <el-button :loading="loading" @click="loadLog">刷新</el-button>
-      </div>
-    </el-card>
+    <div class="bar gc-glass">
+      <el-radio-group v-model="mode">
+        <el-radio-button value="head">当前分支（{{ currentBranch }}）</el-radio-button>
+        <el-radio-button value="all">全部分支</el-radio-button>
+        <el-radio-button value="branch">指定分支</el-radio-button>
+      </el-radio-group>
+      <BranchTreeSelect
+        v-if="mode === 'branch'"
+        v-model="selectedBranch"
+        placeholder="选择分支"
+      />
+      <el-input v-model="pathFilter" clearable placeholder="按路径过滤（可选）" class="path-input" @keyup.enter="loadLog" />
+      <el-select v-model="maxCount" class="count-select">
+        <el-option label="最近 20 条" :value="20" />
+        <el-option label="最近 50 条" :value="50" />
+        <el-option label="最近 100 条" :value="100" />
+      </el-select>
+      <el-button :loading="loading" @click="loadLog">刷新</el-button>
+    </div>
 
-    <el-card shadow="never" class="list-card gc-card-fill">
-      <div class="table-wrap">
-        <el-table
-          :data="commits"
-          height="100%"
-          v-loading="loading"
-          size="default"
-          highlight-current-row
-          @row-click="openCommit"
-        >
-          <el-table-column label="提交" width="100">
-            <template #default="{ row }">
-              <span class="mono hash">{{ row.shortHash }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="信息" min-width="300" show-overflow-tooltip>
-            <template #default="{ row }">
-              <span class="subject" :title="row.refs ? `${row.subject}  ·  ${row.refs}` : row.subject">{{ row.subject }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="作者" width="170" show-overflow-tooltip>
-            <template #default="{ row }">
-              <span :title="`${row.authorName} <${row.authorEmail}>`">{{ row.authorName }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="时间" width="180">
-            <template #default="{ row }">{{ formatDate(row.authorDate) }}</template>
-          </el-table-column>
-          <template #empty>
-            <el-empty description="暂无提交记录" :image-size="48" />
-          </template>
-        </el-table>
+    <div v-if="!loading && commits.length === 0" class="empty gc-glass">
+      <strong>暂无提交记录</strong>
+      <p>换范围、清路径过滤，或先在工作区提交。</p>
+    </div>
+    <div v-else class="table gc-glass" v-loading="loading">
+      <div class="th">
+        <span>提交</span>
+        <span>信息</span>
+        <span>作者</span>
+        <span>时间</span>
       </div>
-    </el-card>
+      <div
+        v-for="row in commits"
+        :key="row.hash"
+        class="tr"
+        :class="{ on: showCommit?.hash === row.hash }"
+        role="button"
+        tabindex="0"
+        @click="openCommit(row)"
+        @keyup.enter="openCommit(row)"
+      >
+        <span class="mono" :title="row.hash">{{ row.shortHash }}</span>
+        <span class="subject" :title="row.refs ? `${row.subject}  ·  ${row.refs}` : row.subject">{{ row.subject }}</span>
+        <span :title="`${row.authorName} <${row.authorEmail}>`">{{ row.authorName }}</span>
+        <span>{{ formatDate(row.authorDate) }}</span>
+      </div>
+    </div>
 
     <el-drawer v-model="showVisible" size="60%" destroy-on-close>
       <template #header>
@@ -194,40 +185,89 @@ defineExpose({ refresh: loadLog, loading });
 
 <style scoped>
 .pane {
+  flex: 1;
   height: 100%;
   min-height: 0;
   display: flex;
   flex-direction: column;
+  gap: var(--gc-pad);
+  overflow: hidden;
 }
-.filter-card {
+.bar {
   flex: none;
-  margin-bottom: var(--gc-gap);
-}
-.list-card {
-  flex: 1;
-  min-height: 0;
-}
-.table-wrap {
-  flex: 1;
-  min-height: 0;
-}
-.filter-bar {
   display: flex;
   align-items: center;
-  gap: var(--gc-gap);
+  gap: var(--gc-pad);
+  padding: var(--gc-gap) var(--gc-pad);
   flex-wrap: wrap;
 }
 .path-input {
   width: 220px;
 }
 .count-select {
-  width: 110px;
+  width: 120px;
 }
-.hash {
+.table {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0;
+}
+.th,
+.tr {
+  display: grid;
+  grid-template-columns: 90px minmax(200px, 1.4fr) 140px 170px;
+  gap: var(--gc-gap);
+  padding: 0 var(--gc-pad);
+  min-height: var(--gc-line);
+  align-items: center;
   font-size: var(--gc-text);
+}
+.th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  color: var(--el-text-color-secondary);
+  font-weight: 600;
+  background: color-mix(in srgb, var(--el-bg-color) 92%, transparent);
+}
+.tr {
+  border-top: 1px solid var(--el-border-color-lighter);
+  cursor: pointer;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+}
+.tr:hover,
+.tr.on {
+  background: color-mix(in srgb, var(--el-color-primary) 10%, transparent);
+}
+.tr span,
+.tr .mono {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .subject {
   font-weight: 500;
+}
+.empty {
+  flex: 1;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  padding: var(--gc-pad);
+  gap: var(--gc-gap);
+  color: var(--el-text-color-secondary);
+}
+.empty strong {
+  font-size: var(--el-font-size-extra-large);
+  color: var(--el-text-color-primary);
+  font-weight: 600;
+}
+.empty p {
+  margin: 0;
+  font-size: var(--gc-text);
 }
 .commit-title {
   display: flex;

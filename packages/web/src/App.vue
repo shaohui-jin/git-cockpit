@@ -36,7 +36,6 @@ const systemItems: DockItem[] = [
   { path: '/settings', label: '设置' }
 ];
 
-const isLab = computed(() => Boolean(route.meta.lab));
 const liveJob = computed(() => jobs.jobs.find((j) => j.status === 'running') ?? null);
 const liveJobTitle = computed(() => (liveJob.value ? jobLine(liveJob.value) : ''));
 
@@ -69,7 +68,7 @@ function goMenu(p: string): void {
   }
   chatOpen.value = false;
   if (p === route.path) return;
-  void router.push(p);
+  void router.push(p).catch(() => undefined);
 }
 
 function toggleChat(): void {
@@ -152,35 +151,35 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div v-if="isLab" class="lab-root">
-    <router-view />
-  </div>
-  <div v-else class="app-shell">
+  <div class="app-shell">
     <header class="top">
       <div class="brand">
         <span class="brand-mark">⌘</span>
         <span class="brand-name">Git Cockpit</span>
       </div>
-      <button
-        v-if="liveJob"
-        type="button"
-        class="pulse"
-        :title="liveJobTitle"
-        @click="goMenu('/jobs')"
-      >
-        <i /><span>{{ liveJobTitle }}</span>
-        <em v-if="jobs.runningCount > 1">{{ jobs.runningCount }}</em>
-      </button>
-      <button type="button" class="lab-entry" @click="goMenu('/ui-lab')">布局实验室</button>
-      <el-tag v-if="repos.healthOk" size="small" type="success">后端已连接</el-tag>
-      <el-tag v-else-if="repos.healthOk === false" size="small" type="danger">后端离线</el-tag>
-      <el-tag v-else size="small" type="info">连接中…</el-tag>
-      <span v-if="repos.serverVersion" class="top-version">{{ repos.serverVersion }}</span>
+      <div class="top-end">
+        <button
+          v-if="liveJob"
+          type="button"
+          class="pulse"
+          :title="liveJobTitle"
+          @click="goMenu('/jobs')"
+        >
+          <i /><span>{{ liveJobTitle }}</span>
+          <em v-if="jobs.runningCount > 1">{{ jobs.runningCount }}</em>
+        </button>
+        <el-tag v-if="repos.healthOk" size="small" type="success">后端已连接</el-tag>
+        <el-tag v-else-if="repos.healthOk === false" size="small" type="danger">后端离线</el-tag>
+        <el-tag v-else size="small" type="info">连接中…</el-tag>
+        <span v-if="repos.serverVersion" class="top-version">{{ repos.serverVersion }}</span>
+      </div>
     </header>
 
     <main class="main-content">
       <router-view v-slot="{ Component }">
-        <component :is="Component" />
+        <div class="route-view">
+          <component :is="Component" />
+        </div>
       </router-view>
     </main>
 
@@ -221,11 +220,8 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.app-shell,
-.lab-root {
-  height: 100%;
-}
 .app-shell {
+  height: 100%;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -254,13 +250,19 @@ onUnmounted(() => {
 .brand-mark {
   color: var(--el-color-primary);
 }
+.top-end {
+  display: flex;
+  align-items: center;
+  gap: var(--gc-pad);
+  margin-left: auto;
+  min-width: 0;
+}
 .pulse {
   display: inline-flex;
   align-items: center;
   gap: var(--gc-gap);
   min-width: 0;
   max-width: 280px;
-  margin-left: auto;
   height: var(--gc-control);
   padding: 0 var(--gc-pad);
   border: 0;
@@ -297,24 +299,6 @@ onUnmounted(() => {
   line-height: 16px;
   text-align: center;
 }
-.lab-entry {
-  margin-left: auto;
-  height: var(--gc-control);
-  padding: 0 var(--gc-gap);
-  border: 0;
-  border-radius: var(--gc-radius);
-  background: transparent;
-  color: var(--el-text-color-secondary);
-  font: inherit;
-  font-size: var(--gc-text);
-  cursor: pointer;
-}
-.lab-entry:hover {
-  color: var(--el-color-primary);
-}
-.pulse + .lab-entry {
-  margin-left: 0;
-}
 .top-version {
   font-size: var(--gc-text);
   color: var(--el-text-color-secondary);
@@ -329,9 +313,18 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
 }
-.main-content > * {
+.route-view {
   flex: 1;
   min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.route-view > * {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
 }
 /* 低于 dock(25) 与 Element 对话框(~2000)，避开底栏 */
 .chat-sheet-anchor {
@@ -346,6 +339,9 @@ onUnmounted(() => {
 .chat-rise-enter-active,
 .chat-rise-leave-active {
   transition: opacity 0.22s ease, transform 0.22s ease;
+}
+.chat-rise-leave-active {
+  pointer-events: none;
 }
 .chat-rise-enter-from,
 .chat-rise-leave-to {

@@ -15,6 +15,7 @@ import ConflictResolvePanel from '@/components/ConflictResolvePanel.vue';
 import MatrixView from '@/views/MatrixView.vue';
 import type { ApplyResolveResult, BranchInfo, CreateMrResult, MergePreviewResult, PrepareMrResult, ToolExecResult } from '@/api/types';
 import { copyToClipboard } from '@/utils/clipboard';
+import { isMergeTempBranchName } from '@/utils/branchTree';
 
 const repos = useReposStore();
 const branchStore = useBranchesStore();
@@ -60,16 +61,6 @@ const truncatedConflicts = computed(() =>
 
 const situation = computed(() => preview.value?.situation ?? preview.value?.outcome ?? '');
 
-const outcomeType = computed(() => {
-  const s = situation.value;
-  if (s === 'conflicts') return 'danger';
-  if (s === 'unrelated') return 'warning';
-  if (s === 'temp_local' || s === 'looking_at_temp') return 'info';
-  if (s === 'already_merged') return 'info';
-  if (s === 'clean' || s === 'temp_remote') return 'success';
-  return 'info';
-});
-
 const outcomeLabel = computed(() => {
   const s = situation.value;
   if (s === 'looking_at_temp') return '这是落盘临时分支';
@@ -79,6 +70,15 @@ const outcomeLabel = computed(() => {
   if (s === 'clean') return '可干净合并';
   if (s === 'unrelated') return '无关历史';
   if (s === 'conflicts') return '存在冲突';
+  return '';
+});
+
+const stampText = computed(() => outcomeLabel.value || '尚未预演');
+const stampClass = computed(() => {
+  const s = situation.value;
+  if (s === 'conflicts' || s === 'unrelated') return 'warn';
+  if (s === 'clean' || s === 'temp_remote' || s === 'already_merged') return 'ok';
+  if (preview.value) return 'info';
   return '';
 });
 
@@ -447,15 +447,15 @@ watch([pairInto, pairFrom], () => {
     <div class="page-head">
       <h2 class="page-title">合并</h2>
       <div class="head-actions">
-        <el-radio-group v-model="mode" size="small">
-          <el-radio-button value="pair">单对预演</el-radio-button>
-          <el-radio-button value="matrix">矩阵</el-radio-button>
-        </el-radio-group>
-        <el-button v-if="mode === 'pair'" :loading="loading" :disabled="!canRun" type="primary" @click="runPreview">预演</el-button>
+        <div class="gc-chip-tabs">
+          <button type="button" :class="{ on: mode === 'pair' }" @click="mode = 'pair'">单对预演</button>
+          <button type="button" :class="{ on: mode === 'matrix' }" @click="mode = 'matrix'">矩阵</button>
+        </div>
+        <el-button v-if="mode === 'pair' && canRun" :loading="loading" type="primary" @click="runPreview">预演</el-button>
       </div>
     </div>
 
-    <div v-if="mode === 'pair' && trail && trailCurrent" class="trail">
+    <div v-if="mode === 'pair' && trail && trailCurrent" class="trail gc-glass">
       <el-button size="small" @click="backToMatrix">← 返回矩阵</el-button>
       <span class="trail-pos mono">{{ trail.index + 1 }} / {{ trail.pairs.length }}</span>
       <span class="trail-pair mono">
@@ -475,28 +475,41 @@ watch([pairInto, pairFrom], () => {
 
     <el-alert v-if="loadError && mode === 'pair'" :title="loadError" type="error" :closable="false" show-icon />
     <el-alert v-else-if="session.loadError && mode === 'matrix'" :title="session.loadError" type="error" :closable="false" show-icon />
-    <div v-if="!canRun" class="empty-tip">请先在「仓库管理」中打开一个仓库</div>
+
+    <div v-if="!canRun" class="empty gc-glass">
+      <strong>还没选仓库</strong>
+      <p>请先在工作台打开仓库再预演。</p>
+      <el-button type="primary" @click="router.push('/dashboard')">去工作台</el-button>
+    </div>
 
     <template v-else-if="mode === 'matrix'">
       <MatrixView @create-mr="onMatrixCreateMr" @push-temp="onMatrixPushTemp" />
     </template>
 
     <template v-else>
-      <el-card shadow="never" class="filter-card">
-        <div class="filter-bar">
-          <div class="field">
-            <span class="field-label">合入目标 into（线上 / ours）</span>
-            <BranchTreeSelect v-model="pairInto" remote-first exclude-merge-temp placeholder="选择合入目标" />
-          </div>
-          <div class="field">
-            <span class="field-label">我的分支 from（theirs）</span>
-            <BranchTreeSelect v-model="pairFrom" exclude-merge-temp placeholder="选择我的分支" />
-          </div>
-          <div class="field field-switch">
-            <span class="field-label">先 fetch</span>
-            <el-switch v-model="fetchRemote" />
-          </div>
+      <div class="pair-col">
+      <section class="gc-glass river">
+        <div class="lane theirs">
+          <small>我的 from</small>
+          <BranchTreeSelect v-model="pairFrom" exclude-merge-temp placeholder="选择我的分支" />
         </div>
+        <div class="flow">
+          <svg viewBox="0 0 200 80" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M0 20 C 80 20, 80 40, 200 40" />
+            <path d="M0 60 C 80 60, 80 40, 200 40" />
+          </svg>
+          <span class="stamp" :class="stampClass">{{ stampText }}</span>
+        </div>
+        <div class="lane ours">
+          <small>合入 into</small>
+          <BranchTreeSelect v-model="pairInto" remote-first exclude-merge-temp placeholder="选择合入目标" />
+        </div>
+      </section>
+      <div class="river-tools">
+        <label class="fetch">
+          先 fetch
+          <el-switch v-model="fetchRemote" />
+        </label>
         <p class="tip">
           <template v-if="fromMatrix">
             从矩阵进来：选边后点「完成冲突处理」，只记到本地临时分支（不推送、不改工作区当前分支），然后回矩阵统一看。
@@ -505,37 +518,36 @@ watch([pairInto, pairFrom], () => {
             预演使用 <span class="mono">git merge-tree</span>，不会改工作区。方向：把「我的分支」合入「合入目标」。
           </template>
         </p>
-      </el-card>
+      </div>
 
-      <el-card v-if="showRecorded" shadow="never" class="apply-card">
-        <template #header>已记入本地</template>
+      <section v-if="showRecorded" class="gc-glass pad next-pane">
+        <p class="gc-eyebrow">已记入本地</p>
         <p class="tip">
           选边已写到临时分支
           <span class="mono">{{ recordedCell?.tempBranch?.name ?? 'merge/…' }}</span>
           （未推送）。原始 from / into 仍然冲突，这是正常的。回矩阵看「已解决·本地」，再统一处理。
         </p>
-        <p class="tip">
-          <el-button type="primary" size="small" @click="backToMatrix">返回矩阵</el-button>
-          <el-button size="small" @click="redoRecordedPreview">重新预演</el-button>
-        </p>
-      </el-card>
+        <div class="hero-actions">
+          <el-button type="primary" @click="backToMatrix">返回矩阵</el-button>
+          <el-button @click="redoRecordedPreview">重新预演</el-button>
+        </div>
+      </section>
 
-      <el-card v-if="preview && !applyResult" shadow="never" class="preview-card gc-card-fill">
-        <template #header>
-          <div class="result-head">
-            <el-tag :type="outcomeType" effect="dark">{{ outcomeLabel }}</el-tag>
-            <span class="mono sha">{{ preview.into }} ({{ preview.intoSha.slice(0, 7) }}) ← {{ preview.from }} ({{ preview.fromSha.slice(0, 7) }})</span>
-            <el-tag v-if="preview.fetchAttempted && !preview.fetched" type="warning" effect="plain" size="small">远程未更新</el-tag>
-            <el-button v-if="canApply" type="primary" @click="runApply">
-              {{ fromMatrix ? '完成冲突处理' : '落盘并推送' }}
-            </el-button>
-            <el-button v-if="canPushTemp" type="primary" @click="runPushTempFromPreview">推送临时分支</el-button>
-            <el-button v-if="canOpenMr" type="primary" @click="runCreatePr">申请 MR</el-button>
-            <el-button v-if="preview.recoveredPair && situation === 'looking_at_temp'" @click="restoreRecoveredPair">
-              切回原 pair
-            </el-button>
-          </div>
-        </template>
+      <section v-if="preview && !applyResult" class="gc-glass pad next-pane fill">
+        <div class="result-head">
+          <p class="gc-eyebrow">{{ outcomeLabel || '预演结果' }}</p>
+          <span class="mono sha">{{ preview.into }} ({{ preview.intoSha.slice(0, 7) }}) ← {{ preview.from }} ({{ preview.fromSha.slice(0, 7) }})</span>
+          <el-tag v-if="preview.fetchAttempted && !preview.fetched" type="warning" effect="plain" size="small">远程未更新</el-tag>
+          <span class="grow" />
+          <el-button v-if="canApply" type="primary" @click="runApply">
+            {{ fromMatrix ? '完成冲突处理' : '落盘并推送' }}
+          </el-button>
+          <el-button v-if="canPushTemp" type="primary" @click="runPushTempFromPreview">推送临时分支</el-button>
+          <el-button v-if="canOpenMr" type="primary" @click="runCreatePr">申请 MR</el-button>
+          <el-button v-if="preview.recoveredPair && situation === 'looking_at_temp'" @click="restoreRecoveredPair">
+            切回原 pair
+          </el-button>
+        </div>
 
         <p v-if="situation === 'looking_at_temp'" class="tip tip-inline">
           合入目标是上次 worktree 落盘留下的临时分支，不是线上目标。
@@ -582,22 +594,15 @@ watch([pairInto, pairFrom], () => {
           :from="pairFrom"
           @progress="resolvePending = $event.pending"
         />
-        <el-empty
-          v-else-if="situation === 'already_merged'"
-          description="没有可合并的新提交，无需操作"
-        />
-        <el-empty v-else-if="preview.clean && canApply" description="没有冲突文件" />
-      </el-card>
+        <p v-else-if="situation === 'already_merged'" class="hint-empty">没有可合并的新提交，无需操作。</p>
+        <p v-else-if="preview.clean && canApply" class="hint-empty">没有冲突文件。落盘只写临时枝，不改你正在看的分支。</p>
+      </section>
 
-      <el-card v-if="applyResult" shadow="never" class="apply-card gc-card-fill">
-        <template #header>
-          <div class="result-head">
-            <el-tag type="success" effect="dark">已落盘</el-tag>
-            <span class="mono sha">{{ applyResult.tempBranch }}</span>
-            <el-tag v-if="applyResult.pushed" type="success" effect="plain" size="small">已推送</el-tag>
-            <el-tag v-else type="info" effect="plain" size="small">仅本地</el-tag>
-          </div>
-        </template>
+      <section v-if="applyResult" class="gc-glass pad next-pane fill">
+        <div class="result-head">
+          <p class="gc-eyebrow">已落盘{{ applyResult.pushed ? ' · 已推送' : ' · 仅本地' }}</p>
+          <span class="mono sha">{{ applyResult.tempBranch }}</span>
+        </div>
         <dl class="apply-meta">
           <div>
             <dt>临时分支</dt>
@@ -621,21 +626,17 @@ watch([pairInto, pairFrom], () => {
           官方下载：
           <a :href="mrPrep.cliInstallUrl" target="_blank" rel="noreferrer">{{ mrPrep.cliInstallUrl }}</a>
         </p>
-        <div class="apply-actions gc-gap-btns">
+        <div class="apply-actions">
           <el-button type="primary" @click="runCreatePr">创建 PR/MR</el-button>
           <el-button @click="runPreview">重新预演</el-button>
         </div>
-      </el-card>
+      </section>
 
-      <el-card v-if="prResult" shadow="never" class="apply-card">
-        <template #header>
-          <div class="result-head">
-            <el-tag :type="prResult.via === 'browser' ? 'info' : 'success'" effect="dark">
-              {{ prResult.via === 'browser' ? '浏览器创建页' : '已开单' }}
-            </el-tag>
-            <span class="mono sha">{{ prResult.sourceBranch }} → {{ prResult.targetBranch }}</span>
-          </div>
-        </template>
+      <section v-if="prResult" class="gc-glass pad next-pane">
+        <div class="result-head">
+          <p class="gc-eyebrow">{{ prResult.via === 'browser' ? 'MR 正文 · 浏览器创建页' : '已开单' }}</p>
+          <span class="mono sha">{{ prResult.sourceBranch }} → {{ prResult.targetBranch }}</span>
+        </div>
         <el-alert
           v-for="(msg, i) in prResult.messages"
           :key="i"
@@ -660,7 +661,8 @@ watch([pairInto, pairFrom], () => {
           </header>
           <pre>{{ prResult.body }}</pre>
         </div>
-      </el-card>
+      </section>
+      </div>
     </template>
 
     <MrCreateDialog
@@ -683,10 +685,19 @@ watch([pairInto, pairFrom], () => {
 
 <style scoped>
 .merge-page {
+  min-height: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: var(--gc-gap);
+}
+.pair-col {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gc-gap);
+  overflow: hidden;
 }
 .page-head {
   display: flex;
@@ -707,11 +718,8 @@ watch([pairInto, pairFrom], () => {
   flex-wrap: wrap;
   align-items: center;
   gap: var(--gc-gap);
-  flex-shrink: 0;
-  padding: 6px var(--gc-pad);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: var(--gc-radius);
-  background: var(--el-fill-color-lighter);
+  flex: none;
+  padding: var(--gc-gap) var(--gc-pad);
   font-size: var(--gc-text);
 }
 .trail-pos {
@@ -735,13 +743,133 @@ watch([pairInto, pairFrom], () => {
   flex: 1;
   min-width: 8px;
 }
-.filter-card {
-  flex-shrink: 0;
+.river {
+  flex: none;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 1.1fr) minmax(0, 1fr);
+  align-items: center;
+  padding: var(--gc-pad);
+  gap: var(--gc-gap);
 }
-.preview-card,
-.apply-card {
-  flex: 1;
+.lane {
+  padding: var(--gc-gap);
+  border-radius: var(--gc-radius);
+  background: var(--el-fill-color-light);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gc-gap);
+}
+.lane small {
+  font-size: var(--gc-text);
+  color: var(--el-text-color-secondary);
+}
+.lane.theirs {
+  border-left: 3px solid var(--el-color-primary);
+}
+.lane.ours {
+  border-left: 3px solid var(--el-color-success);
+}
+.flow {
+  position: relative;
+  height: 80px;
+  min-width: 0;
+}
+.flow svg {
+  width: 100%;
+  height: 100%;
+}
+.flow path {
+  fill: none;
+  stroke: var(--el-color-primary);
+  stroke-width: 2;
+  opacity: 0.55;
+}
+.stamp {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  padding: 0 var(--gc-gap);
+  height: var(--gc-control);
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--gc-radius);
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color-lighter);
+  font-size: var(--gc-text);
+  white-space: nowrap;
+}
+.stamp.warn {
+  color: var(--el-color-danger);
+  border-color: color-mix(in srgb, var(--el-color-danger) 40%, transparent);
+}
+.stamp.ok {
+  color: var(--el-color-success);
+  border-color: color-mix(in srgb, var(--el-color-success) 40%, transparent);
+}
+.stamp.info {
+  color: var(--el-color-primary);
+}
+.river-tools {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gc-pad);
+}
+.fetch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gc-gap);
+  font-size: var(--gc-text);
+}
+.pad {
+  padding: var(--gc-pad);
+}
+.next-pane {
+  flex: none;
+  display: flex;
+  flex-direction: column;
   min-height: 0;
+}
+.next-pane.fill {
+  flex: 1;
+  overflow: hidden;
+}
+.next-pane :deep(.resolve) {
+  flex: 1;
+}
+.hero-actions {
+  display: flex;
+  gap: var(--gc-gap);
+  margin-top: var(--gc-gap);
+}
+.empty {
+  flex: 1;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  padding: var(--gc-pad);
+  gap: var(--gc-gap);
+  color: var(--el-text-color-secondary);
+}
+.empty strong {
+  font-size: var(--el-font-size-extra-large);
+  color: var(--el-text-color-primary);
+  font-weight: 600;
+}
+.empty p {
+  margin: 0;
+  font-size: var(--gc-text);
+}
+.hint-empty {
+  margin: var(--gc-pad) 0 0;
+  font-size: var(--gc-text);
+  color: var(--el-text-color-secondary);
+}
+.grow {
+  flex: 1;
 }
 .apply-meta {
   margin: 0;
@@ -777,42 +905,25 @@ watch([pairInto, pairFrom], () => {
   gap: var(--gc-gap);
   margin-top: var(--gc-pad);
 }
-.filter-bar {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--gc-gap);
-  flex-wrap: wrap;
-}
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--gc-gap);
-}
-.field-label {
-  font-size: var(--gc-text);
-  color: var(--el-text-color-secondary);
-}
-.field-switch {
-  min-width: 80px;
-}
 .tip {
-  margin: var(--gc-gap) 0 0;
+  margin: 0;
   font-size: var(--gc-text);
   color: var(--el-text-color-secondary);
+  line-height: 1.5;
 }
 .tip-inline {
   margin: 0 0 var(--gc-gap);
-  flex-shrink: 0;
-}
-.empty-tip {
-  font-size: var(--gc-text);
-  color: var(--el-text-color-secondary);
+  flex: none;
 }
 .result-head {
   display: flex;
   align-items: center;
   gap: var(--gc-gap);
   flex-wrap: wrap;
+  flex: none;
+}
+.result-head .gc-eyebrow {
+  margin: 0;
 }
 .sha {
   font-size: var(--gc-text);

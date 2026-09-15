@@ -126,7 +126,71 @@ const gitlabTokenCreateUrl = computed(() => {
   return `${origin || 'https://gitlab.com'}/-/user_settings/personal_access_tokens`;
 });
 
-const dangerTools = computed(() => settings.tools.filter((t) => t.riskLevel === 'dangerous'));
+const GIT_GROUP_ORDER = [
+  '查看',
+  '分支',
+  '写入',
+  '同步',
+  '合并',
+  '变基',
+  'MR',
+  '任务',
+  'Worktree',
+  '高风险',
+  '其他'
+] as const;
+
+function toolGroupName(t: ToolSummary): (typeof GIT_GROUP_ORDER)[number] {
+  const n = t.name;
+  if (n.startsWith('git_worktree')) return 'Worktree';
+  if (n.startsWith('git_job') || n === 'git_repo_overview') return '任务';
+  if (n.startsWith('git_mr_')) return 'MR';
+  if (n.startsWith('git_rebase')) return '变基';
+  if (n.startsWith('git_merge') || n === 'git_apply_resolve') return '合并';
+  if (n.startsWith('git_stash') || n === 'git_add' || n === 'git_unstage' || n === 'git_commit') return '写入';
+  if (n === 'git_fetch' || n === 'git_pull' || n === 'git_push' || n === 'git_push_force') return '同步';
+  if (
+    n === 'git_status' ||
+    n === 'git_log' ||
+    n === 'git_diff' ||
+    n === 'git_show' ||
+    n === 'git_file_content' ||
+    n === 'git_graph' ||
+    n === 'git_branch_graph' ||
+    n === 'git_reflog' ||
+    n === 'git_backup_list'
+  ) {
+    return '查看';
+  }
+  if (n.startsWith('git_branch') || n.startsWith('git_tag') || n.startsWith('git_remote') || n === 'git_checkout') {
+    return '分支';
+  }
+  if (t.riskLevel === 'dangerous') return '高风险';
+  return '其他';
+}
+
+const gitToolGroups = computed(() => {
+  const map = new Map<string, ToolSummary[]>();
+  for (const t of settings.tools) {
+    const g = toolGroupName(t);
+    const list = map.get(g) ?? [];
+    list.push(t);
+    map.set(g, list);
+  }
+  return GIT_GROUP_ORDER.filter((g) => map.has(g)).map((name) => ({ name, items: map.get(name) ?? [] }));
+});
+
+function toolChipLabel(name: string): string {
+  return name.replace(/^git_/, '');
+}
+
+function toolEnabled(t: ToolSummary): boolean {
+  return !gitDraft.disabledTools.includes(t.name);
+}
+
+function toolNeedsApproval(t: ToolSummary): boolean {
+  return gitDraft.requireApprovalFor.includes(t.name);
+}
 
 const methodOptions = computed(() => [
   { id: 'cli' as const, title: cliCardTitle(), ready: cliReady.value },
@@ -270,15 +334,15 @@ async function toggleEnabled(t: ToolSummary, enabled: boolean): Promise<void> {
   }
 }
 
-function onToolEnabled(t: ToolSummary, ev: Event): void {
-  void toggleEnabled(t, (ev.target as HTMLInputElement).checked);
+function toggleChip(t: ToolSummary): void {
+  void toggleEnabled(t, !toolEnabled(t));
 }
 
-function onApproval(name: string, ev: Event): void {
-  const on = (ev.target as HTMLInputElement).checked;
-  const i = gitDraft.requireApprovalFor.indexOf(name);
-  if (on && i < 0) gitDraft.requireApprovalFor.push(name);
-  if (!on && i >= 0) gitDraft.requireApprovalFor.splice(i, 1);
+function toggleApproveChip(t: ToolSummary): void {
+  if (!toolEnabled(t) || t.riskLevel !== 'dangerous') return;
+  const i = gitDraft.requireApprovalFor.indexOf(t.name);
+  if (i < 0) gitDraft.requireApprovalFor.push(t.name);
+  else gitDraft.requireApprovalFor.splice(i, 1);
 }
 
 async function saveGit(): Promise<void> {
@@ -487,7 +551,7 @@ async function clearLlmKey(): Promise<void> {
       </button>
     </div>
 
-    <div class="settings-body" :class="{ fill: activeTab === 'template' }">
+    <div class="settings-body" :class="{ fill: activeTab === 'template' || activeTab === 'git' }">
       <section v-show="activeTab === 'mr'" class="stack">
         <div class="gc-glass pad">
           <p class="gc-eyebrow">默认远程</p>
@@ -709,57 +773,51 @@ async function clearLlmKey(): Promise<void> {
         </div>
       </section>
 
-      <section v-show="activeTab === 'git'" class="stack">
-        <div class="gc-glass pad">
+      <section v-show="activeTab === 'git'" class="git-split">
+        <aside class="gc-glass pad git-side">
           <p class="gc-eyebrow">默认行为</p>
           <label class="kv">
-            写操作默认 dry-run
+            dry-run 默认
             <el-switch v-model="gitDraft.dryRunDefault" />
           </label>
-          <p class="hint">开启后所有写操作（MCP / CLI）默认只生成预览，不真正执行。</p>
+          <p class="hint">开启后写操作（MCP / CLI）默认只生成预览，不真正执行。</p>
           <p class="field-label">允许打开的仓库</p>
           <el-input
             v-model="gitDraft.allowedReposText"
             type="textarea"
-            :rows="4"
+            :rows="6"
             placeholder="一行一个本地路径。留空 = 不限制"
           />
-          <p class="hint">非空时，打开的仓库根路径必须等于其中一条，或位于其目录下。MCP 带 repoPath 同样校验。</p>
-        </div>
-
-        <div class="gc-glass pad" v-loading="settings.loading">
-          <p class="gc-eyebrow">工具开关</p>
-          <p class="hint">高风险默认关 · 执行前自动备份。勾选即启用。</p>
-          <label v-for="t in settings.tools" :key="t.name" class="tool">
-            <input
-              type="checkbox"
-              :checked="!gitDraft.disabledTools.includes(t.name)"
-              @change="onToolEnabled(t, $event)"
-            />
-            <code>{{ t.name }}</code>
-            <span>{{ t.description }}</span>
-            <em v-if="t.riskLevel === 'dangerous'">高风险</em>
-          </label>
-        </div>
-
-        <div class="gc-glass pad">
-          <p class="gc-eyebrow">审批规则</p>
-          <p class="hint">勾选后，执行时需在确认框中手工确认。仅对已启用的高危工具生效；禁用后自动移除。</p>
-          <label v-for="t in dangerTools" :key="t.name" class="tool">
-            <input
-              type="checkbox"
-              :checked="gitDraft.requireApprovalFor.includes(t.name)"
-              :disabled="gitDraft.disabledTools.includes(t.name)"
-              @change="onApproval(t.name, $event)"
-            />
-            <code>{{ t.name }}</code>
-            <span>{{ t.description }}</span>
-          </label>
-        </div>
-
-        <div v-if="loaded" class="row">
-          <el-button type="primary" :loading="settings.saving" :disabled="!gitDirty" @click="saveGit">保存 Git 设置</el-button>
-          <el-button :disabled="!gitDirty" @click="syncGitDraft">放弃修改</el-button>
+          <p class="hint">非空时，打开路径必须等于其中一条或位于其下。MCP 带 repoPath 同样校验。</p>
+          <div v-if="loaded" class="row">
+            <el-button type="primary" :loading="settings.saving" :disabled="!gitDirty" @click="saveGit">保存</el-button>
+            <el-button :disabled="!gitDirty" @click="syncGitDraft">放弃</el-button>
+          </div>
+        </aside>
+        <div class="gc-glass pad git-main" v-loading="settings.loading">
+          <p class="hint git-main-hint">点芯片启用。高危左边红条；点「审」表示执行前要确认。悬停看说明。高风险默认关，执行前自动备份。</p>
+          <div v-for="g in gitToolGroups" :key="g.name" class="git-pack">
+            <p class="git-pack-h">{{ g.name }} <span>{{ g.items.length }}</span></p>
+            <div class="git-wall">
+              <button
+                v-for="t in g.items"
+                :key="t.name"
+                type="button"
+                class="git-chip"
+                :class="{ on: toolEnabled(t), high: t.riskLevel === 'dangerous' }"
+                :title="t.description"
+                @click="toggleChip(t)"
+              >
+                {{ toolChipLabel(t.name) }}
+                <span
+                  v-if="t.riskLevel === 'dangerous'"
+                  class="chip-ask"
+                  :class="{ on: toolNeedsApproval(t) }"
+                  @click.stop="toggleApproveChip(t)"
+                >审</span>
+              </button>
+            </div>
+          </div>
         </div>
       </section>
     </div>
@@ -768,7 +826,6 @@ async function clearLlmKey(): Promise<void> {
 
 <style scoped>
 .settings-page {
-  height: 100%;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -784,6 +841,7 @@ async function clearLlmKey(): Promise<void> {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  padding: var(--gc-pad);
 }
 .settings-body.fill {
   overflow: hidden;
@@ -796,6 +854,81 @@ async function clearLlmKey(): Promise<void> {
   gap: var(--gc-gap);
   max-width: 720px;
   padding-bottom: var(--gc-pad);
+}
+.git-split {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  gap: var(--gc-gap);
+}
+.git-side {
+  align-self: start;
+}
+.git-main {
+  min-width: 0;
+  overflow: auto;
+}
+.git-main-hint {
+  margin-top: 0;
+}
+.git-pack + .git-pack {
+  margin-top: var(--gc-pad);
+}
+.git-pack-h {
+  margin: 0 0 var(--gc-gap);
+  font-size: var(--gc-text);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--el-color-primary);
+}
+.git-pack-h span {
+  margin-left: 6px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--el-text-color-placeholder);
+}
+.git-wall {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.git-chip {
+  border: 0;
+  height: var(--gc-control);
+  padding: 0 8px 0 10px;
+  border-radius: var(--gc-radius);
+  background: var(--el-fill-color-light);
+  color: var(--el-text-color-secondary);
+  font: inherit;
+  font-size: var(--gc-text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.git-chip.on {
+  background: color-mix(in srgb, var(--el-color-primary) 22%, transparent);
+  color: var(--el-text-color-primary);
+}
+.git-chip.high {
+  box-shadow: inset 2px 0 0 var(--el-color-danger);
+}
+.chip-ask {
+  font-size: 11px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--el-fill-color);
+  color: var(--el-text-color-secondary);
+}
+.chip-ask.on {
+  background: color-mix(in srgb, var(--el-color-danger) 35%, transparent);
+  color: var(--el-color-danger);
+}
+@media (max-width: 900px) {
+  .git-split {
+    grid-template-columns: 1fr;
+  }
 }
 .pad {
   padding: var(--gc-pad);
@@ -842,43 +975,13 @@ async function clearLlmKey(): Promise<void> {
   margin: var(--gc-pad) 0 var(--gc-gap);
   font-size: var(--gc-text);
 }
-.tool,
-.kv {
-  display: flex;
-  align-items: center;
-  gap: var(--gc-gap);
-  min-height: var(--gc-line);
-  font-size: var(--gc-text);
-}
-.tool {
-  padding: 0;
-}
-.tool code {
-  flex: none;
-  font-family: inherit;
-  font-size: var(--gc-text);
-}
-.tool span {
-  min-width: 0;
-  color: var(--el-text-color-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.tool em {
-  margin-left: auto;
-  flex: none;
-  font-style: normal;
-  color: var(--el-color-danger);
-}
-.tool input:disabled {
-  opacity: 0.35;
-}
 .kv {
   display: grid;
   grid-template-columns: 140px minmax(0, 1fr);
   align-items: center;
   margin-top: var(--gc-gap);
+  min-height: var(--gc-line);
+  font-size: var(--gc-text);
 }
 .row {
   display: flex;

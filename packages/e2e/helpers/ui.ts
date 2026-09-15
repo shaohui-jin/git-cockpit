@@ -43,13 +43,13 @@ export async function cancelWrite(page: Page): Promise<void> {
 }
 
 export async function setMergeMode(page: Page, mode: '单对预演' | '矩阵'): Promise<void> {
-  await page.locator('.el-radio-button__inner', { hasText: mode }).click();
+  await page.locator('.gc-chip-tabs button', { hasText: mode }).click();
 }
 
 export async function waitPairBranches(page: Page, into: string, from: string): Promise<void> {
-  const bar = page.locator('.filter-card').first();
-  await expect(bar).toContainText(into);
-  await expect(bar).toContainText(from);
+  const river = page.locator('.river').first();
+  await expect(river).toContainText(into);
+  await expect(river).toContainText(from);
 }
 
 export async function runPairPreview(page: Page): Promise<void> {
@@ -65,7 +65,7 @@ export async function runPairPreview(page: Page): Promise<void> {
 }
 
 export async function turnOffFetch(page: Page): Promise<void> {
-  const sw = page.locator('.filter-card .field-switch .el-switch').first();
+  const sw = page.locator('.fetch .el-switch, .field-switch .el-switch').first();
   await expect(sw).toBeVisible();
   if (await sw.evaluate((el) => el.classList.contains('is-checked'))) {
     await sw.click();

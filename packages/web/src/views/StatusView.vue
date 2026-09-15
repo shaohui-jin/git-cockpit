@@ -1296,7 +1296,7 @@ onUnmounted(() => {
 
 /* 整体三栏：左分支 · 中更改 · 右监视器+记录 */
 .status-page {
-  height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: var(--gc-gap);
@@ -1474,6 +1474,8 @@ onUnmounted(() => {
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 .lineage-bar {
   flex: none;

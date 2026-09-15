@@ -1,6 +1,6 @@
 {
   "name": "@shaohui_jin/git-cockpit-e2e",
-  "version": "0.1.21",
+  "version": "0.1.22",
   "private": true,
   "type": "module",
   "description": "Git Cockpit Playwright E2E：只测发布形态（build 后的 daemon 静态页），不含产品逻辑",

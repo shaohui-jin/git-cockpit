@@ -244,11 +244,11 @@ onMounted(async () => {
 
 <style scoped>
 .jobs-page {
-  height: 100%;
   min-height: 0;
   display: flex;
   flex-direction: column;
   gap: var(--gc-gap);
+  overflow: hidden;
 }
 .split {
   flex: 1;

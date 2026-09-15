@@ -180,12 +180,17 @@ onUnmounted(() => {
 <template>
   <el-dialog
     v-model="visible"
-    title="创建 PR / MR"
     width="920px"
     class="mr-create-dialog"
     destroy-on-close
     append-to-body
   >
+    <template #header>
+      <div class="dlg-head">
+        <p class="gc-eyebrow">申请 MR</p>
+        <span>创建 PR / MR</span>
+      </div>
+    </template>
     <el-alert v-if="error" type="error" :closable="false" :title="error" class="mb" />
     <el-skeleton v-if="loading" :rows="6" animated />
     <template v-else-if="prepare">
@@ -292,7 +297,7 @@ onUnmounted(() => {
             </el-form-item>
           </el-form>
         </div>
-        <div class="pane preview">
+        <div class="pane preview gc-glass">
           <header>
             <strong>预览</strong>
             <span class="preview-actions">
@@ -315,6 +320,9 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.dlg-head .gc-eyebrow {
+  margin: 0 0 4px;
+}
 .mb { margin-bottom: var(--gc-gap); }
 .pair { margin: 0 0 var(--gc-gap); color: var(--el-text-color-secondary); font-family: ui-monospace, monospace; }
 .split {
@@ -339,10 +347,7 @@ onUnmounted(() => {
   color: var(--el-text-color-regular);
 }
 .preview {
-  border: 1px solid var(--el-border-color);
-  border-radius: var(--gc-radius);
   padding: var(--gc-gap) var(--gc-pad);
-  background: var(--el-fill-color-lighter);
   display: flex;
   flex-direction: column;
   min-height: 0;

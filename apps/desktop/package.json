@@ -1,6 +1,6 @@
 {
   "name": "@shaohui_jin/git-cockpit-desktop",
-  "version": "0.1.21",
+  "version": "0.1.22",
   "private": true,
   "author": "Git Cockpit",
   "description": "Git Cockpit 桌面窗壳：拉起或复用本机 daemon，窗口加载现有 Web",
