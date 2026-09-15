@@ -3,6 +3,7 @@
  * 打包时不能同时开着 desktop:dev，否则会 EBUSY 锁住 default_app.asar。
  */
 import { execSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -37,3 +38,15 @@ execSync('pnpm exec electron-builder --win zip nsis --x64 --publish never', {
   stdio: 'inherit',
   env
 });
+
+const unpacked = path.join(desktopRoot, 'release', 'win-unpacked', 'resources', 'mcp-server');
+const fastifyPkg = path.join(unpacked, 'node_modules', 'fastify', 'package.json');
+if (!existsSync(fastifyPkg)) {
+  console.error('[desktop] win-unpacked 里没有实体 fastify。安装包在别人机器上会起不了 :3000。');
+  process.exit(1);
+}
+execSync('node --input-type=module -e "await import(\'fastify\')"', {
+  cwd: path.join(unpacked, 'dist'),
+  stdio: 'inherit'
+});
+console.log('[desktop] win-unpacked 已能从 dist 解析 fastify');
