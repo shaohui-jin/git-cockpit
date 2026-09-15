@@ -21,7 +21,7 @@ test('工作台克隆后任务列表出现克隆任务', async ({ app }) => {
   expect(body.job.kind).toBe('clone');
   expect(body.job.status).toBe('running');
 
-  await page.locator('.el-menu-item', { hasText: '任务' }).click();
+  await page.locator('.dock-btn', { hasText: '任务' }).click();
   await expect(page).toHaveURL(/#\/jobs/);
   const row = page.locator('.job-row').filter({ hasText: '克隆' }).first();
   await expect(row).toBeVisible();

@@ -200,6 +200,22 @@ export async function createWebServer(
         return { job: jobs.summary(job) };
       }
       if (kind === 'survey' || kind === 'fetch') {
+        const payloadRepos = Array.isArray(payload.repoIds)
+          ? payload.repoIds.map((id) => Number(id)).filter((id) => Number.isInteger(id))
+          : [];
+        if (kind === 'fetch' && payloadRepos.length > 0) {
+          const repos: Array<{ repoPath: string; git: GitService }> = [];
+          for (const id of payloadRepos) {
+            const handle = await runtime.repoManager.getById(id);
+            if (handle) repos.push({ repoPath: handle.service.repoPath, git: handle.service });
+          }
+          if (!repos.length) return reply.code(400).send({ error: '没有可抓取的仓库' } as never);
+          const job = jobs.startFetchMany({
+            repos,
+            remote: payload.remote as string | undefined
+          });
+          return { job: jobs.summary(job) };
+        }
         let repoPath = typeof req.body?.repoPath === 'string' ? req.body.repoPath.trim() : '';
         if (!repoPath && req.body?.repoId != null) {
           const handle = await runtime.repoManager.getById(Number(req.body.repoId));

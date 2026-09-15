@@ -9,9 +9,21 @@ import MessageList from '@/components/chat/MessageList.vue';
 import ConfirmBar from '@/components/chat/ConfirmBar.vue';
 import type { ChatLine, PendingConfirm } from '@/components/chat/types';
 
+const props = defineProps<{
+  embedded?: boolean;
+}>();
+const emit = defineEmits<{
+  leave: [];
+}>();
+
 const repos = useReposStore();
 const settings = useSettingsStore();
 const router = useRouter();
+
+function leaveTo(path: string, query?: Record<string, string>): void {
+  emit('leave');
+  void router.push(query ? { path, query } : path);
+}
 
 const input = ref('');
 const streaming = ref(false);
@@ -22,7 +34,9 @@ let seq = 0;
 const listEl = ref<HTMLElement | null>(null);
 
 const repoPath = computed(() => repos.currentPath);
-const canSend = computed(() => Boolean(repoPath.value && settings.llm?.tokenSet && input.value.trim() && !streaming.value));
+const canSend = computed(() =>
+  Boolean(repoPath.value && settings.llm?.tokenSet && repos.healthOk && input.value.trim() && !streaming.value)
+);
 
 function sessionIdFor(path: string): string {
   const key = `gc-chat-session:${path}`;
@@ -45,9 +59,11 @@ async function scrollBottom(): Promise<void> {
   if (listEl.value) listEl.value.scrollTop = listEl.value.scrollHeight;
 }
 
-watch(repoPath, () => {
+watch(repoPath, (_next, prev) => {
   lines.value = [];
   pending.value = [];
+  seq = 0;
+  if (prev) sessionStorage.removeItem(`gc-chat-session:${prev}`);
 });
 
 async function send(): Promise<void> {
@@ -144,8 +160,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="page chat-page">
-    <h2 class="page-title">聊天</h2>
+  <div class="page chat-page" :class="{ embedded: props.embedded }">
+    <h2 v-if="!props.embedded" class="page-title">聊天</h2>
     <p class="page-lead">
       当前仓：<span class="mono">{{ repoPath || '未选择' }}</span>
       。打开/克隆请走工作台，写入同一份仓库列表。第一期只能看改动并暂存/提交；推送和合并请用其它页。
@@ -166,7 +182,7 @@ onMounted(() => {
       show-icon
       class="mb"
     >
-      <el-button link type="primary" @click="router.push({ path: '/settings', query: { tab: 'llm' } })">去设置</el-button>
+      <el-button link type="primary" @click="leaveTo('/settings', { tab: 'llm' })">去设置</el-button>
     </el-alert>
     <el-alert
       v-else-if="!repoPath"
@@ -176,25 +192,26 @@ onMounted(() => {
       show-icon
       class="mb"
     >
-      <el-button link type="primary" @click="router.push('/dashboard')">去工作台</el-button>
+      <el-button link type="primary" @click="leaveTo('/dashboard')">去工作台</el-button>
     </el-alert>
 
-    <div ref="listEl" class="chat-list">
+    <div ref="listEl" class="chat-list gc-glass">
       <MessageList :lines="lines" :streaming="streaming" />
     </div>
 
-    <ConfirmBar :items="pending" :confirming="confirming" @confirm="confirmOne" @cancel="cancelOne" />
-
-    <div class="composer">
-      <el-input
-        v-model="input"
-        type="textarea"
-        :rows="3"
-        :disabled="streaming || !repoPath || !settings.llm?.tokenSet"
-        placeholder="例如：看看改了什么，帮我提交"
-        @keydown.enter.exact.prevent="send"
-      />
-      <el-button type="primary" :disabled="!canSend" :loading="streaming" @click="send">发送</el-button>
+    <div class="dock-stack" :class="{ pending: pending.length }">
+      <ConfirmBar :items="pending" :confirming="confirming" @confirm="confirmOne" @cancel="cancelOne" />
+      <div class="composer">
+        <el-input
+          v-model="input"
+          type="textarea"
+          :rows="3"
+          :disabled="streaming || !repoPath || !settings.llm?.tokenSet || !repos.healthOk"
+          placeholder="例如：看看改了什么，帮我提交"
+          @keydown.enter.exact.prevent="send"
+        />
+        <el-button type="primary" :disabled="!canSend" :loading="streaming" @click="send">发送</el-button>
+      </div>
     </div>
   </div>
 </template>
@@ -216,18 +233,38 @@ onMounted(() => {
   min-height: 0;
   overflow: auto;
   padding: var(--gc-pad);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: var(--gc-radius);
-  background: var(--el-fill-color-lighter);
+}
+.dock-stack {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--gc-gap);
+}
+.dock-stack :deep(.confirm-bar) {
+  margin-top: 0;
+}
+.dock-stack :deep(.confirm-card) {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.dock-stack.pending .composer {
+  margin-top: 0;
+  padding: var(--gc-gap);
+  border: 1px solid var(--el-color-warning);
+  border-top: 0;
+  border-radius: 0 0 var(--gc-radius) var(--gc-radius);
+  background: var(--el-bg-color);
 }
 .composer {
   flex: none;
   display: flex;
   gap: var(--gc-gap);
   align-items: flex-end;
-  margin-top: var(--gc-gap);
 }
 .composer .el-textarea {
   flex: 1;
+}
+.chat-page.embedded {
+  overflow: hidden;
 }
 </style>

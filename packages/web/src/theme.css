@@ -454,6 +454,10 @@ body,
   line-height: var(--gc-line);
   padding: 0 var(--gc-pad);
 }
+.el-dropdown-menu__item:not(.is-disabled):hover,
+.el-dropdown-menu__item:not(.is-disabled):focus {
+  background-color: var(--el-fill-color-light);
+}
 .el-dropdown-menu__item.gc-danger {
   color: var(--el-color-danger);
 }
@@ -471,6 +475,21 @@ body,
   box-sizing: border-box;
   margin: 0;
   list-style: none;
+}
+.gc-card-menu {
+  position: fixed;
+  z-index: 4000;
+  width: auto;
+  min-width: 168px;
+  max-width: 240px;
+  box-sizing: border-box;
+  margin: 0;
+  list-style: none;
+  box-shadow: var(--gc-shadow-menu);
+}
+.gc-card-menu .el-dropdown-menu__item.is-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 /* ---- Select / TreeSelect 下拉：宽度锁成触发器，长 option 省略 ----
@@ -548,6 +567,43 @@ body,
   margin: calc(-1 * var(--gc-gap) + 2px) 0 var(--gc-gap);
   font-size: var(--gc-text);
   color: var(--el-text-color-secondary);
+}
+
+/* 玻璃卡：任务 / 日志 / 设置等与工作台同一套半透明底 */
+.gc-glass {
+  --el-card-bg-color: color-mix(in srgb, var(--el-bg-color) 82%, transparent);
+  background: color-mix(in srgb, var(--el-bg-color) 82%, transparent);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: var(--gc-radius);
+  box-shadow: var(--gc-shadow-menu);
+}
+.gc-eyebrow {
+  margin: 0 0 var(--gc-gap);
+  font-size: var(--gc-text);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--el-color-primary);
+}
+.gc-chip-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gc-gap);
+  flex: none;
+}
+.gc-chip-tabs button {
+  border: 0;
+  height: var(--gc-control);
+  padding: 0 var(--gc-pad);
+  border-radius: var(--gc-radius);
+  background: var(--el-fill-color-light);
+  color: var(--el-text-color-regular);
+  font: inherit;
+  font-size: var(--gc-text);
+  cursor: pointer;
+}
+.gc-chip-tabs button.on {
+  background: color-mix(in srgb, var(--el-color-primary) 22%, transparent);
+  color: var(--el-color-primary);
 }
 .mb {
   margin-bottom: var(--gc-gap);

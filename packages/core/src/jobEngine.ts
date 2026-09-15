@@ -32,6 +32,7 @@ export class JobEngine {
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly pendingChunks = new Map<string, string>();
   private readonly aborts = new Map<string, AbortController>();
+  private readonly batchGit = new Map<string, Map<string, GitService>>();
 
   constructor(
     private readonly eventBus: EventEmitter,
@@ -173,6 +174,47 @@ export class JobEngine {
     return job;
   }
 
+  /** 多仓合成一条 fetch 任务：串行抓取，日志写在同一份里。 */
+  startFetchMany(opts: { repos: Array<{ repoPath: string; git?: GitService }>; remote?: string }): Job {
+    const seen = new Set<string>();
+    const repos: Array<{ repoPath: string; git?: GitService }> = [];
+    for (const r of opts.repos) {
+      const p = r.repoPath.trim();
+      if (!p || seen.has(p)) continue;
+      seen.add(p);
+      repos.push({ repoPath: p, git: r.git });
+    }
+    if (repos.length === 0) throw new Error('没有可抓取的仓库');
+    const batchRunning = this.list().find((j) => j.status === 'running' && this.isFetchBatch(j));
+    if (batchRunning) throw new Error('已有批量抓取任务进行中');
+
+    const remote = opts.remote ?? 'origin';
+    const paths = repos.map((r) => r.repoPath);
+    const job: Job = {
+      id: `fetch-${randomUUID()}`,
+      kind: 'fetch',
+      status: 'running',
+      title: `fetch ${paths.length} 个仓库`,
+      payload: { remote, repos: paths },
+      logs: [`$ git fetch --prune --no-tags ${remote}  × ${paths.length}`],
+      progress: { current: 0, total: paths.length },
+      startedAt: new Date().toISOString()
+    };
+    this.jobs.set(job.id, job);
+    this.persist(job);
+    this.prune();
+    this.emit(job);
+    const gitMap = new Map<string, GitService>();
+    for (const r of repos) {
+      if (r.git) gitMap.set(r.repoPath, r.git);
+    }
+    this.batchGit.set(job.id, gitMap);
+    const ac = new AbortController();
+    this.aborts.set(job.id, ac);
+    void this.runFetchJob(job, undefined, ac);
+    return job;
+  }
+
   cancel(id: string): Job {
     const job = this.jobs.get(id);
     if (!job) throw new Error('任务不存在');
@@ -183,10 +225,21 @@ export class JobEngine {
     return job;
   }
 
+  private isFetchBatch(job: Job): boolean {
+    return job.kind === 'fetch' && Array.isArray(job.payload.repos);
+  }
+
+  private busyOnPath(repoPath: string): Job | undefined {
+    return this.list().find((j) => {
+      if (j.status !== 'running' || (j.kind !== 'survey' && j.kind !== 'fetch')) return false;
+      if (j.repoPath === repoPath) return true;
+      const repos = j.payload.repos;
+      return Array.isArray(repos) && repos.includes(repoPath);
+    });
+  }
+
   private assertRepoQueueFree(repoPath: string): void {
-    const running = this.list().find(
-      (j) => j.status === 'running' && j.repoPath === repoPath && (j.kind === 'survey' || j.kind === 'fetch')
-    );
+    const running = this.busyOnPath(repoPath);
     if (running) {
       throw new Error(`仓库已有进行中的 ${running.kind} 任务`);
     }
@@ -299,6 +352,10 @@ export class JobEngine {
 
   private async runFetchJob(job: Job, git: GitService | undefined, ac?: AbortController): Promise<void> {
     try {
+      if (this.isFetchBatch(job)) {
+        await this.runFetchBatch(job, ac);
+        return;
+      }
       if (ac?.signal.aborted) throw new Error('用户取消');
       const svc = await this.resolveGit(job.repoPath ?? '', git);
       await svc.fetch({ remote: job.payload.remote as string | undefined });
@@ -311,8 +368,59 @@ export class JobEngine {
       this.append(job, `\n失败: ${job.error}\n`);
     } finally {
       this.aborts.delete(job.id);
+      this.batchGit.delete(job.id);
       job.finishedAt = new Date().toISOString();
       this.emit(job, true);
+    }
+  }
+
+  private async runFetchBatch(job: Job, ac?: AbortController): Promise<void> {
+    const paths = (job.payload.repos as string[]) ?? [];
+    const remote = (job.payload.remote as string | undefined) ?? 'origin';
+    const gitMap = this.batchGit.get(job.id);
+    let ok = 0;
+    let fail = 0;
+    let skip = 0;
+    const failed: string[] = [];
+    for (let i = 0; i < paths.length; i++) {
+      if (ac?.signal.aborted) throw new Error('用户取消');
+      const repoPath = paths[i] ?? '';
+      job.progress = { current: i, total: paths.length, message: repoPath };
+      const others = this.list().find(
+        (j) =>
+          j.id !== job.id &&
+          j.status === 'running' &&
+          (j.kind === 'survey' || j.kind === 'fetch') &&
+          j.repoPath === repoPath
+      );
+      if (others) {
+        skip += 1;
+        this.append(job, `[${i + 1}/${paths.length}] skip ${repoPath}（已有 ${others.kind}）\n`);
+        continue;
+      }
+      this.append(job, `[${i + 1}/${paths.length}] fetch ${repoPath}\n`);
+      try {
+        const svc = await this.resolveGit(repoPath, gitMap?.get(repoPath));
+        await svc.fetch({ remote });
+        ok += 1;
+        this.append(job, '  ok\n');
+      } catch (err) {
+        fail += 1;
+        const msg = err instanceof Error ? err.message : String(err);
+        failed.push(repoPath);
+        this.append(job, `  失败: ${msg}\n`);
+      }
+    }
+    if (ac?.signal.aborted) throw new Error('用户取消');
+    job.progress = { current: paths.length, total: paths.length };
+    job.result = { ok, fail, skip, failed };
+    if (fail > 0) {
+      job.status = 'error';
+      job.error = `完成 ${ok}，失败 ${fail}${skip ? `，跳过 ${skip}` : ''}`;
+      this.append(job, `\n${job.error}\n`);
+    } else {
+      job.status = 'ok';
+      this.append(job, `\nfetch 完成 ${ok} 个${skip ? `，跳过 ${skip}` : ''}\n`);
     }
   }
 

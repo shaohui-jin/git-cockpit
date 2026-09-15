@@ -63,14 +63,28 @@ const branchMenu = reactive<{ visible: boolean; x: number; y: number; node: Bran
   node: null
 });
 
-/** 文件差异抽屉（文件 diff 或 stash diff 共用） */
-const drawer = reactive<{ visible: boolean; title: string; diff: DiffResult | null; patch: string; loading: boolean }>({
-  visible: false,
+/** 右侧差异监视器（点文件 / Stash「差异」写入这里，不再开抽屉） */
+const monitor = reactive<{
+  path: string;
+  title: string;
+  diff: DiffResult | null;
+  patch: string;
+  loading: boolean;
+}>({
+  path: '',
   title: '',
   diff: null,
   patch: '',
   loading: false
 });
+
+function resetMonitor(): void {
+  monitor.path = '';
+  monitor.title = '';
+  monitor.diff = null;
+  monitor.patch = '';
+  monitor.loading = false;
+}
 
 /** 参数录入对话框 */
 const commitVisible = ref(false);
@@ -344,22 +358,30 @@ function unstageAll(): void {
   void run('git_unstage', { paths: all });
 }
 
-/** 查看单个文件差异 */
+function fillMonitor(opts: { path: string; title: string }): void {
+  monitor.path = opts.path;
+  monitor.title = opts.title;
+  monitor.diff = null;
+  monitor.patch = '';
+  monitor.loading = true;
+}
+
+/** 查看单个文件差异（右侧监视器） */
 async function showDiff(f: FileStatus): Promise<void> {
   const id = repoId();
   if (id === null) return;
-  drawer.title = `${f.path}（${f.staged ? '已 git add' : '工作区修改'}）`;
-  drawer.diff = null;
-  drawer.patch = '';
-  drawer.visible = true;
-  drawer.loading = true;
+  fillMonitor({
+    path: f.path,
+    title: `${f.path}（${f.staged ? '已 git add' : '工作区修改'}）`
+  });
   try {
-    drawer.diff = await api.getDiff(id, { path: f.path, staged: f.staged });
+    monitor.diff = await api.getDiff(id, { path: f.path, staged: f.staged });
   } catch (err) {
     ElMessage.error(err instanceof Error ? err.message : String(err));
-    drawer.visible = false;
+    monitor.path = '';
+    monitor.title = '';
   } finally {
-    drawer.loading = false;
+    monitor.loading = false;
   }
 }
 
@@ -367,25 +389,23 @@ async function showDiff(f: FileStatus): Promise<void> {
 async function showStashDiff(s: StashInfo): Promise<void> {
   const id = repoId();
   if (id === null) return;
-  drawer.title = `${s.ref} · ${s.message || '（无说明）'}`;
-  drawer.diff = null;
-  drawer.patch = '';
-  drawer.visible = true;
-  drawer.loading = true;
+  fillMonitor({ path: s.ref, title: `${s.ref} · ${s.message || '（无说明）'}` });
   try {
     const exec: ToolExecResult = await api.runTool(id, 'git_stash_show', { index: s.index });
     if (exec.success) {
       const r = (exec.result as { patch?: string } | undefined) ?? {};
-      drawer.patch = r.patch ?? '';
+      monitor.patch = r.patch ?? '';
     } else {
       ElMessage.error(exec.error?.message ?? '查看差异失败');
-      drawer.visible = false;
+      monitor.path = '';
+      monitor.title = '';
     }
   } catch (err) {
     ElMessage.error(err instanceof Error ? err.message : String(err));
-    drawer.visible = false;
+    monitor.path = '';
+    monitor.title = '';
   } finally {
-    drawer.loading = false;
+    monitor.loading = false;
   }
 }
 
@@ -697,9 +717,7 @@ function firstLine(msg: string): string {
 }
 
 watch(repoId, () => {
-  drawer.diff = null;
-  drawer.patch = '';
-  drawer.visible = false;
+  resetMonitor();
   checkedFiles.clear();
   closeBranchMenu();
   void refresh();
@@ -750,11 +768,11 @@ onUnmounted(() => {
     </div>
 
     <el-alert v-if="loadError" :title="loadError" type="error" :closable="false" show-icon class="mb" />
-    <div v-if="!canRun" class="empty-tip">请先在「仓库管理」中打开一个仓库</div>
+    <div v-if="!canRun" class="empty-tip">请先在工作台打开仓库</div>
 
     <div v-else class="status-layout">
       <!-- 左：分支树 -->
-      <el-card v-if="contentMode === 'workspace'" shadow="never" class="branch-panel gc-card-fill gc-card-fill--tight">
+      <el-card v-if="contentMode === 'workspace'" shadow="never" class="branch-panel glass gc-card-fill gc-card-fill--tight">
         <template #header>
           <div class="panel-head">
             <span class="panel-title">分支 Branch</span>
@@ -799,7 +817,7 @@ onUnmounted(() => {
 
       <!-- 右：工作区 / 分支图 / 提交 -->
       <div class="status-content">
-        <div v-if="contentMode === 'graph'" class="graph-pane">
+        <div v-if="contentMode === 'graph'" class="graph-pane glass">
           <div class="lineage-bar">
             <span class="field-label">合入目标</span>
             <BranchTreeSelect v-model="lineageInto" remote-first placeholder="选择线上目标" />
@@ -832,7 +850,7 @@ onUnmounted(() => {
 
         <template v-else>
         <!-- 工具栏 -->
-        <el-card shadow="never" class="toolbar-card">
+        <el-card shadow="never" class="toolbar-card glass">
           <div class="toolbar">
             <div class="toolbar-group gc-gap-btns">
               <el-button type="primary" @click="commitVisible = true">提交 Commit</el-button>
@@ -844,7 +862,7 @@ onUnmounted(() => {
               <el-tooltip content="Shelve Silently：使用默认说明，一键暂存全部更改" placement="top">
                 <el-button plain @click="silentStash">静默 Stash</el-button>
               </el-tooltip>
-              <el-tooltip content="把选中分支合并进当前检出分支（会改工作区）。预演请走左侧「合并」页。" placement="top">
+              <el-tooltip content="把选中分支合并进当前检出分支（会改工作区）。预演请走底栏「合并」。" placement="top">
                 <el-button plain @click="mergeVisible = true">工作区合并</el-button>
               </el-tooltip>
               <el-tooltip content="git fetch --prune，更新远程跟踪分支，不改工作区" placement="top">
@@ -868,7 +886,7 @@ onUnmounted(() => {
           :title="status.operation === 'merge' ? '工作区 merge 进行中' : '工作区 rebase 进行中'"
           :description="
             (status.conflicted.length ? `还有 ${status.conflicted.length} 个冲突文件。` : '冲突已处理，可以继续。') +
-            ' 选边写回当前工作区后点继续；或中止这次操作。不是左侧「合并」页的 merge-tree 预演。'
+            ' 选边写回当前工作区后点继续；或中止这次操作。不是底栏「合并」的 merge-tree 预演。'
           "
           type="error"
           :closable="false"
@@ -903,8 +921,9 @@ onUnmounted(() => {
           class="mb"
         />
 
+        <div class="workspace-body">
         <!-- 更改文件 -->
-        <el-card shadow="never" class="changes-card gc-card-fill gc-card-fill--flush">
+        <el-card shadow="never" class="changes-card glass gc-card-fill gc-card-fill--flush">
           <template #header>
             <div class="card-head">
               <span class="card-title">更改 Changes</span>
@@ -935,11 +954,15 @@ onUnmounted(() => {
                 class="change-tree gc-tree gc-tree-files"
               >
                 <template #default="{ data }">
-                  <div v-if="data.file" class="change-file gc-gap-btns">
+                  <div
+                    v-if="data.file"
+                    class="change-file gc-gap-btns"
+                    :class="{ on: monitor.path === data.file.path }"
+                    @click="showDiff(data.file)"
+                  >
                     <el-checkbox :model-value="isChecked(data.file.path)" @click.stop @change="toggleChecked(data.file.path)" />
                     <span class="file-status" :class="statusClass(data.file)">{{ statusLetter(data.file) }}</span>
                     <span class="file-path mono" :title="data.file.path">{{ data.label }}</span>
-                    <el-button size="small" text type="primary" @click.stop="showDiff(data.file)">查看差异</el-button>
                     <el-button v-if="data.file.conflicted" size="small" text type="warning" @click.stop="stageFile(data.file)">标记已解决(git add)</el-button>
                     <el-button v-else size="small" text :type="data.file.staged ? 'warning' : 'success'" @click.stop="rowAction(data.file)">
                       {{ data.file.staged ? '取消暂存' : '暂存' }}
@@ -961,7 +984,29 @@ onUnmounted(() => {
           </el-tabs>
         </el-card>
 
-        <el-card shadow="never" class="history-card gc-card-fill gc-card-fill--flush">
+        <div class="right-stack">
+        <el-card shadow="never" class="monitor-card glass gc-card-fill gc-card-fill--flush">
+          <template #header>
+            <div class="card-head">
+              <span class="card-title">差异监视器</span>
+              <span v-if="monitor.diff" class="monitor-stat">
+                <span>{{ monitor.diff.files.length }} 个文件</span>
+                <span class="add">+{{ monitor.diff.insertions }}</span>
+                <span class="del">-{{ monitor.diff.deletions }}</span>
+                <span v-if="monitor.diff.truncated" class="warn">（已截断）</span>
+              </span>
+            </div>
+          </template>
+          <div v-loading="monitor.loading" class="monitor-body">
+            <p v-if="monitor.title" class="monitor-file mono">{{ monitor.title }}</p>
+            <DiffViewer v-if="monitor.diff?.rawPatch" :patch="monitor.diff.rawPatch" />
+            <DiffViewer v-else-if="monitor.patch" :patch="monitor.patch" />
+            <p v-else-if="monitor.diff" class="file-empty">无差异</p>
+            <p v-else class="file-empty">点文件看红绿差异。Stash 的「差异」也会显示在这里。</p>
+          </div>
+        </el-card>
+
+        <el-card shadow="never" class="history-card glass gc-card-fill gc-card-fill--flush">
           <template #header>
             <div class="card-head">
               <span class="card-title">记录 Records</span>
@@ -976,7 +1021,7 @@ onUnmounted(() => {
               <template #label>Stash（{{ stashes.length }}）</template>
               <div v-if="stashes.length === 0" class="file-empty">没有暂存的更改</div>
               <div v-else class="stash-list mono">
-                <div v-for="s in stashes" :key="s.ref" class="stash-row">
+                <div v-for="s in stashes" :key="s.ref" class="stash-row" :class="{ on: monitor.path === s.ref }">
                   <div class="stash-main">
                     <span class="stash-ref">{{ s.ref }}</span>
                     <span class="stash-msg" :title="s.message">{{ firstLine(s.message) || '（无说明）' }}</span>
@@ -1053,6 +1098,8 @@ onUnmounted(() => {
             </el-tab-pane>
           </el-tabs>
         </el-card>
+        </div>
+        </div>
         </template>
       </div>
     </div>
@@ -1078,26 +1125,6 @@ onUnmounted(() => {
 
     <!-- 写操作确认对话框 -->
     <ConfirmDialog v-model:visible="confirmVisible" :tool="pending?.tool ?? ''" :preview="pending?.preview ?? null" @confirm="onConfirmed" @cancel="cancel" />
-
-    <!-- 差异抽屉 -->
-    <el-drawer v-model="drawer.visible" :title="drawer.title" size="56%" destroy-on-close>
-      <div v-loading="drawer.loading" class="diff-wrap">
-        <template v-if="drawer.diff">
-          <div class="diff-summary">
-            <span>{{ drawer.diff.files.length }} 个文件</span>
-            <span class="add">+{{ drawer.diff.insertions }}</span>
-            <span class="del">-{{ drawer.diff.deletions }}</span>
-            <span v-if="drawer.diff.truncated" class="warn">（已截断）</span>
-          </div>
-          <DiffViewer :patch="drawer.diff.rawPatch" />
-        </template>
-        <template v-else-if="drawer.patch">
-          <div v-if="!drawer.patch" class="file-empty">无差异</div>
-          <DiffViewer v-else :patch="drawer.patch" />
-        </template>
-        <el-empty v-else-if="!drawer.loading" description="无差异" :image-size="60" />
-      </div>
-    </el-drawer>
 
     <!-- 提交 -->
     <el-dialog v-model="commitVisible" title="提交 Commit" width="520px" @closed="commitMessage = ''">
@@ -1209,7 +1236,7 @@ onUnmounted(() => {
     <el-dialog v-model="mergeVisible" title="工作区合并" width="480px" @closed="mergeBranch = ''">
       <el-alert
         class="mb"
-        title="会把所选分支合并进当前检出分支，可能产生冲突。只想预演、不改工作区请用左侧「合并」页。"
+        title="会把所选分支合并进当前检出分支，可能产生冲突。只想预演、不改工作区请用底栏「合并」。"
         type="warning"
         :closable="false"
         show-icon
@@ -1267,13 +1294,19 @@ onUnmounted(() => {
   border-radius: 8px;
 }
 
-/* 整体两栏布局：占满剩余高度 */
+/* 整体三栏：左分支 · 中更改 · 右监视器+记录 */
 .status-page {
   height: 100%;
   display: flex;
   flex-direction: column;
   gap: var(--gc-gap);
   overflow: hidden;
+}
+.glass {
+  --el-card-bg-color: color-mix(in srgb, var(--el-bg-color) 82%, transparent);
+  background: color-mix(in srgb, var(--el-bg-color) 82%, transparent);
+  border: 1px solid var(--el-border-color-lighter);
+  box-shadow: var(--gc-shadow-menu);
 }
 .page-head {
   display: flex;
@@ -1332,7 +1365,7 @@ onUnmounted(() => {
 
 /* 左：分支树（内部滚动，占满高度） */
 .branch-panel {
-  width: 300px;
+  width: 220px;
   flex: none;
   display: flex;
   flex-direction: column;
@@ -1435,6 +1468,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: var(--gc-gap);
+  padding: var(--gc-pad);
 }
 .log-pane {
   flex: 1;
@@ -1480,10 +1514,28 @@ onUnmounted(() => {
   gap: var(--gc-gap);
 }
 
+/* 中更改 | 右监视器+记录 */
+.workspace-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(240px, 0.95fr) minmax(280px, 1.25fr);
+  gap: var(--gc-gap);
+}
+.right-stack {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gc-gap);
+}
+
 /* 更改卡片：弹性占位，Tab 内容内部滚动 */
 .changes-card {
-  flex: 1 1 0;
+  min-width: 0;
   min-height: 0;
+  height: 100%;
 }
 .card-head {
   display: flex;
@@ -1540,6 +1592,14 @@ onUnmounted(() => {
   align-items: center;
   gap: var(--gc-gap);
   height: var(--gc-line);
+  padding: 0 4px;
+  border-radius: var(--gc-radius);
+}
+.change-file {
+  cursor: pointer;
+}
+.change-file.on {
+  background: var(--el-color-primary-light-9);
 }
 .dir-name {
   flex: 1;
@@ -1603,12 +1663,51 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  cursor: pointer;
 }
 
-/* 记录：stash / 备份 / reflog 合一块，与更改对半铺满 */
-.history-card {
-  flex: 1 1 0;
+/* 差异监视器 */
+.monitor-card {
+  flex: 1.55 1 0;
   min-height: 0;
+}
+.monitor-stat {
+  display: flex;
+  align-items: center;
+  gap: var(--gc-gap);
+  font-size: var(--gc-text);
+  color: var(--el-text-color-secondary);
+}
+.monitor-stat .add {
+  color: var(--el-color-success);
+}
+.monitor-stat .del {
+  color: var(--el-color-danger);
+}
+.monitor-stat .warn {
+  color: var(--el-color-warning);
+}
+.monitor-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 0 var(--gc-gap);
+}
+.monitor-file {
+  margin: 0;
+  height: var(--gc-line);
+  line-height: var(--gc-line);
+  font-size: var(--gc-text);
+  color: var(--el-text-color-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 记录：stash / 备份 / reflog / worktree，叠在监视器下面 */
+.history-card {
+  flex: 0.85 1 0;
+  min-height: 140px;
 }
 .history-tabs {
   flex: 1;
@@ -1623,11 +1722,17 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: var(--gc-gap);
-  padding: 4px 2px;
+  height: var(--gc-line);
+  padding: 0 2px;
+  box-sizing: border-box;
   border-bottom: 1px solid var(--el-border-color-lighter);
 }
 .stash-row:last-child {
   border-bottom: none;
+}
+.stash-row.on {
+  background: var(--el-color-primary-light-9);
+  border-radius: var(--gc-radius);
 }
 .stash-main {
   flex: 1;
@@ -1635,11 +1740,14 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: var(--gc-gap);
+  height: var(--gc-line);
+  overflow: hidden;
 }
 .stash-ref {
   flex: none;
   color: var(--el-color-primary);
   font-weight: 600;
+  line-height: var(--gc-line);
 }
 .stash-msg {
   flex: 1;
@@ -1647,6 +1755,7 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: var(--gc-line);
 }
 .stash-date {
   flex: none;
@@ -1676,27 +1785,5 @@ onUnmounted(() => {
 .stash-files-title {
   font-size: 12px;
   color: var(--el-text-color-secondary);
-}
-
-/* 差异抽屉 */
-.diff-summary {
-  display: flex;
-  align-items: center;
-  gap: var(--gc-gap);
-  height: var(--gc-line);
-  font-size: var(--gc-text);
-  margin-bottom: var(--gc-gap);
-}
-.diff-summary .add {
-  color: var(--el-color-success);
-}
-.diff-summary .del {
-  color: var(--el-color-danger);
-}
-.diff-summary .warn {
-  color: var(--el-color-warning);
-}
-.diff-wrap {
-  min-height: 200px;
 }
 </style>

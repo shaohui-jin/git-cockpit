@@ -13,7 +13,10 @@ export async function openRepo(page: Page, repoPath: string): Promise<void> {
 }
 
 export async function enterCurrentRepo(page: Page, action: '进入' | '合并'): Promise<void> {
-  await page.locator('.repo-card').first().getByRole('button', { name: action }).click();
+  const card = page.locator('.repo-card').first();
+  await card.getByRole('button', { name: '更多' }).click();
+  const item = action === '进入' ? '进入工作区' : '预演合并';
+  await page.locator('.gc-card-menu').getByText(item, { exact: true }).click();
 }
 
 export function writeDialog(page: Page) {

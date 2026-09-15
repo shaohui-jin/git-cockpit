@@ -8,8 +8,16 @@ import { useRevision } from '@/composables/revision';
 import * as api from '@/api/client';
 import CloneDialog from '@/components/CloneDialog.vue';
 import RepoCard from '@/components/RepoCard.vue';
+import ActivityHeatmap from '@/components/ActivityHeatmap.vue';
 import { jobLine, notifyJobStarted } from '@/utils/jobNotify';
-import { attentionOf, matchesFilter, type RepoFilter } from '@/utils/repoAttention';
+import {
+  attentionOf,
+  filterAriaName,
+  matchesFilter,
+  weatherHint,
+  weatherOf,
+  type RepoFilter
+} from '@/utils/repoAttention';
 import { moveAmong } from '@/utils/repoOrder';
 import type { RepoOverview } from '@/api/types';
 
@@ -29,7 +37,6 @@ const overviewLoading = ref(false);
 const filter = ref<RepoFilter>('all');
 const dragId = ref<number | null>(null);
 const overId = ref<number | null>(null);
-const selectedIds = ref<Set<number>>(new Set());
 const fetching = ref(false);
 const { revision } = useRevision();
 
@@ -41,69 +48,94 @@ const filterCounts = computed(() => {
   let stuck = 0;
   let dirty = 0;
   let sync = 0;
+  let quiet = 0;
   for (const r of repos.repos) {
     const a = attentionOf(overviewOf(r.path));
     if (a === 'stuck') stuck += 1;
     else if (a === 'dirty') dirty += 1;
     else if (a === 'sync') sync += 1;
+    else quiet += 1;
   }
-  return { stuck, dirty, sync };
+  return { stuck, dirty, sync, quiet };
+});
+
+const weatherTabs = computed(() => {
+  const n = repos.repos.length;
+  const c = filterCounts.value;
+  return [
+    { key: 'all' as const, weather: '全部', count: n, hint: '所有已打开的仓库', aria: filterAriaName('all', n) },
+    { key: 'stuck' as const, weather: '雷雨', count: c.stuck, hint: weatherHint('stuck'), aria: filterAriaName('stuck', c.stuck) },
+    { key: 'dirty' as const, weather: '薄雾', count: c.dirty, hint: weatherHint('dirty'), aria: filterAriaName('dirty', c.dirty) },
+    { key: 'sync' as const, weather: '刮风', count: c.sync, hint: weatherHint('sync'), aria: filterAriaName('sync', c.sync) },
+    { key: 'quiet' as const, weather: '晴天', count: c.quiet, hint: weatherHint('quiet'), aria: filterAriaName('quiet', c.quiet) }
+  ];
 });
 
 const cardRepos = computed(() =>
   repos.repos.filter((r) => matchesFilter(overviewOf(r.path), filter.value))
 );
 
+const current = computed(
+  () => repos.repos.find((r) => r.id === repos.currentId) ?? repos.repos[0] ?? null
+);
+const currentOv = computed(() => (current.value ? overviewOf(current.value.path) : undefined));
+const currentAttention = computed(() => attentionOf(currentOv.value));
+const currentMissing = computed(() => currentOv.value?.available === false);
+
+function formatOpened(iso: string | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString(undefined, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
 function setFilter(next: RepoFilter): void {
   filter.value = filter.value === next && next !== 'all' ? 'all' : next;
 }
 
-function toggleSelect(id: number): void {
-  const next = new Set(selectedIds.value);
-  if (next.has(id)) next.delete(id);
-  else next.add(id);
-  selectedIds.value = next;
-}
-
-const selectedCount = computed(() => selectedIds.value.size);
-
-async function fetchSelected(): Promise<void> {
-  const ids = [...selectedIds.value];
+async function fetchAll(): Promise<void> {
+  const ids = repos.repos
+    .filter((r) => overviewOf(r.path)?.available !== false)
+    .map((r) => r.id);
   if (!ids.length) {
-    ElMessage.warning('请先勾选要刷新远程的仓库');
+    ElMessage.warning('没有可抓取的仓库');
     return;
   }
   fetching.value = true;
-  let ok = 0;
-  const errors: string[] = [];
   try {
-    for (const id of ids) {
-      const repo = repos.repos.find((r) => r.id === id);
-      const ov = repo ? overviewOf(repo.path) : undefined;
-      if (!repo || ov?.available === false) {
-        errors.push(repo?.path ?? String(id));
-        continue;
-      }
-      try {
-        const { job } = await api.startJob('fetch', { repoId: id });
-        ok += 1;
-        notifyJobStarted({
-          id: job.id,
-          kind: 'fetch',
-          title: jobLine({ ...job, repoPath: job.repoPath || repo.path }),
-          router
-        });
-      } catch (err) {
-        errors.push(err instanceof Error ? err.message : String(err));
-      }
-    }
+    const { job } = await api.startJob('fetch', { payload: { repoIds: ids } });
     await jobs.load();
-    if (ok && !errors.length) ElMessage.success(`已开始抓取 ${ok} 个仓库`);
-    else if (ok) ElMessage.warning(`已开始 ${ok} 个，失败 ${errors.length}`);
-    else ElMessage.error(errors[0] || '无法开始抓取');
-    selectedIds.value = new Set();
+    notifyJobStarted({
+      id: job.id,
+      kind: 'fetch',
+      title: jobLine({ ...job, title: job.title || `fetch ${ids.length} 个仓库` }),
+      router
+    });
+    ElMessage.success(`已开始抓取 ${ids.length} 个仓库（一条任务）`);
+  } catch (err) {
+    ElMessage.error(err instanceof Error ? err.message : String(err));
   } finally {
     fetching.value = false;
+  }
+}
+
+async function fetchOne(id: number): Promise<void> {
+  const repo = repos.repos.find((r) => r.id === id);
+  if (!repo || overviewOf(repo.path)?.available === false) {
+    ElMessage.warning('路径不存在或不是 Git 仓库，不能抓取远程');
+    return;
+  }
+  try {
+    const { job } = await api.startJob('fetch', { repoId: id });
+    await jobs.load();
+    notifyJobStarted({
+      id: job.id,
+      kind: 'fetch',
+      title: jobLine({ ...job, repoPath: job.repoPath || repo.path }),
+      router
+    });
+  } catch (err) {
+    ElMessage.error(err instanceof Error ? err.message : String(err));
   }
 }
 
@@ -187,7 +219,17 @@ async function removeRepo(id: number, path: string): Promise<void> {
   }
 }
 
+function repoUsable(id: number): boolean {
+  const repo = repos.repos.find((r) => r.id === id);
+  if (!repo) return false;
+  return overviewOf(repo.path)?.available !== false;
+}
+
 async function openStatus(id: number): Promise<void> {
+  if (!repoUsable(id)) {
+    ElMessage.warning('路径不存在或不是 Git 仓库，不能进入工作区');
+    return;
+  }
   try {
     await repos.activate(id);
   } catch {
@@ -197,6 +239,10 @@ async function openStatus(id: number): Promise<void> {
 }
 
 async function openMerge(id: number): Promise<void> {
+  if (!repoUsable(id)) {
+    ElMessage.warning('路径不存在或不是 Git 仓库，不能预演合并');
+    return;
+  }
   try {
     await repos.activate(id);
   } catch {
@@ -248,67 +294,118 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="page">
+  <div class="page board">
     <h2 class="page-title">工作台</h2>
 
-    <el-card class="open-card" shadow="never">
-      <template #header>打开本地仓库</template>
-      <div class="open-row">
-        <el-input
-          v-model="newPath"
-          placeholder="输入本地 Git 仓库路径，例如 D:\project\repo 或 /Users/me/code/app"
-          clearable
-          @keyup.enter="openRepo"
-        />
-        <el-button type="primary" :loading="opening" @click="openRepo">打开</el-button>
-        <el-button @click="openCloneDialog">克隆到本地</el-button>
-      </div>
-    </el-card>
+    <el-alert
+      v-if="repos.healthOk === false"
+      title="后端离线。请先启动 git-cockpit start，或用桌面应用拉起 daemon。"
+      type="error"
+      :closable="false"
+      show-icon
+      class="offline"
+    />
 
-    <el-card shadow="never" class="list-card gc-card-fill">
-      <template #header>
-        <div class="list-header">
-          <div class="summary-chips">
-            <span>仓库一览</span>
-            <button type="button" class="chip" :class="{ on: filter === 'all' }" @click="setFilter('all')">
-              全部 {{ repos.repos.length }}
-            </button>
-            <button type="button" class="chip stuck" :class="{ on: filter === 'stuck' }" @click="setFilter('stuck')">
-              卡住 {{ filterCounts.stuck }}
-            </button>
-            <button type="button" class="chip dirty" :class="{ on: filter === 'dirty' }" @click="setFilter('dirty')">
-              有更改 {{ filterCounts.dirty }}
-            </button>
-            <button type="button" class="chip sync" :class="{ on: filter === 'sync' }" @click="setFilter('sync')">
-              未同步 {{ filterCounts.sync }}
-            </button>
+    <section class="hero glass">
+      <div v-if="!current" class="hero-copy">
+        <p class="eyebrow">工作台</p>
+        <h3>还没有打开仓库</h3>
+        <p class="hero-hint">输入本地 Git 路径，或从远程克隆。不会删盘上的文件。</p>
+        <div class="open-row">
+          <el-input
+            v-model="newPath"
+            placeholder="输入本地 Git 仓库路径，例如 D:\project\repo 或 /Users/me/code/app"
+            clearable
+            @keyup.enter="openRepo"
+          />
+          <el-button type="primary" :loading="opening" @click="openRepo">打开</el-button>
+          <el-button @click="openCloneDialog">克隆到本地</el-button>
+        </div>
+      </div>
+      <template v-else>
+        <div class="hero-copy">
+          <p class="eyebrow">当前仓库</p>
+          <h3>{{ currentOv?.name || current.path.split(/[\\/]/).pop() }}</h3>
+          <p class="path mono">{{ current.path }}</p>
+          <div class="branch">
+            <span class="wx" :class="currentAttention">{{
+              currentMissing ? '丢失' : weatherOf(currentAttention)
+            }}</span>
+            <code>{{ currentMissing ? '不可用' : currentOv?.current || '…' }}</code>
+            <template v-if="currentOv && !currentMissing">
+              <span class="ab"
+                ><b :class="{ on: currentOv.ahead > 0 }">{{ currentOv.ahead }}</b
+                >↑
+                <b :class="{ on: currentOv.behind > 0 }">{{ currentOv.behind }}</b
+                >↓</span
+              >
+              <span v-if="currentOv.dirtyCount" class="chip">{{ currentOv.dirtyCount }} 更改</span>
+              <span v-if="currentOv.conflictCount" class="chip danger">{{ currentOv.conflictCount }} 冲突</span>
+              <span v-if="currentOv.operation !== 'none'" class="chip danger">{{ currentOv.operation }}</span>
+              <span v-if="currentOv.tempMergeBranchCount" class="chip">{{ currentOv.tempMergeBranchCount }} 合并草稿</span>
+            </template>
           </div>
-          <div class="list-actions">
-            <el-button
-              :disabled="selectedCount === 0"
-              :loading="fetching"
-              @click="fetchSelected"
-            >刷新远程{{ selectedCount ? ` (${selectedCount})` : '' }}</el-button>
-            <el-button
-              text
-              type="primary"
-              :loading="repos.loading || overviewLoading"
-              @click="() => { void repos.load(); void loadOverview(); }"
-            >刷新</el-button>
+          <p class="hero-hint">
+            {{
+              currentMissing
+                ? '路径不存在或不是 Git 仓库。可以从列表移除，不会删磁盘。'
+                : weatherHint(currentAttention) +
+                  (formatOpened(current.lastOpenedAt) ? ` · 打开 ${formatOpened(current.lastOpenedAt)}` : '')
+            }}
+          </p>
+          <div class="hero-actions">
+            <el-button type="primary" :disabled="currentMissing" @click="openStatus(current.id)">进入工作区</el-button>
+            <el-button :disabled="currentMissing" @click="openMerge(current.id)">预演合并</el-button>
+            <el-button v-if="currentMissing" type="danger" plain @click="removeRepo(current.id, current.path)"
+              >移除</el-button
+            >
           </div>
         </div>
+        <ActivityHeatmap
+          v-if="!currentMissing"
+          :days="currentOv?.activity"
+          :start="currentOv?.activityStart"
+          :total="currentOv?.activityTotal"
+        />
       </template>
+    </section>
 
-      <el-empty
-        v-if="!repos.loading && repos.repos.length === 0"
-        description="还没有打开仓库。输入本地路径打开，或从远程克隆。"
-      />
+    <section v-if="repos.repos.length" class="weather">
+      <button
+        v-for="w in weatherTabs"
+        :key="w.key"
+        type="button"
+        class="wx-tab glass"
+        :class="[w.key, { on: filter === w.key }]"
+        :aria-label="w.aria"
+        :title="w.hint"
+        @click="setFilter(w.key)"
+      >
+        <strong>{{ w.count }}</strong>
+        <span>{{ w.weather }}</span>
+        <small>{{ w.hint }}</small>
+      </button>
+    </section>
 
-      <el-empty
-        v-else-if="cardRepos.length === 0"
-        description="没有符合筛选的仓库"
-        :image-size="40"
-      />
+    <section v-if="repos.repos.length" class="mosaic-block">
+      <div class="mosaic-head">
+        <p class="eyebrow">仓库一览 · 点卡片换当前仓</p>
+        <div class="open-row">
+          <el-input
+            v-model="newPath"
+            placeholder="输入本地 Git 仓库路径，例如 D:\project\repo 或 /Users/me/code/app"
+            clearable
+            @keyup.enter="openRepo"
+          />
+          <el-button type="primary" :loading="opening" @click="openRepo">打开</el-button>
+          <el-button @click="openCloneDialog">克隆到本地</el-button>
+          <el-tooltip content="对所有可用仓 git fetch，合成一条后台任务。丢失仓会跳过。" placement="top">
+            <el-button :loading="fetching" @click="fetchAll">刷新</el-button>
+          </el-tooltip>
+        </div>
+      </div>
+
+      <el-empty v-if="cardRepos.length === 0" description="没有符合筛选的仓库" :image-size="40" />
 
       <div v-else class="card-grid">
         <RepoCard
@@ -320,19 +417,18 @@ onMounted(() => {
           :muted="repos.currentId != null && r.id !== repos.currentId"
           :dragging="dragId === r.id"
           :drag-over="overId === r.id"
-          :selected="selectedIds.has(r.id)"
           @select="repos.switchTo(r.id)"
           @enter="openStatus(r.id)"
           @merge="openMerge(r.id)"
+          @fetch="fetchOne(r.id)"
           @remove="removeRepo(r.id, r.path)"
-          @toggle-select="toggleSelect(r.id)"
           @dragstart="onCardDragStart($event, r.id)"
           @dragover="onCardDragOver($event, r.id)"
           @drop="onCardDrop($event, r.id)"
           @dragend="onCardDragEnd"
         />
       </div>
-    </el-card>
+    </section>
 
     <CloneDialog
       v-model:visible="cloneVisible"
@@ -346,70 +442,176 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.page {
+.board {
   height: 100%;
   min-height: 0;
   display: flex;
   flex-direction: column;
+  gap: var(--gc-pad);
+  overflow: auto;
 }
-.open-card {
+.offline {
   flex: none;
-  margin-bottom: var(--gc-gap);
 }
-.list-card {
-  flex: 1;
-  min-height: 0;
+.glass {
+  background: color-mix(in srgb, var(--el-bg-color) 82%, transparent);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: var(--gc-radius);
+  box-shadow: var(--gc-shadow-menu);
 }
-.open-row {
-  display: flex;
-  gap: var(--gc-gap);
-}
-.open-row .el-input {
-  flex: 1;
-}
-.list-header {
+.hero {
+  flex: none;
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  gap: var(--gc-gap);
-  flex-wrap: wrap;
+  gap: var(--gc-pad);
+  align-items: flex-start;
+  padding: var(--gc-pad);
 }
-.list-actions {
+.hero-copy {
+  min-width: 0;
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: var(--gc-gap);
-  flex: none;
 }
-.summary-chips {
-  display: flex;
-  align-items: center;
-  gap: var(--gc-gap);
-  flex-wrap: wrap;
-}
-.chip {
-  height: 22px;
-  padding: 0 8px;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 11px;
-  background: transparent;
-  color: var(--el-text-color-regular);
-  font-size: 12px;
-  cursor: pointer;
-}
-.chip.on {
-  border-color: var(--el-color-primary);
+.eyebrow {
+  margin: 0;
+  font-size: var(--gc-text);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--el-color-primary);
-  background: var(--el-color-primary-light-9);
 }
-.chip.stuck.on {
-  border-color: var(--el-color-danger);
+.hero h3 {
+  margin: 0;
+  font-size: var(--el-font-size-extra-large);
+  font-weight: 600;
+}
+.path {
+  margin: 0;
+  font-size: var(--gc-text);
+  color: var(--el-text-color-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.branch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gc-gap);
+}
+.wx {
+  font-size: var(--gc-text);
+  padding: 0 var(--gc-gap);
+  border-radius: 999px;
+  background: var(--el-fill-color-light);
+}
+.wx.stuck {
   color: var(--el-color-danger);
   background: var(--el-color-danger-light-9);
 }
-.chip.dirty.on {
-  border-color: var(--el-color-warning);
-  color: var(--el-color-warning);
-  background: var(--el-color-warning-light-9);
+.wx.dirty {
+  color: var(--el-color-primary);
+  background: var(--el-color-primary-light-9);
+}
+.wx.sync {
+  color: var(--el-color-primary);
+  background: color-mix(in srgb, var(--el-color-primary) 16%, transparent);
+}
+.wx.quiet {
+  color: var(--el-color-success);
+  background: var(--el-color-success-light-9);
+}
+.ab b {
+  font-size: var(--el-font-size-extra-large);
+  font-weight: 600;
+  margin: 0 2px 0 4px;
+}
+.ab b.on:first-of-type {
+  color: var(--el-color-success);
+}
+.ab b.on:last-of-type {
+  color: var(--el-color-danger);
+}
+.chip {
+  font-size: var(--gc-text);
+  padding: 0 var(--gc-gap);
+  border-radius: 999px;
+  background: var(--el-fill-color-light);
+}
+.chip.danger {
+  color: var(--el-color-danger);
+  background: var(--el-color-danger-light-9);
+}
+.hero-hint {
+  margin: 0;
+  font-size: var(--gc-text);
+  color: var(--el-text-color-secondary);
+}
+.hero-actions,
+.open-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gc-gap);
+  align-items: center;
+}
+.open-row .el-input {
+  flex: 1;
+  min-width: 200px;
+}
+.weather {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--gc-gap);
+}
+.wx-tab {
+  border: 0;
+  text-align: left;
+  color: inherit;
+  padding: var(--gc-pad);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font: inherit;
+  background: color-mix(in srgb, var(--el-bg-color) 82%, transparent);
+}
+.wx-tab strong {
+  font-size: var(--el-font-size-extra-large);
+  line-height: 1;
+}
+.wx-tab.stuck strong {
+  color: var(--el-color-danger);
+}
+.wx-tab.dirty strong {
+  color: var(--el-color-primary);
+}
+.wx-tab.sync strong {
+  color: var(--el-color-primary);
+}
+.wx-tab.quiet strong {
+  color: var(--el-color-success);
+}
+.wx-tab small {
+  color: var(--el-text-color-secondary);
+  font-size: var(--gc-text);
+  line-height: 1.35;
+}
+.wx-tab.on {
+  box-shadow: 0 0 0 1px var(--el-color-primary) inset;
+}
+.mosaic-block {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gc-gap);
+}
+.mosaic-head {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gc-gap);
 }
 .card-grid {
   flex: 1;
@@ -419,5 +621,10 @@ onMounted(() => {
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: var(--gc-gap);
   align-content: start;
+}
+@media (max-width: 900px) {
+  .weather {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 </style>

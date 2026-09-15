@@ -5,7 +5,7 @@ import { ElMessage } from 'element-plus';
 import { useJobsStore } from '@/stores/jobs';
 import * as api from '@/api/client';
 import CloneDialog from '@/components/CloneDialog.vue';
-import { jobLine, kindLabel, notifyJobStarted, statusLabel, statusTag } from '@/utils/jobNotify';
+import { jobLine, kindLabel, notifyJobStarted, statusLabel } from '@/utils/jobNotify';
 import type { CloneJobSummary, JobStatus } from '@/api/types';
 
 type Filter = 'all' | JobStatus;
@@ -163,119 +163,71 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="page">
+  <div class="page jobs-page">
     <h2 class="page-title">任务</h2>
 
-    <div class="split" v-loading="jobs.loading && !jobs.jobs.length">
-      <section class="pane list-pane">
-        <div class="pane-head">
-          <div class="chips">
-            <button type="button" class="chip" :class="{ on: filter === 'all' }" @click="setFilter('all')">
-              全部 {{ counts.all }}
-            </button>
-            <button
-              type="button"
-              class="chip running"
-              :class="{ on: filter === 'running' }"
-              @click="setFilter('running')"
-            >
-              进行中 {{ counts.running }}
-            </button>
-            <button
-              type="button"
-              class="chip error"
-              :class="{ on: filter === 'error' }"
-              @click="setFilter('error')"
-            >
-              失败 {{ counts.error }}
-            </button>
-            <button type="button" class="chip ok" :class="{ on: filter === 'ok' }" @click="setFilter('ok')">
-              成功 {{ counts.ok }}
-            </button>
-          </div>
+    <div v-if="!jobs.loading && !jobs.jobs.length" class="empty gc-glass">
+      <strong>还没有后台任务</strong>
+      <p>克隆、矩阵扫描、抓取远程会排在这里。去工作台克隆一个仓。</p>
+    </div>
+
+    <div v-else class="split" v-loading="jobs.loading && !jobs.jobs.length">
+      <aside class="gc-glass list">
+        <div class="chips">
+          <button type="button" class="chip" :class="{ on: filter === 'all' }" @click="setFilter('all')">全部 {{ counts.all }}</button>
+          <button type="button" class="chip" :class="{ on: filter === 'running' }" @click="setFilter('running')">
+            进行中 {{ counts.running }}
+          </button>
+          <button type="button" class="chip" :class="{ on: filter === 'error' }" @click="setFilter('error')">
+            失败 {{ counts.error }}
+          </button>
+          <button type="button" class="chip" :class="{ on: filter === 'ok' }" @click="setFilter('ok')">成功 {{ counts.ok }}</button>
           <el-button text type="primary" :loading="jobs.loading" @click="jobs.load()">刷新</el-button>
         </div>
-
-        <el-empty
-          v-if="!jobs.loading && !jobs.jobs.length"
-          description="还没有后台任务。可在工作台克隆仓库。"
-          :image-size="48"
-        />
-        <el-empty v-else-if="!visibleJobs.length" description="没有这类任务" :image-size="48" />
-
-        <div v-else class="job-list">
-          <button
-            v-for="j in visibleJobs"
-            :key="j.id"
-            type="button"
-            class="job-row"
-            :class="[j.status, { current: j.id === activeJobId }]"
-            @click="openJob(j.id)"
-          >
-            <div class="row-top">
-              <el-tag :type="statusTag(j.status)" size="small" effect="plain">{{ statusLabel(j.status) }}</el-tag>
-              <span class="kind">{{ kindLabel(j.kind) }}</span>
-              <span class="time">{{ formatTime(j.startedAt) }}</span>
-              <el-button
-                v-if="j.status === 'running'"
-                size="small"
-                text
-                type="danger"
-                :loading="cancellingId === j.id"
-                @click.stop="cancelJob(j.id)"
-              >取消</el-button>
-              <el-button
-                v-if="j.status === 'error' && j.kind === 'clone'"
-                size="small"
-                text
-                type="primary"
-                @click.stop="retryClone(j)"
-              >重试</el-button>
-            </div>
-            <div class="row-title mono" :title="jobLine(j)">{{ jobLine(j) }}</div>
-            <div class="row-tail" :class="{ err: !!j.error }">{{ tailOf(j) }}</div>
-          </button>
-        </div>
-      </section>
-
-      <section class="pane log-pane" v-loading="jobDetailLoading">
-        <template v-if="activeJob">
-          <div class="log-head">
-            <div class="log-title">
-              <el-tag :type="statusTag(activeJob.status)" size="small" effect="plain">{{
-                statusLabel(activeJob.status)
-              }}</el-tag>
-              <span>{{ kindLabel(activeJob.kind) }}</span>
-              <span class="time">{{ formatTime(activeJob.startedAt) }}</span>
-            </div>
-            <div class="log-actions">
-              <el-button
-                v-if="activeJob.status === 'running'"
-                type="danger"
-                plain
-                :loading="cancellingId === activeJob.id"
-                @click="cancelJob(activeJob.id)"
-              >取消</el-button>
-              <el-button
-                v-if="activeJob.status === 'error' && activeJob.kind === 'clone'"
-                type="primary"
-                plain
-                @click="retryClone(activeJob)"
-              >修改并重试</el-button>
-            </div>
+        <p v-if="!visibleJobs.length" class="miss">没有这类任务</p>
+        <button
+          v-for="j in visibleJobs"
+          :key="j.id"
+          type="button"
+          class="row"
+          :class="[j.status, { on: j.id === activeJobId }]"
+          @click="openJob(j.id)"
+        >
+          <div class="top">
+            <b :class="j.status">{{ statusLabel(j.status) }}</b>
+            <span>{{ kindLabel(j.kind) }}</span>
+            <em>{{ formatTime(j.startedAt) }}</em>
           </div>
-          <div class="job-meta mono">{{ jobLine(activeJob) }}</div>
-          <el-alert
-            v-if="activeJob.error"
-            :title="activeJob.error"
-            type="error"
-            :closable="false"
-            show-icon
-            class="mb"
-          />
-          <pre ref="logEl" class="job-log">{{ jobLogText || '（等待输出）' }}</pre>
+          <div class="title mono" :title="jobLine(j)">{{ jobLine(j) }}</div>
+          <div class="tail" :class="{ err: !!j.error }">{{ tailOf(j) }}</div>
+        </button>
+      </aside>
+
+      <section class="gc-glass log" v-loading="jobDetailLoading">
+        <template v-if="activeJob">
+          <header>
+            <b :class="activeJob.status">{{ statusLabel(activeJob.status) }}</b>
+            <span>{{ kindLabel(activeJob.kind) }} · {{ formatTime(activeJob.startedAt) }}</span>
+            <span class="grow" />
+            <el-button
+              v-if="activeJob.status === 'running'"
+              type="danger"
+              plain
+              :loading="cancellingId === activeJob.id"
+              @click="cancelJob(activeJob.id)"
+            >取消</el-button>
+            <el-button
+              v-if="activeJob.status === 'error' && activeJob.kind === 'clone'"
+              type="primary"
+              plain
+              @click="retryClone(activeJob)"
+            >修改并重试</el-button>
+          </header>
+          <p class="meta mono">{{ jobLine(activeJob) }}</p>
+          <p v-if="activeJob.error" class="banner-err">{{ activeJob.error }}</p>
+          <pre ref="logEl">{{ jobLogText || '（等待输出）' }}</pre>
         </template>
-        <el-empty v-else description="点左侧任务看日志" :image-size="48" />
+        <p v-else class="miss">点左侧任务看日志</p>
       </section>
     </div>
 
@@ -291,176 +243,171 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.page {
+.jobs-page {
   height: 100%;
   min-height: 0;
   display: flex;
   flex-direction: column;
+  gap: var(--gc-gap);
 }
 .split {
   flex: 1;
   min-height: 0;
   display: flex;
-  gap: var(--gc-gap);
+  gap: var(--gc-pad);
 }
-.pane {
-  min-height: 0;
-  min-width: 0;
+.list {
+  width: 340px;
+  flex: none;
+  overflow: auto;
+  padding: var(--gc-pad);
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: var(--gc-radius);
-  background: var(--el-bg-color);
-}
-.list-pane {
-  flex: 0 0 360px;
-  width: 360px;
-}
-.log-pane {
-  flex: 1;
-  padding: var(--gc-pad);
-}
-.pane-head {
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   gap: var(--gc-gap);
-  padding: var(--gc-gap) var(--gc-pad);
-  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+.log {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  padding: var(--gc-pad);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gc-gap);
 }
 .chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--gc-gap);
   align-items: center;
 }
-.chip {
-  height: 22px;
-  padding: 0 8px;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 11px;
-  background: transparent;
-  color: var(--el-text-color-regular);
-  font-size: 12px;
+.chips .chip {
+  border: 0;
+  border-radius: var(--gc-radius);
+  padding: 0 var(--gc-pad);
+  height: var(--gc-control);
+  background: var(--el-fill-color-light);
+  color: inherit;
+  font: inherit;
+  font-size: var(--gc-text);
   cursor: pointer;
 }
-.chip.on {
-  border-color: var(--el-color-primary);
+.chips .chip.on {
+  background: color-mix(in srgb, var(--el-color-primary) 22%, transparent);
   color: var(--el-color-primary);
-  background: var(--el-color-primary-light-9);
 }
-.chip.running.on {
-  border-color: var(--el-color-warning);
-  color: var(--el-color-warning);
-  background: var(--el-color-warning-light-9);
-}
-.chip.error.on {
-  border-color: var(--el-color-danger);
-  color: var(--el-color-danger);
-  background: var(--el-color-danger-light-9);
-}
-.chip.ok.on {
-  border-color: var(--el-color-success);
-  color: var(--el-color-success);
-  background: var(--el-color-success-light-9);
-}
-.job-list {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  padding: 4px;
-}
-.job-row {
+.row {
   display: block;
   width: 100%;
   text-align: left;
-  margin-bottom: 4px;
-  padding: 6px 8px;
-  border: 1px solid transparent;
+  border: 0;
   border-radius: var(--gc-radius);
+  padding: var(--gc-gap) var(--gc-pad);
   background: transparent;
   color: inherit;
   cursor: pointer;
+  font: inherit;
 }
-.job-row:hover {
-  background: var(--el-fill-color-light);
+.row.on {
+  background: color-mix(in srgb, var(--el-color-primary) 12%, transparent);
 }
-.job-row.current {
-  border-color: var(--el-color-primary-light-5);
-  background: var(--el-color-primary-light-9);
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--el-color-primary) 12%, transparent);
-}
-.job-row.running:not(.current) {
-  background: color-mix(in srgb, var(--el-color-warning) 6%, transparent);
-}
-.row-top {
+.top {
   display: flex;
+  gap: var(--gc-gap);
   align-items: center;
-  gap: 6px;
-  height: 22px;
+  font-size: var(--gc-text);
 }
-.kind {
-  font-size: 12px;
-  color: var(--el-text-color-regular);
-}
-.time {
+.top em {
   margin-left: auto;
-  font-size: 11px;
+  font-style: normal;
   color: var(--el-text-color-secondary);
-  flex: none;
 }
-.row-title,
-.row-tail {
+.title,
+.tail {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.row-title {
-  margin-top: 2px;
+.title {
   font-size: var(--gc-text);
+  margin: 2px 0;
 }
-.row-tail {
-  margin-top: 2px;
-  font-size: 11px;
+.tail {
+  font-size: var(--gc-text);
   color: var(--el-text-color-secondary);
 }
-.row-tail.err {
+.tail.err,
+.top b.error,
+header b.error {
   color: var(--el-color-danger);
 }
-.log-head {
+.top b.running,
+header b.running {
+  color: var(--el-color-warning);
+}
+.top b.ok,
+header b.ok {
+  color: var(--el-color-success);
+}
+header {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
   gap: var(--gc-gap);
-  flex: none;
-}
-.log-title {
-  display: flex;
   align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-.log-actions {
+  font-size: var(--gc-text);
   flex: none;
 }
-.job-meta {
-  margin: var(--gc-gap) 0;
+.grow {
+  flex: 1;
+}
+.meta {
+  margin: 0;
   font-size: var(--gc-text);
   color: var(--el-text-color-secondary);
   word-break: break-all;
 }
-.job-log {
+.banner-err {
+  margin: 0;
+  padding: var(--gc-gap) var(--gc-pad);
+  border-radius: var(--gc-radius);
+  background: color-mix(in srgb, var(--el-color-danger) 16%, transparent);
+  color: var(--el-color-danger);
+  font-size: var(--gc-text);
+  line-height: 1.45;
+}
+pre {
+  margin: 0;
   flex: 1;
   min-height: 0;
-  margin: 0;
   overflow: auto;
   padding: var(--gc-pad);
-  background: var(--el-fill-color-light);
   border-radius: var(--gc-radius);
-  font-size: 12px;
-  line-height: 1.45;
+  background: color-mix(in srgb, var(--el-bg-color-page) 88%, #000);
+  font-size: var(--gc-text);
+  line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-all;
+}
+.miss {
+  margin: 0;
+  font-size: var(--gc-text);
+  color: var(--el-text-color-secondary);
+  padding: var(--gc-pad);
+}
+.empty {
+  flex: 1;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  padding: var(--gc-pad);
+  gap: var(--gc-gap);
+  color: var(--el-text-color-secondary);
+}
+.empty strong {
+  font-size: var(--el-font-size-extra-large);
+  color: var(--el-text-color-primary);
+  font-weight: 600;
+}
+.empty p {
+  margin: 0;
+  font-size: var(--gc-text);
 }
 </style>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import { nextTick, onMounted, onUnmounted, reactive, ref } from 'vue';
 import type { OpenedRepo, RepoOverview } from '@/api/types';
-import { attentionOf } from '@/utils/repoAttention';
+import { attentionOf, weatherOf } from '@/utils/repoAttention';
 import ActivityHeatmap from '@/components/ActivityHeatmap.vue';
 
 const props = defineProps<{
@@ -10,20 +11,24 @@ const props = defineProps<{
   muted?: boolean;
   dragging?: boolean;
   dragOver?: boolean;
-  selected?: boolean;
 }>();
 
 const emit = defineEmits<{
   select: [];
   enter: [];
   merge: [];
+  fetch: [];
   remove: [];
-  'toggle-select': [];
   dragstart: [e: DragEvent];
   dragover: [e: DragEvent];
   drop: [e: DragEvent];
   dragend: [];
 }>();
+
+const missing = () => props.overview?.available === false;
+const moreBtn = ref<HTMLButtonElement | null>(null);
+const menuEl = ref<HTMLUListElement | null>(null);
+const menu = reactive({ open: false, x: 0, y: 0 });
 
 function formatOpened(iso: string): string {
   const d = new Date(iso);
@@ -48,6 +53,55 @@ function extraBadges(): string[] {
   if (o.conflictCount > 0) out.push(`${o.conflictCount} 冲突`);
   return out;
 }
+
+function closeMenu(): void {
+  menu.open = false;
+}
+
+async function toggleMenu(e: MouseEvent): Promise<void> {
+  e.stopPropagation();
+  if (menu.open) {
+    closeMenu();
+    return;
+  }
+  const btn = moreBtn.value?.getBoundingClientRect();
+  if (!btn) return;
+  menu.open = true;
+  menu.x = btn.right;
+  menu.y = btn.bottom + 4;
+  await nextTick();
+  const box = menuEl.value?.getBoundingClientRect();
+  const w = box?.width ?? 168;
+  const h = box?.height ?? 128;
+  let x = btn.right - w;
+  let y = btn.bottom + 4;
+  if (x < 8) x = 8;
+  if (y + h > window.innerHeight - 8) y = Math.max(8, btn.top - h - 4);
+  menu.x = x;
+  menu.y = y;
+}
+
+function run(action: 'enter' | 'merge' | 'fetch' | 'remove'): void {
+  closeMenu();
+  emit(action);
+}
+
+function onWinClick(e: MouseEvent): void {
+  const t = e.target as Node | null;
+  if (moreBtn.value?.contains(t) || menuEl.value?.contains(t)) return;
+  closeMenu();
+}
+
+onMounted(() => {
+  window.addEventListener('click', onWinClick, true);
+  window.addEventListener('scroll', closeMenu, true);
+  window.addEventListener('resize', closeMenu);
+});
+onUnmounted(() => {
+  window.removeEventListener('click', onWinClick, true);
+  window.removeEventListener('scroll', closeMenu, true);
+  window.removeEventListener('resize', closeMenu);
+});
 </script>
 
 <template>
@@ -64,24 +118,22 @@ function extraBadges(): string[] {
     @dragend="emit('dragend')"
   >
     <div class="card-top">
-      <el-checkbox
-        class="card-check"
-        :model-value="selected"
-        @click.stop
-        @change="emit('toggle-select')"
-      />
       <span class="card-name mono">{{ overview?.name || repo.path.split(/[\\/]/).pop() }}</span>
-      <span class="card-actions">
-        <el-button size="small" text type="primary" @click.stop="emit('enter')">进入</el-button>
-        <el-button size="small" text type="primary" @click.stop="emit('merge')">合并</el-button>
-        <el-button size="small" text type="danger" @click.stop="emit('remove')">移除</el-button>
-      </span>
+      <em class="wx" :class="attentionOf(overview)">{{ missing() ? '丢失' : weatherOf(attentionOf(overview)) }}</em>
+      <button
+        ref="moreBtn"
+        type="button"
+        class="more-btn"
+        aria-label="更多"
+        :aria-expanded="menu.open"
+        @click="toggleMenu"
+      >
+        ⋯
+      </button>
     </div>
     <div class="card-meta">
-      <span class="card-branch mono">{{
-        overview?.available === false ? '不可用' : overview?.current || '…'
-      }}</span>
-      <template v-if="overview && overview.available !== false">
+      <span class="card-branch mono">{{ missing() ? '不可用' : overview?.current || '…' }}</span>
+      <template v-if="overview && !missing()">
         <span class="card-stat mono">
           <span class="stat-ahead" :class="{ on: overview.ahead > 0 }">{{ overview.ahead }}↑</span>
           <span class="stat-behind" :class="{ on: overview.behind > 0 }">{{ overview.behind }}↓</span>
@@ -100,19 +152,54 @@ function extraBadges(): string[] {
       <span class="card-opened" :title="repo.lastOpenedAt">打开 {{ formatOpened(repo.lastOpenedAt) }}</span>
     </div>
   </div>
+
+  <Teleport to="body">
+    <ul
+      v-if="menu.open"
+      ref="menuEl"
+      class="el-dropdown-menu gc-card-menu"
+      :style="{ left: menu.x + 'px', top: menu.y + 'px' }"
+      @click.stop
+    >
+      <li
+        class="el-dropdown-menu__item"
+        :class="{ 'is-disabled': missing() }"
+        @click="missing() || run('enter')"
+      >
+        进入工作区
+      </li>
+      <li
+        class="el-dropdown-menu__item"
+        :class="{ 'is-disabled': missing() }"
+        @click="missing() || run('merge')"
+      >
+        预演合并
+      </li>
+      <li
+        class="el-dropdown-menu__item"
+        :class="{ 'is-disabled': missing() }"
+        @click="missing() || run('fetch')"
+      >
+        抓取这一仓远程
+      </li>
+      <li class="el-dropdown-menu__item gc-danger" @click="run('remove')">
+        移除（不删磁盘）
+      </li>
+    </ul>
+  </Teleport>
 </template>
 
 <style scoped>
 .repo-card {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: var(--gc-gap) var(--gc-pad);
+  gap: var(--gc-gap);
+  padding: var(--gc-pad);
   border: 1px solid var(--el-border-color-lighter);
   border-radius: var(--gc-radius);
   border-left-width: 3px;
   cursor: grab;
-  background: var(--el-bg-color);
+  background: color-mix(in srgb, var(--el-bg-color) 88%, transparent);
   min-width: 0;
 }
 .repo-card.drag-over {
@@ -144,7 +231,7 @@ function extraBadges(): string[] {
   border-left-color: var(--el-color-primary);
 }
 .repo-card.quiet {
-  border-left-color: var(--el-border-color);
+  border-left-color: var(--el-color-success);
 }
 .card-top,
 .card-meta {
@@ -153,22 +240,55 @@ function extraBadges(): string[] {
   gap: var(--gc-gap);
   min-width: 0;
 }
-.card-check {
-  flex: none;
-  margin-right: 0;
-}
 .card-name {
   flex: 1;
   min-width: 0;
-  font-size: 13px;
+  font-size: var(--el-font-size-extra-large);
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.card-actions {
+.wx {
   flex: none;
-  display: flex;
+  font-style: normal;
+  font-size: var(--gc-text);
+  padding: 0 var(--gc-gap);
+  border-radius: 999px;
+  background: var(--el-fill-color-light);
+}
+.wx.stuck {
+  color: var(--el-color-danger);
+  background: var(--el-color-danger-light-9);
+}
+.wx.dirty {
+  color: var(--el-color-primary);
+  background: var(--el-color-primary-light-9);
+}
+.wx.sync {
+  color: var(--el-color-primary);
+  background: color-mix(in srgb, var(--el-color-primary) 16%, transparent);
+}
+.wx.quiet {
+  color: var(--el-color-success);
+  background: var(--el-color-success-light-9);
+}
+.more-btn {
+  flex: none;
+  width: var(--gc-control);
+  height: var(--gc-control);
+  border: 0;
+  border-radius: var(--gc-radius);
+  background: transparent;
+  color: var(--el-text-color-regular);
+  cursor: pointer;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
+}
+.more-btn:hover,
+.more-btn[aria-expanded='true'] {
+  background: var(--el-fill-color);
 }
 .card-branch {
   flex: 1;

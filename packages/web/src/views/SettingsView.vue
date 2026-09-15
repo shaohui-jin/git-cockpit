@@ -127,7 +127,6 @@ const gitlabTokenCreateUrl = computed(() => {
 });
 
 const dangerTools = computed(() => settings.tools.filter((t) => t.riskLevel === 'dangerous'));
-const dangerNames = computed(() => dangerTools.value.map((t) => t.name));
 
 const methodOptions = computed(() => [
   { id: 'cli' as const, title: cliCardTitle(), ready: cliReady.value },
@@ -255,6 +254,13 @@ watch(activeTab, (tab, prev) => {
   if (tab === 'mr' && prev !== 'mr') void reloadSettings({ validateToken: true });
 });
 
+const settingTabs: Array<{ id: SettingsTab; label: string }> = [
+  { id: 'mr', label: 'MR 配置' },
+  { id: 'template', label: '正文规范' },
+  { id: 'llm', label: '模型' },
+  { id: 'git', label: 'Git 操作' }
+];
+
 async function toggleEnabled(t: ToolSummary, enabled: boolean): Promise<void> {
   if (enabled) {
     gitDraft.disabledTools = gitDraft.disabledTools.filter((n) => n !== t.name);
@@ -264,11 +270,15 @@ async function toggleEnabled(t: ToolSummary, enabled: boolean): Promise<void> {
   }
 }
 
-function riskType(r: string): 'success' | 'primary' | 'danger' {
-  return r === 'readonly' ? 'success' : r === 'write' ? 'primary' : 'danger';
+function onToolEnabled(t: ToolSummary, ev: Event): void {
+  void toggleEnabled(t, (ev.target as HTMLInputElement).checked);
 }
-function riskLabel(r: string): string {
-  return r === 'readonly' ? '只读' : r === 'write' ? '写操作' : '高风险';
+
+function onApproval(name: string, ev: Event): void {
+  const on = (ev.target as HTMLInputElement).checked;
+  const i = gitDraft.requireApprovalFor.indexOf(name);
+  if (on && i < 0) gitDraft.requireApprovalFor.push(name);
+  if (!on && i >= 0) gitDraft.requireApprovalFor.splice(i, 1);
 }
 
 async function saveGit(): Promise<void> {
@@ -292,7 +302,7 @@ async function saveGit(): Promise<void> {
 
 async function selectMethod(next: MrMethod): Promise<void> {
   if (!repoId()) {
-    ElMessage.warning('请先在左侧选择仓库');
+    ElMessage.warning('请先在工作台打开并选择仓库');
     return;
   }
   const prev = method.value;
@@ -332,7 +342,7 @@ async function pickPlatform(p: 'github' | 'gitlab'): Promise<void> {
 async function saveToken(): Promise<void> {
   const host = current.value?.host;
   if (!host) {
-    ElMessage.warning(repos.currentId ? '当前仓库没有可识别的远程地址' : '请先在左侧选择仓库');
+    ElMessage.warning(repos.currentId ? '当前仓库没有可识别的远程地址' : '请先在工作台打开并选择仓库');
     return;
   }
   if (platform.value === 'unknown') {
@@ -460,16 +470,28 @@ async function clearLlmKey(): Promise<void> {
 </script>
 
 <template>
-  <div class="page">
+  <div class="page settings-page">
     <h2 class="page-title">设置</h2>
     <p v-if="repos.serverVersion" class="page-version">服务 {{ repos.serverVersion }}</p>
     <el-alert v-if="settings.error" :title="settings.error" type="error" :closable="false" show-icon class="mb" />
 
-    <el-tabs v-model="activeTab" class="settings-tabs gc-tabs-fill gc-tabs-scroll">
-      <el-tab-pane label="MR 配置" name="mr">
-        <el-card shadow="never" class="mb">
+    <div class="gc-chip-tabs">
+      <button
+        v-for="t in settingTabs"
+        :key="t.id"
+        type="button"
+        :class="{ on: activeTab === t.id }"
+        @click="activeTab = t.id"
+      >
+        {{ t.label }}
+      </button>
+    </div>
+
+    <div class="settings-body" :class="{ fill: activeTab === 'template' }">
+      <section v-show="activeTab === 'mr'" class="stack">
+        <div class="gc-glass pad">
+          <p class="gc-eyebrow">默认远程</p>
           <div class="remote-bar">
-            <span class="remote-label">默认远程</span>
             <template v-if="hasRepoRemotes">
               <el-select
                 v-model="selectedRemote"
@@ -483,7 +505,7 @@ async function clearLlmKey(): Promise<void> {
               <el-tag size="small" effect="plain">{{ platformLabel(platform) }}</el-tag>
             </template>
             <span v-else class="mr-hint">{{
-              repos.currentId ? '当前仓库没有 remote' : '未选择仓库，请先在左侧打开仓库'
+              repos.currentId ? '当前仓库没有 remote' : '未选择仓库，请先在工作台打开仓库'
             }}</span>
           </div>
           <p class="mr-hint">用于 fetch、MR 短名剥前缀、CLI 未传远程时的默认值。切换后立即保存。</p>
@@ -492,26 +514,22 @@ async function clearLlmKey(): Promise<void> {
             <el-button :disabled="!current?.host || settings.saving" @click="pickPlatform('github')">GitHub</el-button>
             <el-button :disabled="!current?.host || settings.saving" @click="pickPlatform('gitlab')">GitLab</el-button>
           </div>
-        </el-card>
+        </div>
 
         <div
           v-for="opt in methodOptions"
           :key="opt.id"
-          class="mr-option mb"
-          :class="{ active: method === opt.id, disabled: settings.saving }"
+          class="gc-glass opt"
+          :class="{ on: method === opt.id, disabled: settings.saving }"
           role="button"
           tabindex="0"
           @click="selectMethod(opt.id)"
           @keydown.enter.prevent="selectMethod(opt.id)"
         >
-          <div class="mr-option-head">
-            <el-radio class="gc-radio-flush" :model-value="method" :value="opt.id" :disabled="settings.saving" @change="selectMethod(opt.id)" @click.stop>
-              {{ opt.title }}
-            </el-radio>
-            <el-tag size="small" :type="opt.ready ? 'success' : 'warning'" effect="plain">
-              {{ opt.ready ? '可用' : '未就绪' }}
-            </el-tag>
-          </div>
+          <header class="opt-head">
+            <strong>{{ opt.title }}</strong>
+            <span :class="opt.ready ? 'ok' : 'bad'">{{ opt.ready ? '可用' : '未就绪' }}</span>
+          </header>
 
           <div v-if="method === opt.id" class="mr-panel" @click.stop>
             <div v-if="opt.id === 'cli'" class="mr-stack">
@@ -555,7 +573,7 @@ async function clearLlmKey(): Promise<void> {
             <div v-if="opt.id === 'token'" class="mr-stack">
               <template v-if="!current?.host">
                 <p class="mr-hint">{{
-                  repos.currentId ? '当前仓库没有可识别的远程地址，无法绑定 Token。' : '请先在左侧选择仓库。Token 始终绑定当前远程的域名。'
+                  repos.currentId ? '当前仓库没有可识别的远程地址，无法绑定 Token。' : '请先在工作台打开并选择仓库。Token 始终绑定当前远程的域名。'
                 }}</p>
               </template>
               <template v-else>
@@ -627,8 +645,8 @@ async function clearLlmKey(): Promise<void> {
           </div>
         </div>
 
-        <el-card v-if="showCurrentHostCard && currentHostProfile" shadow="never" class="mb">
-          <template #header>当前远程凭证</template>
+        <div v-if="showCurrentHostCard && currentHostProfile" class="gc-glass pad">
+          <p class="gc-eyebrow">当前远程凭证</p>
           <p class="mr-hint">只显示当前选中远程的域名。其它实例上的 Token 不在这里列出。</p>
           <ul class="host-list">
             <li class="host-row">
@@ -646,145 +664,110 @@ async function clearLlmKey(): Promise<void> {
               <el-button link type="danger" @click="removeHost(currentHostProfile.host)">清除</el-button>
             </li>
           </ul>
-        </el-card>
-      </el-tab-pane>
-      <el-tab-pane label="正文规范" name="template">
-        <div class="template-pane gc-pane-fill">
-          <MrTemplateSettings />
         </div>
-      </el-tab-pane>
-      <el-tab-pane label="模型" name="llm">
-        <el-card shadow="never" class="mb">
+      </section>
+
+      <section v-show="activeTab === 'template'" class="template-pane">
+        <MrTemplateSettings />
+      </section>
+
+      <section v-show="activeTab === 'llm'" class="stack">
+        <div class="gc-glass pad">
+          <p class="gc-eyebrow">聊天模型</p>
           <p class="mr-hint">
-            聊天页调用大模型用。Key 与 MR Token 一样只存在本机设置里，不进 MCP 工具参数，页面不回填明文。浏览器和桌面同一套配置。
+            Key 与 MR Token 一样只存在本机设置里，不进 MCP 工具参数，页面不回填明文。浏览器和桌面同一套配置。
           </p>
-          <el-form label-width="120px" label-position="left" class="mr-form">
-            <el-form-item label="供应商">
-              <el-select model-value="openai" disabled style="width: 220px">
-                <el-option label="OpenAI 兼容" value="openai" />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="模型名">
-              <el-input v-model="llmModel" placeholder="gpt-4.1" style="max-width: 280px" />
-            </el-form-item>
-            <el-form-item label="Base URL">
-              <el-input
-                v-model="llmBaseUrl"
-                placeholder="空 = https://api.openai.com/v1 ；兼容网关填到 /v1"
-                style="max-width: 420px"
-              />
-            </el-form-item>
-            <el-form-item label="API Key">
-              <el-input
-                v-model="llmKeyInput"
-                type="password"
-                show-password
-                :placeholder="
-                  settings.llm?.tokenSet
-                    ? `已保存 ${settings.llm.tokenPreview}，输入新 Key 覆盖`
-                    : 'sk-…'
-                "
-                style="max-width: 420px"
-              />
-            </el-form-item>
-          </el-form>
-          <div class="action-bar">
+          <label class="kv">
+            供应商
+            <el-select model-value="openai" disabled>
+              <el-option label="OpenAI 兼容" value="openai" />
+            </el-select>
+          </label>
+          <label class="kv">
+            模型名
+            <el-input v-model="llmModel" placeholder="gpt-4.1" />
+          </label>
+          <label class="kv">
+            Base URL
+            <el-input v-model="llmBaseUrl" placeholder="空 = https://api.openai.com/v1 ；兼容网关填到 /v1" />
+          </label>
+          <label class="kv">
+            API Key
+            <el-input
+              v-model="llmKeyInput"
+              type="password"
+              show-password
+              :placeholder="
+                settings.llm?.tokenSet ? `已保存 ${settings.llm.tokenPreview}，输入新 Key 覆盖` : 'sk-…'
+              "
+            />
+          </label>
+          <div class="row">
             <el-button type="primary" :loading="settings.saving" @click="saveLlm">保存</el-button>
             <el-button :disabled="!settings.llm?.tokenSet || settings.saving" @click="clearLlmKey">清除 Key</el-button>
           </div>
-        </el-card>
-      </el-tab-pane>
-      <el-tab-pane label="Git 操作" name="git">
-        <el-card shadow="never" class="mb">
-          <template #header>默认行为</template>
-          <el-form label-width="180px" label-position="left">
-            <el-form-item label="写操作默认 dry-run 预览">
-              <el-switch v-model="gitDraft.dryRunDefault" />
-              <span class="form-tip">开启后所有写操作（MCP/CLI）默认只生成预览，不真正执行</span>
-            </el-form-item>
-            <el-form-item label="允许打开的仓库">
-              <el-input
-                v-model="gitDraft.allowedReposText"
-                type="textarea"
-                :rows="4"
-                placeholder="一行一个本地路径。留空 = 不限制"
-              />
-              <span class="form-tip">非空时，打开的仓库根路径必须等于其中一条，或位于其目录下。MCP 带 repoPath 同样校验。</span>
-            </el-form-item>
-          </el-form>
-        </el-card>
+        </div>
+      </section>
 
-        <el-card shadow="never" class="mb">
-          <template #header>
-            <div class="card-head">
-              <span>工具开关与风险等级</span>
-              <el-tag size="small" type="warning" effect="plain">高危工具默认禁用，需在下方开启</el-tag>
-            </div>
-          </template>
-          <el-table :data="settings.tools" v-loading="settings.loading" size="default">
-            <el-table-column label="工具" width="230">
-              <template #default="{ row }">
-                <span class="mono">{{ row.name }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="风险" width="90">
-              <template #default="{ row }">
-                <el-tag :type="riskType(row.riskLevel)" size="small" effect="dark">{{ riskLabel(row.riskLevel) }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="描述" min-width="240">
-              <template #default="{ row }">
-                <span class="desc">{{ row.description }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="启用" width="100" align="center">
-              <template #default="{ row }">
-                <el-switch
-                  :model-value="!gitDraft.disabledTools.includes(row.name)"
-                  @change="(v: boolean | string | number) => toggleEnabled(row, v === true)"
-                />
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-card>
+      <section v-show="activeTab === 'git'" class="stack">
+        <div class="gc-glass pad">
+          <p class="gc-eyebrow">默认行为</p>
+          <label class="kv">
+            写操作默认 dry-run
+            <el-switch v-model="gitDraft.dryRunDefault" />
+          </label>
+          <p class="hint">开启后所有写操作（MCP / CLI）默认只生成预览，不真正执行。</p>
+          <p class="field-label">允许打开的仓库</p>
+          <el-input
+            v-model="gitDraft.allowedReposText"
+            type="textarea"
+            :rows="4"
+            placeholder="一行一个本地路径。留空 = 不限制"
+          />
+          <p class="hint">非空时，打开的仓库根路径必须等于其中一条，或位于其目录下。MCP 带 repoPath 同样校验。</p>
+        </div>
 
-        <el-card shadow="never" class="mb">
-          <template #header>审批规则</template>
-          <el-form label-position="top">
-            <el-form-item label="执行前需要审批的工具（勾选后，执行时需在确认框中手工确认）">
-              <el-select
-                v-model="gitDraft.requireApprovalFor"
-                multiple
-                filterable
-                collapse-tags
-                placeholder="选择需要审批的工具"
-                style="width: 100%"
-              >
-                <el-option
-                  v-for="t in dangerNames"
-                  :key="t"
-                  :label="t"
-                  :value="t"
-                  :disabled="gitDraft.disabledTools.includes(t)"
-                />
-              </el-select>
-              <span class="form-tip">审批仅对已启用的高危工具生效；禁用后自动移除</span>
-            </el-form-item>
-          </el-form>
-        </el-card>
+        <div class="gc-glass pad" v-loading="settings.loading">
+          <p class="gc-eyebrow">工具开关</p>
+          <p class="hint">高风险默认关 · 执行前自动备份。勾选即启用。</p>
+          <label v-for="t in settings.tools" :key="t.name" class="tool">
+            <input
+              type="checkbox"
+              :checked="!gitDraft.disabledTools.includes(t.name)"
+              @change="onToolEnabled(t, $event)"
+            />
+            <code>{{ t.name }}</code>
+            <span>{{ t.description }}</span>
+            <em v-if="t.riskLevel === 'dangerous'">高风险</em>
+          </label>
+        </div>
 
-        <div class="action-bar" v-if="loaded">
+        <div class="gc-glass pad">
+          <p class="gc-eyebrow">审批规则</p>
+          <p class="hint">勾选后，执行时需在确认框中手工确认。仅对已启用的高危工具生效；禁用后自动移除。</p>
+          <label v-for="t in dangerTools" :key="t.name" class="tool">
+            <input
+              type="checkbox"
+              :checked="gitDraft.requireApprovalFor.includes(t.name)"
+              :disabled="gitDraft.disabledTools.includes(t.name)"
+              @change="onApproval(t.name, $event)"
+            />
+            <code>{{ t.name }}</code>
+            <span>{{ t.description }}</span>
+          </label>
+        </div>
+
+        <div v-if="loaded" class="row">
           <el-button type="primary" :loading="settings.saving" :disabled="!gitDirty" @click="saveGit">保存 Git 设置</el-button>
           <el-button :disabled="!gitDirty" @click="syncGitDraft">放弃修改</el-button>
         </div>
-      </el-tab-pane>
-
-    </el-tabs>
+      </section>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.page {
+.settings-page {
   height: 100%;
   min-height: 0;
   display: flex;
@@ -793,32 +776,128 @@ async function clearLlmKey(): Promise<void> {
 }
 .page-title,
 .page-version,
-.page > .el-alert {
+.settings-page > .el-alert,
+.gc-chip-tabs {
   flex: none;
 }
-.settings-tabs {
+.settings-body {
   flex: 1;
   min-height: 0;
+  overflow: auto;
 }
-.form-tip {
-  margin-left: var(--gc-gap);
-  font-size: var(--gc-text);
-  color: var(--el-text-color-secondary);
+.settings-body.fill {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
-.card-head {
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gc-gap);
+  max-width: 720px;
+  padding-bottom: var(--gc-pad);
+}
+.pad {
+  padding: var(--gc-pad);
+}
+.opt {
+  padding: var(--gc-pad);
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  width: 100%;
+}
+.opt.on {
+  box-shadow: 0 0 0 1px var(--el-color-primary) inset;
+}
+.opt.disabled {
+  cursor: default;
+}
+.opt-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  min-height: var(--gc-control);
+  gap: var(--gc-gap);
 }
-.desc {
+.opt-head strong {
   font-size: var(--gc-text);
-  color: var(--el-text-color-regular);
 }
-.action-bar {
+.ok {
+  color: var(--el-color-success);
+  font-size: var(--gc-text);
+}
+.bad {
+  color: var(--el-color-danger);
+  font-size: var(--gc-text);
+}
+.hint {
+  margin: var(--gc-gap) 0 0;
+  font-size: var(--gc-text);
+  line-height: 1.5;
+  color: var(--el-text-color-secondary);
+}
+.field-label {
+  margin: var(--gc-pad) 0 var(--gc-gap);
+  font-size: var(--gc-text);
+}
+.tool,
+.kv {
   display: flex;
-  padding-bottom: var(--gc-gap);
+  align-items: center;
+  gap: var(--gc-gap);
+  min-height: var(--gc-line);
+  font-size: var(--gc-text);
 }
-
+.tool {
+  padding: 0;
+}
+.tool code {
+  flex: none;
+  font-family: inherit;
+  font-size: var(--gc-text);
+}
+.tool span {
+  min-width: 0;
+  color: var(--el-text-color-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tool em {
+  margin-left: auto;
+  flex: none;
+  font-style: normal;
+  color: var(--el-color-danger);
+}
+.tool input:disabled {
+  opacity: 0.35;
+}
+.kv {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  align-items: center;
+  margin-top: var(--gc-gap);
+}
+.row {
+  display: flex;
+  gap: var(--gc-gap);
+  margin-top: var(--gc-gap);
+}
+.template-pane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.template-pane :deep(.tmpl) {
+  flex: 1;
+}
+.template-pane :deep(.pane) {
+  background: color-mix(in srgb, var(--el-bg-color) 82%, transparent);
+  box-shadow: var(--gc-shadow-menu);
+}
 .mr-hint {
   margin: 0;
   font-size: var(--gc-text);
@@ -856,28 +935,6 @@ async function clearLlmKey(): Promise<void> {
   gap: var(--gc-gap);
   flex-wrap: wrap;
   margin-top: var(--gc-gap);
-}
-.mr-option {
-  border: 1px solid var(--el-border-color);
-  border-radius: var(--gc-radius);
-  padding: 0 var(--gc-pad);
-  background: var(--el-bg-color);
-  cursor: pointer;
-}
-.mr-option.active {
-  border-color: var(--el-color-primary);
-  background: color-mix(in srgb, var(--el-color-primary) 8%, var(--el-bg-color));
-  padding-bottom: var(--gc-pad);
-}
-.mr-option.disabled {
-  cursor: default;
-}
-.mr-option-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: var(--gc-line);
-  gap: var(--gc-gap);
 }
 .mr-panel {
   display: flex;

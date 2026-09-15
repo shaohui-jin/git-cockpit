@@ -39,7 +39,7 @@ const emit = defineEmits<{
   border: 1px solid var(--el-color-warning);
   border-radius: var(--gc-radius);
   padding: var(--gc-pad);
-  background: var(--el-bg-color);
+  background: color-mix(in srgb, var(--el-color-warning) 10%, var(--el-bg-color));
 }
 .confirm-title {
   font-weight: 600;

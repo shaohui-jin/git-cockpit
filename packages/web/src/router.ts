@@ -6,6 +6,13 @@ import JobsView from '@/views/JobsView.vue';
 import LogsView from '@/views/LogsView.vue';
 import SettingsView from '@/views/SettingsView.vue';
 import ChatView from '@/views/ChatView.vue';
+import UiLabHub from '@/views/ui-lab/UiLabHub.vue';
+import DemoAurora from '@/views/ui-lab/DemoAurora.vue';
+import DemoOrbit from '@/views/ui-lab/DemoOrbit.vue';
+import DemoStudio from '@/views/ui-lab/DemoStudio.vue';
+import DemoGrove from '@/views/ui-lab/DemoGrove.vue';
+import DemoDeck from '@/views/ui-lab/DemoDeck.vue';
+import DeckBoardSchemes from '@/views/ui-lab/DeckBoardSchemes.vue';
 
 export const router = createRouter({
   // 使用 hash 历史模式：后端 SPA fallback 与文件托管下均无需服务端改写
@@ -20,7 +27,14 @@ export const router = createRouter({
     { path: '/chat', name: 'chat', component: ChatView, meta: { title: '聊天' } },
     { path: '/matrix', redirect: { path: '/merge', query: { mode: 'matrix' } } },
     { path: '/logs', name: 'logs', component: LogsView, meta: { title: '操作日志' } },
-    { path: '/settings', name: 'settings', component: SettingsView, meta: { title: '设置' } }
+    { path: '/settings', name: 'settings', component: SettingsView, meta: { title: '设置' } },
+    { path: '/ui-lab', name: 'ui-lab', component: UiLabHub, meta: { title: '布局实验室', lab: true } },
+    { path: '/ui-lab/deck', name: 'ui-lab-deck', component: DemoDeck, meta: { title: '整合方案', lab: true } },
+    { path: '/ui-lab/board-cards', name: 'ui-lab-board-cards', component: DeckBoardSchemes, meta: { title: '工作台卡片', lab: true } },
+    { path: '/ui-lab/aurora', name: 'ui-lab-aurora', component: DemoAurora, meta: { title: 'Aurora', lab: true } },
+    { path: '/ui-lab/orbit', name: 'ui-lab-orbit', component: DemoOrbit, meta: { title: 'Orbit', lab: true } },
+    { path: '/ui-lab/studio', name: 'ui-lab-studio', component: DemoStudio, meta: { title: 'Studio', lab: true } },
+    { path: '/ui-lab/grove', name: 'ui-lab-grove', component: DemoGrove, meta: { title: 'Grove', lab: true } }
   ]
 });
 

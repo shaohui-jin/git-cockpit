@@ -14,7 +14,7 @@ const LOCKFILE_RE = /(?:^|[/\\])(pnpm-lock\.yaml|package-lock\.json|yarn\.lock)$
 const D2H_OPTS = {
   drawFileList: false,
   outputFormat: 'line-by-line' as const,
-  matching: 'lines' as const,
+  matching: 'none' as const,
   colorScheme: ColorSchemeType.DARK,
   renderNothingWhenEmpty: true
 };
