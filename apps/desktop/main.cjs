@@ -2,11 +2,17 @@ const { app, BrowserWindow, dialog, shell } = require('electron');
 const { spawn, spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const http = require('node:http');
+const os = require('node:os');
 const path = require('node:path');
 
 const NODE_DOWNLOAD = 'https://nodejs.org/en/download';
 const MIN_NODE = [22, 5, 0];
 const SQLITE_UNFLAGGED = [22, 13, 0];
+
+const DAEMON_PKG = '@shaohui_jin/git-cockpit-mcp-server';
+const DAEMON_SPEC = process.env.GIT_COCKPIT_DAEMON_SPEC || `${DAEMON_PKG}@latest`;
+const INSTALL_TIMEOUT_MS = 5 * 60 * 1000;
+const PROBE_TIMEOUT_MS = 15 * 1000;
 
 const PORT = Number(process.env.GIT_COCKPIT_PORT) || 3000;
 const DEV_UI_PORT = Number(process.env.GIT_COCKPIT_DEV_UI_PORT) || 5173;
@@ -19,6 +25,13 @@ let spawnedByUs = false;
 let mainWindow = null;
 let spawnLog = '';
 let systemNode = null;
+
+let starting = true;
+let installWindow = null;
+let installProc = null;
+let installReady = false;
+let installCancelled = false;
+let pendingLog = '';
 
 function probeUrl(url) {
   return new Promise((resolve) => {
@@ -134,25 +147,107 @@ function resolveDevEntry() {
   return fs.existsSync(entry) ? entry : null;
 }
 
-function resolveGlobalEntry(nodePath) {
+function npmGlobalPrefix(nodePath) {
   const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-  const prefix = spawnSync(npm, ['prefix', '-g'], {
+  const res = spawnSync(npm, ['prefix', '-g'], {
     encoding: 'utf8',
     windowsHide: true,
     timeout: 20000,
     shell: process.platform === 'win32',
     env: pathWithNode(nodePath)
   });
-  if (prefix.status !== 0) return null;
-  const entry = path.join(
-    prefix.stdout.trim(),
-    'node_modules',
-    '@shaohui_jin',
-    'git-cockpit-mcp-server',
-    'dist',
-    'cli-entry.js'
-  );
-  return fs.existsSync(entry) ? entry : null;
+  if (res.status !== 0) return null;
+  return res.stdout.trim() || null;
+}
+
+function pkgEntry(prefix) {
+  return path.join(prefix, 'node_modules', '@shaohui_jin', 'git-cockpit-mcp-server', 'dist', 'cli-entry.js');
+}
+
+/** 全局目录不可写时的兜底安装位置（用户可写，不需要管理员）。 */
+function customPrefix() {
+  const base =
+    process.platform === 'win32'
+      ? process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local')
+      : process.env.XDG_DATA_HOME || path.join(os.homedir(), '.local');
+  return path.join(base, 'git-cockpit', 'npm');
+}
+
+/** 按优先级找到可运行的 daemon 入口。只看文件在不在不够，必须由 probeEntry 试跑确认。 */
+function resolveDaemonEntry(nodePath) {
+  const dev = resolveDevEntry();
+  if (dev) return { entry: dev, kind: 'dev' };
+  // 上次若因权限装到用户目录，这里按路径解析，保证后续启动还能找到。
+  const custom = pkgEntry(customPrefix());
+  if (fs.existsSync(custom)) return { entry: custom, kind: 'custom' };
+  const prefix = npmGlobalPrefix(nodePath);
+  if (prefix) {
+    const entry = pkgEntry(prefix);
+    if (fs.existsSync(entry)) return { entry, kind: 'global' };
+  }
+  const shim = whereCommand('git-cockpit')[0];
+  if (shim) return { entry: shim, kind: 'shim' };
+  return null;
+}
+
+/** 试跑 version：退出码 0 且能解析出版本号才算可用，可覆盖「包在但依赖坏了」。 */
+function probeEntry(nodePath, resolved) {
+  const run =
+    resolved.kind === 'shim'
+      ? spawnSync(resolved.entry, ['version'], {
+          encoding: 'utf8',
+          windowsHide: true,
+          timeout: PROBE_TIMEOUT_MS,
+          shell: process.platform === 'win32'
+        })
+      : spawnSync(nodePath, [resolved.entry, 'version'], {
+          encoding: 'utf8',
+          windowsHide: true,
+          timeout: PROBE_TIMEOUT_MS,
+          env: pathWithNode(nodePath)
+        });
+  const output = `${run.stdout || ''}${run.stderr || ''}`.trim();
+  const version = parseVersion(output);
+  return {
+    ok: run.status === 0 && !run.error && !!version,
+    version: version ? formatVersion(version) : '',
+    output
+  };
+}
+
+function tail(text, max) {
+  const value = String(text || '').trim();
+  if (!value) return '';
+  return value.length > max ? `…${value.slice(-max)}` : value;
+}
+
+function resolveNpmCli(nodePath) {
+  const dir = path.dirname(nodePath);
+  const candidates = [
+    path.join(dir, 'node_modules', 'npm', 'bin', 'npm-cli.js'),
+    path.resolve(dir, '..', 'lib', 'node_modules', 'npm', 'bin', 'npm-cli.js')
+  ];
+  return candidates.find((p) => fs.existsSync(p)) || null;
+}
+
+function logDir() {
+  const base =
+    process.platform === 'win32'
+      ? process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local')
+      : os.tmpdir();
+  return path.join(base, 'git-cockpit-desktop', 'logs');
+}
+
+function writeInstallLog(text) {
+  try {
+    const dir = logDir();
+    fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, `install-${new Date().toISOString().replace(/[:.]/g, '-')}.log`);
+    fs.writeFileSync(file, String(text || ''), 'utf8');
+    return file;
+  } catch {
+    return null;
+  }
 }
 
 function attachSpawnLog(proc) {
@@ -164,33 +259,177 @@ function attachSpawnLog(proc) {
   proc.stderr?.on('data', onChunk);
 }
 
-function spawnDaemon() {
+const INSTALL_PAGE = `data:text/html;charset=utf-8,${encodeURIComponent(`<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>安装 Git Cockpit 服务</title>
+<style>body{margin:0;padding:16px;background:#ffffff;color:#1f2328;font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+h1{margin:0 0 4px;font-size:14px;font-weight:500}
+p{margin:0 0 12px;font-size:12px;color:#57606a}
+pre{margin:0;padding:10px;background:#f6f8fa;border-radius:6px;font:12px/1.6 ui-monospace,Consolas,monospace;white-space:pre-wrap;word-break:break-all;height:calc(100vh - 110px);overflow:auto}
+</style></head>
+<body><h1>正在安装 Git Cockpit 服务</h1><p>首次启动需要下载 npm 包，只需一次。关闭此窗口即取消安装。</p><pre id="log"></pre>
+<script>window.appendLog=function(t){var p=document.getElementById('log');if(!p)return;p.textContent+=t;p.scrollTop=p.scrollHeight;};</script>
+</body></html>`)}`;
+
+function openInstallWindow() {
+  if (installWindow && !installWindow.isDestroyed()) return;
+  installReady = false;
+  installCancelled = false;
+  pendingLog = '';
+  installWindow = new BrowserWindow({
+    width: 640,
+    height: 400,
+    title: '安装 Git Cockpit 服务',
+    autoHideMenuBar: true,
+    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true }
+  });
+  installWindow.webContents.on('did-finish-load', () => {
+    installReady = true;
+    flushInstallLog();
+  });
+  installWindow.on('closed', () => {
+    installWindow = null;
+    installReady = false;
+    if (installProc && !installProc.killed) {
+      installProc.kill();
+      installCancelled = true;
+    }
+  });
+  void installWindow.loadURL(INSTALL_PAGE);
+}
+
+function flushInstallLog() {
+  if (!installReady || !installWindow || installWindow.isDestroyed() || !pendingLog) return;
+  const chunk = pendingLog;
+  pendingLog = '';
+  void installWindow.webContents
+    .executeJavaScript(`window.appendLog(${JSON.stringify(chunk)})`)
+    .catch(() => undefined);
+}
+
+function appendInstallLog(text) {
+  if (!text) return;
+  pendingLog += text;
+  if (pendingLog.length > 40000) pendingLog = pendingLog.slice(-40000);
+  flushInstallLog();
+}
+
+function closeInstallWindow() {
+  if (installWindow && !installWindow.isDestroyed()) installWindow.close();
+  installWindow = null;
+  installReady = false;
+}
+
+function runNpm(nodePath, args) {
+  return new Promise((resolve) => {
+    const env = pathWithNode(nodePath);
+    const npmCli = resolveNpmCli(nodePath);
+    let proc;
+    if (npmCli) {
+      proc = spawn(nodePath, [npmCli, ...args], {
+        env,
+        windowsHide: true,
+        stdio: ['ignore', 'pipe', 'pipe']
+      });
+    } else {
+      const npmBin = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+      proc = spawn(npmBin, args, {
+        env,
+        windowsHide: true,
+        shell: process.platform === 'win32',
+        stdio: ['ignore', 'pipe', 'pipe']
+      });
+    }
+    installProc = proc;
+    let out = '';
+    let done = false;
+    let timer = null;
+    const push = (buf) => {
+      const text = buf.toString();
+      out += text;
+      if (out.length > 200000) out = out.slice(-200000);
+      appendInstallLog(text);
+    };
+    const finish = (ok, extra = '') => {
+      if (done) return;
+      done = true;
+      if (timer) clearTimeout(timer);
+      installProc = null;
+      resolve({ ok, output: `${out}${extra}` });
+    };
+    proc.stdout?.on('data', push);
+    proc.stderr?.on('data', push);
+    timer = setTimeout(() => {
+      appendInstallLog(`\n[git-cockpit] 安装超过 ${Math.round(INSTALL_TIMEOUT_MS / 1000)} 秒，已取消。\n`);
+      proc.kill();
+      finish(false, '\n[timeout]');
+    }, INSTALL_TIMEOUT_MS);
+    proc.on('error', (err) => finish(false, `\n[error] ${err.message}`));
+    proc.on('close', (code) => finish(code === 0, code === 0 ? '' : `\n[npm exit ${code}]`));
+  });
+}
+
+/** 全局目录不可写（EACCES / EPERM）时才考虑换到用户目录。 */
+function needsPrefixFallback(output) {
+  return /EACCES|EPERM|permission denied|Operation not permitted/i.test(output || '');
+}
+
+async function installDaemon(nodePath) {
+  const base = ['install', '-g', DAEMON_SPEC, '--no-audit', '--no-fund'];
+  const fallback = customPrefix();
+  const attempts = [
+    { args: base, prefix: null },
+    { args: [...base, '--prefix', fallback], prefix: fallback }
+  ];
+  let last = '';
+  for (const attempt of attempts) {
+    appendInstallLog(`\n$ npm ${attempt.args.join(' ')}\n`);
+    const res = await runNpm(nodePath, attempt.args);
+    if (res.ok) {
+      writeInstallLog(res.output);
+      return { ok: true, output: res.output };
+    }
+    last = res.output;
+    if (!needsPrefixFallback(last)) break;
+    appendInstallLog(`\n[git-cockpit] 全局目录不可写，改安装到 ${fallback}\n`);
+  }
+  return { ok: false, output: last, logFile: writeInstallLog(last) };
+}
+
+async function promptInstall(failed) {
+  const detail = failed
+    ? `已装的 ${DAEMON_PKG} 无法运行（来源：${failed.kind}）。\n${tail(failed.output, 300) || '（无输出）'}\n\n将重新安装：npm i -g ${DAEMON_SPEC}`
+    : `桌面窗需要 Git Cockpit 服务才能工作，安装包本身不带服务。\n\n将执行：npm i -g ${DAEMON_SPEC}\n使用本机 Node.js ${systemNode ? formatVersion(systemNode.version) : ''}。首次启动需要联网，只需一次，安装过程会显示日志。`;
+  const { response } = await dialog.showMessageBox({
+    type: 'question',
+    title: 'Git Cockpit',
+    message: '需要安装 Git Cockpit 服务（npm 包）。',
+    detail,
+    buttons: ['安装', '退出'],
+    defaultId: 0,
+    cancelId: 1
+  });
+  return response === 0;
+}
+
+function spawnDaemon(resolved) {
   const nodePath = systemNode.path;
   const env = pathWithNode(nodePath);
   if (!versionAtLeast(systemNode.version, SQLITE_UNFLAGGED)) {
     env.NODE_OPTIONS = [env.NODE_OPTIONS, '--experimental-sqlite'].filter(Boolean).join(' ');
   }
   spawnLog = '';
-  const devEntry = resolveDevEntry();
-  const entry = devEntry || resolveGlobalEntry(nodePath);
-  if (entry) {
-    child = spawn(nodePath, [entry, 'start'], {
-      env,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      cwd: path.resolve(path.dirname(entry), '..'),
-      windowsHide: true
-    });
-  } else {
-    const shim = whereCommand('git-cockpit')[0];
-    if (!shim) {
-      throw new Error(
-        '没有找到 git-cockpit。安装包不带服务。\n\n请先执行：\nnpm i -g @shaohui_jin/git-cockpit-mcp-server\n\n然后重新打开。'
-      );
-    }
-    child = spawn(shim, ['start'], {
+  if (resolved.kind === 'shim') {
+    child = spawn(resolved.entry, ['start'], {
       env,
       stdio: ['ignore', 'pipe', 'pipe'],
       shell: process.platform === 'win32',
+      windowsHide: true
+    });
+  } else {
+    child = spawn(nodePath, [resolved.entry, 'start'], {
+      env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      cwd: path.resolve(path.dirname(resolved.entry), '..'),
       windowsHide: true
     });
   }
@@ -226,7 +465,47 @@ async function ensureDaemon() {
     await promptNode(`当前是 Node.js ${formatVersion(systemNode.version)}。请安装 22 或更高版本后再打开。`);
     throw new Error('__node_prompted__');
   }
-  spawnDaemon();
+
+  let resolved = resolveDaemonEntry(systemNode.path);
+  let probe = resolved ? probeEntry(systemNode.path, resolved) : null;
+
+  if (!probe || !probe.ok) {
+    // 开发态不自动装全局包：缺失时优先提示 pnpm build，避免把全局包当成开发依赖。
+    if (!app.isPackaged) {
+      throw new Error(
+        `没有找到可运行的 git-cockpit。请先执行 pnpm build，或安装全局包：\n\nnpm i -g ${DAEMON_PKG}` +
+          (probe ? `\n\n试跑输出：\n${tail(probe.output, 400)}` : '')
+      );
+    }
+    const agreed = await promptInstall(probe ? { kind: resolved.kind, output: probe.output } : null);
+    if (!agreed) throw new Error('__install_declined__');
+
+    openInstallWindow();
+    let installed;
+    try {
+      installed = await installDaemon(systemNode.path);
+    } finally {
+      closeInstallWindow();
+    }
+    if (!installed.ok) {
+      // 用户主动关掉日志窗 == 取消，不再弹错误框。
+      if (installCancelled) throw new Error('__install_declined__');
+      const hint = installed.logFile ? `\n\n完整日志：${installed.logFile}` : '';
+      throw new Error(
+        `安装 Git Cockpit 服务失败。\n\n${tail(installed.output, 900)}${hint}\n\n也可手动执行：npm i -g ${DAEMON_PKG}`
+      );
+    }
+
+    resolved = resolveDaemonEntry(systemNode.path);
+    probe = resolved ? probeEntry(systemNode.path, resolved) : null;
+    if (!probe || !probe.ok) {
+      throw new Error(
+        `服务已安装，但仍无法运行（${resolved ? resolved.kind : '未找到入口'}）。\n\n${tail(probe ? probe.output : '', 900)}`
+      );
+    }
+  }
+
+  spawnDaemon(resolved);
   const ok = await waitHealth(25000);
   if (!ok) {
     const hint = spawnLog.trim()
@@ -283,9 +562,12 @@ app.whenReady().then(async () => {
     await ensureDaemon();
     const origin = await resolveUiOrigin();
     createWindow(origin);
+    starting = false;
     offerUpdate();
   } catch (err) {
-    if (!(err instanceof Error) || err.message !== '__node_prompted__') {
+    const silent =
+      err instanceof Error && (err.message === '__node_prompted__' || err.message === '__install_declined__');
+    if (!silent) {
       dialog.showErrorBox('Git Cockpit', err instanceof Error ? err.message : String(err));
     }
     app.quit();
@@ -303,6 +585,8 @@ app.on('second-instance', () => {
 });
 
 app.on('window-all-closed', () => {
+  // 启动期会先关安装日志窗再开主窗，这段空窗不能当成「用户关掉了应用」。
+  if (starting) return;
   if (spawnedByUs && child && !child.killed) child.kill();
   app.quit();
 });

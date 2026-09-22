@@ -180,3 +180,7 @@ pnpm desktop:dev           # 终端 2：窗口；侧栏「工作台」下面应�
 ```
 
 形态与分期见 [docs/聊天壳方案.md](docs/聊天壳方案.md)。
+
+安装包只带窗壳，不含服务。启动时会先探活 `:3000`，未命中则找本机 Node.js 22+，再**试跑** `git-cockpit version` 确认服务可用；不可用（没装 / 依赖损坏）时，打包版会询问后自动执行 `npm i -g @shaohui_jin/git-cockpit-mcp-server@latest`，安装过程有日志窗口、可取消，全局目录不可写时自动改装到用户目录。开发态（`pnpm desktop:dev`）不自动安装，缺失时提示先 `pnpm build`。
+
+本地打 Windows 安装包（验证用）：`pnpm --filter @shaohui_jin/git-cockpit-desktop pack:local`，产物在 `apps/desktop/release`。步骤与排障见 [docs/桌面端本地打包.md](docs/桌面端本地打包.md)。
