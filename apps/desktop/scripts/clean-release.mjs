@@ -19,10 +19,8 @@ function stash(dir) {
     try {
       renameSync(dir, dest);
       console.warn(`[desktop] ${path.basename(dir)} 被占用，已改名为 ${path.basename(dest)}。请关掉 Git Cockpit 后再删。`);
-    } catch (renameErr) {
-      console.error('[desktop] 无法清理打包目录（多半被未退出的 Git Cockpit / Electron 占用）。');
-      console.error('[desktop] 请先关掉桌面窗后再运行 pack:win。');
-      process.exit(1);
+    } catch {
+      console.warn(`[desktop] ${path.basename(dir)} 仍被占用，先留着。本次打包改到临时目录，不受它影响。`);
     }
   }
 }

@@ -23,7 +23,7 @@
   --gc-pad: 12px;
   --gc-gap: 8px;
   --gc-radius: 6px;
-  --gc-ctx-menu: 100px;
+  --gc-ctx-menu: 168px;
   --gc-shadow-menu:
     0 8px 24px color-mix(in srgb, #102028 14%, transparent),
     0 0 0 1px var(--el-border-color-lighter);

@@ -14,10 +14,8 @@ describe('suggestNext', () => {
     ]);
   });
 
-  it('git_add dry-run → 真 git_add；成功 → git_commit', () => {
-    expect(suggestNext('git_add', { dryRun: true, command: 'git add' }, { paths: ['a.ts'], dryRun: true })).toEqual([
-      { tool: 'git_add', args: { paths: ['a.ts'], dryRun: false } }
-    ]);
+  it('git_add dry-run 不再给出真执行；成功后才建议 git_commit', () => {
+    expect(suggestNext('git_add', { dryRun: true, command: 'git add' }, { paths: ['a.ts'], dryRun: true })).toEqual([]);
     expect(suggestNext('git_add', { ok: true }, { paths: ['a.ts'] })).toEqual([
       { tool: 'git_commit', args: { dryRun: true } }
     ]);

@@ -2,7 +2,7 @@
  * 批量合并预演：一次问「这些分支两两合起来会怎样」。
  * git 调用一律由 GitService 传入；本文件只做笛卡尔积、缓存、临时分支解析与格子组装。
  */
-import { defaultTempBranchName, isSameBranchForMr } from './merge.ts';
+import { defaultTempBranchName, isSameBranchForMr, legacyTempBranchName } from './merge.ts';
 import type { MergeSurveyCell, MergeSurveyPair, MergeSurveyResult, TempBranchState } from './types.ts';
 
 export const MAX_SURVEY_PAIRS = 200;
@@ -94,8 +94,13 @@ export async function runSurvey(
 ): Promise<MergeSurveyResult> {
   const useCache = options.cache !== false;
   const remotes = runner.remoteNames.length ? runner.remoteNames : ['origin'];
-  const tempFor = (into: string, from: string): TempBranchState | undefined =>
-    runner.tempBranches.get(defaultTempBranchName(into, from, remotes));
+  const tempFor = (into: string, from: string, intoSha: string, fromSha: string): TempBranchState | undefined => {
+    const tips = { intoSha, fromSha };
+    return (
+      runner.tempBranches.get(defaultTempBranchName(into, from, remotes, tips)) ??
+      runner.tempBranches.get(legacyTempBranchName(into, from, remotes))
+    );
+  };
 
   const cells: MergeSurveyCell[] = [];
   const total = options.pairs.length;
@@ -123,7 +128,7 @@ export async function runSurvey(
             ...hit,
             into: pair.into,
             from: pair.from,
-            tempBranch: tempFor(pair.into, pair.from)
+            tempBranch: tempFor(pair.into, pair.from, intoSha, fromSha)
           });
           continue;
         }
@@ -139,7 +144,7 @@ export async function runSurvey(
         resultTree: preview.resultTree
       };
       if (useCache) cachePut(key, cell);
-      cells.push({ ...cell, tempBranch: tempFor(pair.into, pair.from) });
+      cells.push({ ...cell, tempBranch: tempFor(pair.into, pair.from, intoSha, fromSha) });
     } catch (err) {
       cells.push({
         into: pair.into,

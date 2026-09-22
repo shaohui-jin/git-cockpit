@@ -82,12 +82,6 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
-      - name: Build web + mcp-server
-        run: |
-          pnpm --filter @shaohui_jin/git-cockpit-core build
-          pnpm --filter @shaohui_jin/git-cockpit-web build
-          pnpm --filter @shaohui_jin/git-cockpit-mcp-server build
-
       - name: Package
         run: pnpm --filter @shaohui_jin/git-cockpit-desktop pack:win
 
@@ -98,6 +92,8 @@ jobs:
           path: |
             apps/desktop/release/*.zip
             apps/desktop/release/*.exe
+            apps/desktop/release/*.blockmap
+            apps/desktop/release/latest.yml
 
       - name: Create desktop tag
         env:
@@ -121,5 +117,7 @@ jobs:
           files: |
             apps/desktop/release/*.zip
             apps/desktop/release/*.exe
+            apps/desktop/release/*.blockmap
+            apps/desktop/release/latest.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

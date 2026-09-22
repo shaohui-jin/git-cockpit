@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { BackupManager } from '../backup.ts';
 import type { BackupResult } from '../backup.ts';
@@ -5,6 +6,49 @@ import type { GitService } from '../gitService.ts';
 import { GitOperationError, PermissionError } from '../types.ts';
 import type { Capability, ExecutionContext, ExecutionResult } from './types.ts';
 
+const PREVIEW_TTL_MS = 10 * 60 * 1000;
+const mcpPreviews = new Map<string, number>();
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([k]) => k !== 'dryRun' && k !== '__backup')
+      .sort(([a], [b]) => a.localeCompare(b));
+    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${stableJson(v)}`).join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
+}
+
+function previewKey(tool: string, repoPath: string, args: Record<string, unknown>): string {
+  return createHash('sha256').update(`${tool}\0${repoPath}\0${stableJson(args)}`).digest('hex');
+}
+
+function gcPreviews(): void {
+  const now = Date.now();
+  for (const [k, exp] of mcpPreviews) {
+    if (exp <= now) mcpPreviews.delete(k);
+  }
+}
+
+function rememberMcpPreview(tool: string, repoPath: string, args: Record<string, unknown>): void {
+  gcPreviews();
+  mcpPreviews.set(previewKey(tool, repoPath, args), Date.now() + PREVIEW_TTL_MS);
+}
+
+function takeMcpPreview(tool: string, repoPath: string, args: Record<string, unknown>): boolean {
+  gcPreviews();
+  const key = previewKey(tool, repoPath, args);
+  const exp = mcpPreviews.get(key);
+  if (!exp) return false;
+  mcpPreviews.delete(key);
+  return true;
+}
+
+/** MCP 写操作：真执行前必须有一次相同参数的成功干跑。网页和聊天不走这里。 */
+function mcpWriteNeedsPreview(source: string, risk: string, dryRun: boolean): boolean {
+  return source === 'mcp' && !dryRun && (risk === 'write' || risk === 'dangerous');
+}
 function extractError(err: unknown): { code: string; message: string; requiredApproval: boolean } {
   if (err instanceof PermissionError) {
     return { code: 'PERMISSION_DENIED', message: err.message, requiredApproval: err.requiredApproval };
@@ -72,7 +116,8 @@ export async function executeCapability(
       if (
         def.name === 'git_apply_resolve' ||
         def.name === 'git_merge_continue' ||
-        def.name === 'git_rebase_continue'
+        def.name === 'git_rebase_continue' ||
+        def.name === 'git_cherry_pick_continue'
       ) {
         throw new GitOperationError(
           '冲突选边只在网页完成。Agent 不要传 files / resolvedContent，请把 preview 的 webUrl 给人。',
@@ -93,6 +138,13 @@ export async function executeCapability(
       repoPath = handle.repoPath;
     }
 
+    if (mcpWriteNeedsPreview(ctx.source, def.risk, dryRun) && !takeMcpPreview(def.name, repoPath, args)) {
+      throw new GitOperationError(
+        '真写之前要先用相同参数 dry_run=true，把命令给人看，等人明确说执行后再 dry_run=false。',
+        'NEED_DRY_RUN'
+      );
+    }
+
     let backup: BackupResult | null = null;
     if (!dryRun && def.risk === 'dangerous' && host.config.git.backupOnDangerousOps && git) {
       backup = await new BackupManager(git).createBackup();
@@ -107,6 +159,9 @@ export async function executeCapability(
     });
 
     record('success', args, undefined, repoPath);
+    if (ctx.source === 'mcp' && dryRun && (def.risk === 'write' || def.risk === 'dangerous')) {
+      rememberMcpPreview(def.name, repoPath, args);
+    }
 
     return {
       tool: def.name,

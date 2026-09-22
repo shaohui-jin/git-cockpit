@@ -10,7 +10,7 @@ import {
   turnOffFetch
 } from '../helpers/ui';
 
-test('矩阵一格去预演 → 选边落盘 → 回矩阵显示已解决·本地', async ({ app }) => {
+test('矩阵一格去预演 → 选边落盘 → 回矩阵显示冲突 · 本地临时枝', async ({ app }) => {
   const { dir } = await createSurveyRepo();
   const { page } = app;
 
@@ -40,5 +40,5 @@ test('矩阵一格去预演 → 选边落盘 → 回矩阵显示已解决·本�
   await page.getByRole('button', { name: '完成冲突处理' }).click();
   await confirmWrite(page, /worktree add/);
 
-  await expect(page.locator('button.cell.is-stage-local')).toContainText('已解决·本地', { timeout: 30_000 });
+  await expect(page.locator('button.cell.is-stage-local')).toContainText('本地临时枝', { timeout: 30_000 });
 });

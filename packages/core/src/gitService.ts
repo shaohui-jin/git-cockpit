@@ -47,6 +47,7 @@ import {
   buildCreateMrUrl,
   classifyMergePair,
   defaultTempBranchName,
+  legacyTempBranchName,
   EMPTY_TREE_SHA,
   evaluateMrMergeGate,
   buildMergePageUrl,
@@ -326,12 +327,14 @@ export class GitService extends EventEmitter {
     return bucketActivityDays(log.stdout.split('\n'));
   }
 
-  /** MERGE_HEAD / REBASE_HEAD；cherry-pick 本期不当作 operation */
+  /** MERGE_HEAD / REBASE_HEAD / CHERRY_PICK_HEAD */
   async detectWorkspaceOperation(): Promise<WorkspaceOperation> {
     const merge = await this.runAllowFail(['rev-parse', '-q', '--verify', 'MERGE_HEAD']);
     if (merge.code === 0 && merge.stdout.trim()) return 'merge';
     const rebase = await this.runAllowFail(['rev-parse', '-q', '--verify', 'REBASE_HEAD']);
     if (rebase.code === 0 && rebase.stdout.trim()) return 'rebase';
+    const pick = await this.runAllowFail(['rev-parse', '-q', '--verify', 'CHERRY_PICK_HEAD']);
+    if (pick.code === 0 && pick.stdout.trim()) return 'cherry-pick';
     try {
       if (
         fs.existsSync(path.join(this.gitDir, 'rebase-merge')) ||
@@ -925,11 +928,25 @@ export class GitService extends EventEmitter {
     }
   }
 
-  /** git checkout：切换分支 */
-  async checkoutBranch(branchName: string, options: { dryRun?: boolean } = {}): Promise<WritePreview | string> {
+  /** git checkout：切换分支；newBranch 时从起点新建并检出，远程起点带 --track */
+  async checkoutBranch(
+    branchName: string,
+    options: { dryRun?: boolean; newBranch?: string } = {}
+  ): Promise<WritePreview | string> {
     this.validateRefName(branchName);
-    const cmd = ['checkout', branchName];
-    if (options.dryRun) return GitService.preview(cmd, 'medium', undefined, `将切换到分支 ${branchName}`);
+    const fresh = options.newBranch?.trim();
+    let cmd = ['checkout', branchName];
+    let note = `将切换到分支 ${branchName}`;
+    if (fresh) {
+      this.validateRefName(fresh);
+      const exists = await this.runAllowFail(['show-ref', '--verify', '--quiet', `refs/heads/${fresh}`]);
+      if (exists.code === 0) {
+        throw new GitOperationError(`本地已有分支 ${fresh}，请换一个名字，或直接切换到它`, 'BRANCH_EXISTS');
+      }
+      cmd = ['checkout', '-b', fresh, '--track', branchName];
+      note = `将从 ${branchName} 检出本地分支 ${fresh} 并跟踪它`;
+    }
+    if (options.dryRun) return GitService.preview(cmd, 'medium', undefined, note);
     await this.prepareWrite();
     try {
       const out = await this.run(cmd);
@@ -939,6 +956,9 @@ export class GitService extends EventEmitter {
       const msg = String((err as Error).message ?? '');
       if (/local changes would be overwritten|Your local changes/.test(msg)) {
         throw new GitOperationError('本地更改会被覆盖，请先提交或暂存（git stash）', 'CHECKOUT_CONFLICT');
+      }
+      if (/already exists|a branch named/.test(msg)) {
+        throw new GitOperationError(`本地已有分支 ${fresh ?? branchName}，请换一个名字，或直接切换到它`, 'BRANCH_EXISTS');
       }
       throw new GitOperationError(this.extractGitMessage(msg), 'GIT_CHECKOUT_FAILED');
     }
@@ -1050,6 +1070,9 @@ export class GitService extends EventEmitter {
       const msg = String((err as Error).message ?? '');
       if (/conflict|CONFLICT/.test(msg)) {
         throw new GitOperationError('拉取产生冲突，请解决冲突后提交', 'PULL_CONFLICT');
+      }
+      if (/no tracking information for the current branch/i.test(msg)) {
+        throw new GitOperationError('当前分支没有上游，无法拉取', 'NO_UPSTREAM');
       }
       throw new GitOperationError(this.extractGitMessage(msg), 'GIT_PULL_FAILED');
     }
@@ -1352,6 +1375,58 @@ export class GitService extends EventEmitter {
     return this.runContinue(cmd, 'GIT_REBASE_CONTINUE_FAILED', 'rebase --continue 失败，请确认冲突已全部暂存');
   }
 
+  /** 把一个提交拣到当前分支。一次一个，不跳过空提交。 */
+  async cherryPick(commit: string): Promise<string> {
+    this.validateRefName(commit);
+    const op = await this.detectWorkspaceOperation();
+    if (op !== 'none') {
+      throw new GitOperationError(`工作区正在 ${op}，先继续或中止`, 'WORKSPACE_BUSY');
+    }
+    const ancestor = await this.runAllowFail(['merge-base', '--is-ancestor', commit, 'HEAD']);
+    if (ancestor.code === 0) {
+      throw new GitOperationError('这个提交已经在当前分支里', 'ALREADY_CONTAINED');
+    }
+    await this.prepareWrite();
+    const cmd = ['cherry-pick', commit];
+    try {
+      const out = await this.run(cmd);
+      this.emit('changed', { repoPath: this.repoPath, command: cmd });
+      return out;
+    } catch (err) {
+      const now = await this.detectWorkspaceOperation();
+      if (now === 'cherry-pick') {
+        throw new GitOperationError('拣选产生冲突，请在网页三栏选边后继续', 'CHERRY_PICK_CONFLICT');
+      }
+      const msg = String((err as Error).message ?? '');
+      if (/now empty|nothing to commit/i.test(msg)) {
+        throw new GitOperationError('拣选结果是空提交。没有跳过，请中止这次拣选。', 'CHERRY_PICK_EMPTY');
+      }
+      throw new GitOperationError(this.extractGitMessage(msg), 'GIT_CHERRY_PICK_FAILED');
+    }
+  }
+
+  async abortCherryPick(): Promise<WritePreview | string> {
+    const op = await this.detectWorkspaceOperation();
+    if (op !== 'cherry-pick') {
+      throw new GitOperationError('当前没有进行中的拣选', 'NO_CHERRY_PICK_IN_PROGRESS');
+    }
+    return this.runWrite(['cherry-pick', '--abort'], { risk: 'medium', note: '已中止拣选' });
+  }
+
+  async continueCherryPick(files?: ApplyResolveFile[]): Promise<string> {
+    const op = await this.detectWorkspaceOperation();
+    if (op !== 'cherry-pick') {
+      throw new GitOperationError('当前没有进行中的拣选', 'NO_CHERRY_PICK_IN_PROGRESS');
+    }
+    await this.prepareWrite();
+    if (files?.length) await this.writeResolvedToWorktree(files);
+    return this.runContinue(
+      ['-c', 'core.editor=true', 'cherry-pick', '--continue'],
+      'GIT_CHERRY_PICK_CONTINUE_FAILED',
+      'cherry-pick --continue 失败，请确认冲突已全部暂存'
+    );
+  }
+
   private async runContinue(cmd: string[], code: string, fallback: string): Promise<string> {
     const r = await this.runAllowFail(cmd, { ...process.env, GIT_EDITOR: 'true' });
     if (r.code !== 0) {
@@ -1379,7 +1454,7 @@ export class GitService extends EventEmitter {
 
   /**
    * 工作区未合并文件：index 三阶段 :1: / :2: / :3: → 三栏选边。
-   * 仅 merge / rebase。
+   * merge / rebase / cherry-pick。
    */
   async listWorkspaceConflicts(): Promise<{
     operation: WorkspaceOperation;
@@ -1401,9 +1476,11 @@ export class GitService extends EventEmitter {
       };
     }
     const into = 'HEAD';
-    const from = operation === 'merge' ? 'MERGE_HEAD' : 'REBASE_HEAD';
-    const oursLabel = operation === 'merge' ? '当前分支' : '变基目标';
-    const theirsLabel = operation === 'merge' ? '合入的' : '正在重放的提交';
+    const from =
+      operation === 'merge' ? 'MERGE_HEAD' : operation === 'rebase' ? 'REBASE_HEAD' : 'CHERRY_PICK_HEAD';
+    const oursLabel = operation === 'rebase' ? '变基目标' : '当前分支';
+    const theirsLabel =
+      operation === 'merge' ? '合入的' : operation === 'rebase' ? '正在重放的提交' : '拣进来的提交';
     const listed = await this.runAllowFail(['ls-files', '-u']);
     const stages = new Map<string, { s1?: string; s2?: string; s3?: string }>();
     for (const line of listed.stdout.split('\n')) {
@@ -1884,8 +1961,10 @@ export class GitService extends EventEmitter {
     const intoIsTempBranch = isMergeTempRef(options.into, options.remotes);
     const fromIsTempBranch = isMergeTempRef(options.from, options.remotes);
     const temps = await this.loadTempBranches(options.remotes);
-    const expected = defaultTempBranchName(options.into, options.from, options.remotes);
-    let pairTempBranch = temps.get(expected) ?? null;
+    const tips = { intoSha: options.intoSha, fromSha: options.fromSha };
+    const expected = defaultTempBranchName(options.into, options.from, options.remotes, tips);
+    const legacy = legacyTempBranchName(options.into, options.from, options.remotes);
+    let pairTempBranch = temps.get(expected) ?? temps.get(legacy) ?? null;
     if (!pairTempBranch && intoIsTempBranch) {
       pairTempBranch = temps.get(branchNameForMr(options.into, options.remotes)) ?? {
         name: branchNameForMr(options.into, options.remotes),
@@ -2097,7 +2176,19 @@ export class GitService extends EventEmitter {
         shouldStop: () => options.signal?.aborted === true,
         onProgress: options.onProgress
       }
-    );
+    ).then(async (result) => {
+      for (const cell of result.cells) {
+        if (!cell.tempBranch?.name || !cell.intoSha || !cell.fromSha) continue;
+        const ref = cell.tempBranch.local ? cell.tempBranch.name : `${remotes[0]}/${cell.tempBranch.name}`;
+        const tip = await this.ensureRev(ref).catch(() => '');
+        const holds =
+          !!tip &&
+          (await this.isAncestor(cell.fromSha, tip)) &&
+          (await this.isAncestor(cell.intoSha, tip));
+        if (!holds) delete cell.tempBranch;
+      }
+      return result;
+    });
   }
 
   /**
@@ -2221,8 +2312,9 @@ export class GitService extends EventEmitter {
       throw new GitOperationError(`没有可合并的新提交（${from} → ${into}），无需落盘。`, 'NOTHING_TO_MERGE');
     }
     const doPush = options.push !== false;
-    const keepLocal = options.keepLocal === true || !doPush;
-    const tempBranch = options.tempBranch?.trim() || defaultTempBranchName(into, from, remoteNames);
+    const tempBranch =
+      options.tempBranch?.trim() ||
+      defaultTempBranchName(into, from, remoteNames, { intoSha, fromSha });
     this.validateRefName(tempBranch);
 
     const cmd = ['worktree', 'add', '-B', tempBranch, '<tmp>', into, '&&', 'merge', '--no-ff', '--no-commit', from];
@@ -2251,12 +2343,15 @@ export class GitService extends EventEmitter {
         'TEMP_BRANCH_CHECKED_OUT'
       );
     }
+    const previousTipRun = await this.runAllowFail(['rev-parse', '--verify', '--quiet', `refs/heads/${tempBranch}`]);
+    const previousTip = previousTipRun.code === 0 ? previousTipRun.stdout.trim() : '';
 
     const parent = await mkdtemp(path.join(tmpdir(), 'git-cockpit-resolve-'));
     const wtPath = path.join(parent, 'wt');
     const messages: string[] = [];
     let pushSucceeded = false;
     let committed = false;
+    const rollbackNote = previousTip ? '临时枝已回到落盘前的提交。' : '未留下本次临时枝。';
 
     const wt = (...args: string[]) => this.runAllowFail(['-C', wtPath, ...args]);
 
@@ -2265,7 +2360,7 @@ export class GitService extends EventEmitter {
       if (addRun.code !== 0) {
         throw new GitOperationError(
           `无法创建 worktree（主工作区未改动）：${(addRun.stderr || addRun.stdout).trim()}` +
-            `\n若「${tempBranch}」已在其他 worktree 中检出，请先移除该 worktree。`,
+            `\n若「${tempBranch}」已在其他 worktree 中检出，请先移除该 worktree。${rollbackNote}`,
           'WORKTREE_ADD_FAILED'
         );
       }
@@ -2283,10 +2378,7 @@ export class GitService extends EventEmitter {
       if (mergeRun.code !== 0 || unmerged.length > 0) {
         if (files.length === 0) {
           await wt('merge', '--abort');
-          throw new GitOperationError(
-            '合并存在冲突，请先在网页三栏完成选边',
-            'HAS_CONFLICTS'
-          );
+          throw new GitOperationError(`合并存在冲突，请先在网页三栏完成选边。${rollbackNote}`, 'HAS_CONFLICTS');
         }
         await writeResolvedFiles(wtPath, files, (rel) => wt('add', '--', rel));
         const still = (await wt('diff', '--name-only', '--diff-filter=U')).stdout
@@ -2297,7 +2389,7 @@ export class GitService extends EventEmitter {
         if (missing.length > 0) {
           await wt('merge', '--abort');
           throw new GitOperationError(
-            `以下冲突文件没有暂存解决结果，已中止合并（主工作区未改动）：\n${missing.join('\n')}`,
+            `以下冲突文件没有暂存解决结果，已中止合并（主工作区未改动）：\n${missing.join('\n')}\n${rollbackNote}`,
             'UNRESOLVED_LEFT'
           );
         }
@@ -2319,9 +2411,9 @@ export class GitService extends EventEmitter {
         const detail = (commitRun.stderr || commitRun.stdout).trim();
         const mergeText = `${mergeRun.stdout}\n${mergeRun.stderr}`;
         if (/nothing to commit|no changes added/i.test(detail) || /Already up to date/i.test(mergeText)) {
-          throw new GitOperationError(`没有可合并的新提交（${from} → ${into}），无需落盘。`, 'NOTHING_TO_MERGE');
+          throw new GitOperationError(`没有可合并的新提交（${from} → ${into}），无需落盘。${rollbackNote}`, 'NOTHING_TO_MERGE');
         }
-        throw new GitOperationError(`提交失败（主工作区未改动）：${detail}`, 'COMMIT_FAILED');
+        throw new GitOperationError(`提交失败（主工作区未改动）：${detail} ${rollbackNote}`, 'COMMIT_FAILED');
       }
 
       const head = await wt('rev-parse', 'HEAD');
@@ -2334,7 +2426,7 @@ export class GitService extends EventEmitter {
         const pushRun = await wt('push', '-u', remote, `HEAD:refs/heads/${tempBranch}`);
         if (pushRun.code !== 0) {
           throw new GitOperationError(
-            `本地临时分支已提交，但推送失败（主工作区仍在原分支）：${(pushRun.stderr || pushRun.stdout).trim()}`,
+            `推送失败，${rollbackNote}主工作区仍在原分支：${(pushRun.stderr || pushRun.stdout).trim()}`,
             'PUSH_FAILED'
           );
         }
@@ -2366,8 +2458,13 @@ export class GitService extends EventEmitter {
       await this.runAllowFail(['worktree', 'remove', '--force', wtPath]);
       await rm(parent, { recursive: true, force: true }).catch(() => undefined);
       await this.runAllowFail(['worktree', 'prune']);
-      if (!pushSucceeded && !(keepLocal && committed)) {
-        await this.runAllowFail(['branch', '-D', tempBranch]);
+      const keepNew = committed && (!doPush || pushSucceeded);
+      if (!keepNew) {
+        if (previousTip) {
+          await this.runAllowFail(['update-ref', `refs/heads/${tempBranch}`, previousTip]);
+        } else {
+          await this.runAllowFail(['branch', '-D', tempBranch]);
+        }
       }
     }
   }
@@ -2400,15 +2497,25 @@ export class GitService extends EventEmitter {
     const remoteUrl = urlOfRemote(remoteList, remote);
 
     const targetBranch = branchNameForMr(into, remoteNames);
-    let sourceBranch = options.sourceBranch?.trim() || defaultTempBranchName(into, from, remoteNames);
+    const intoResolved = await this.resolveMergeRef(into, remote).catch(() => null);
+    const fromResolved = await this.resolveMergeRef(from, remote).catch(() => null);
+    const tipped =
+      intoResolved && fromResolved
+        ? defaultTempBranchName(into, from, remoteNames, { intoSha: intoResolved.sha, fromSha: fromResolved.sha })
+        : '';
+    const legacy = legacyTempBranchName(into, from, remoteNames);
+    let sourceBranch = options.sourceBranch?.trim() || tipped || legacy;
     this.validateRefName(sourceBranch);
     this.validateRefName(targetBranch);
 
     if (!options.sourceBranch?.trim()) {
       const { branches } = await this.listBranches();
-      const hasLocal = branches.some((b) => !b.remote && b.name === sourceBranch);
-      const hasRemote = branches.some((b) => b.remote && b.name === `${remote}/${sourceBranch}`);
-      if (!hasLocal && !hasRemote) {
+      const has = (name: string) =>
+        branches.some((b) => !b.remote && b.name === name) ||
+        branches.some((b) => b.remote && b.name === `${remote}/${name}`);
+      if (tipped && has(tipped)) sourceBranch = tipped;
+      else if (has(legacy)) sourceBranch = legacy;
+      else {
         sourceBranch = branchNameForMr(from, remoteNames);
         this.validateRefName(sourceBranch);
       }

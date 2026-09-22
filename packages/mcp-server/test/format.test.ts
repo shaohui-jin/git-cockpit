@@ -65,14 +65,14 @@ describe('summarizeForAgent', () => {
     expect(out.next[0]).toMatchObject({ tool: 'git_add' });
   });
 
-  it('写操作 dry-run 预览附 next 真执行', () => {
+  it('写操作 dry-run 不再把 dry_run=false 放进 next', () => {
     const out = summarizeForAgent(
       'git_add',
       { dryRun: true, command: 'git add -- a.ts', args: ['add', '--', 'a.ts'], risk: 'low' },
       { paths: ['a.ts'], dryRun: true },
       true
-    ) as { next: Array<{ tool: string; args?: { dryRun?: boolean } }> };
-    expect(out.next[0]).toMatchObject({ tool: 'git_add', args: { dryRun: false } });
+    ) as { next: unknown[] };
+    expect(out.next).toBeUndefined();
   });
 
   it('git_repo_overview 默认去掉每日热力格子', () => {

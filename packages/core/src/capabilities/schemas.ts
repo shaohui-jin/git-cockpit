@@ -175,7 +175,11 @@ export type GitCommitArgs = z.infer<typeof GitCommitSchema>;
 
 export const GitCheckoutSchema = z.object({
   ...writeBase,
-  branch: z.string().describe('要切换到的分支名')
+  branch: z.string().describe('要切换到的分支；给出 newBranch 时这是检出起点'),
+  newBranch: z
+    .string()
+    .optional()
+    .describe('从 branch 新建并检出的本地分支名。起点是远程跟踪枝时带 --track')
 });
 export type GitCheckoutArgs = z.infer<typeof GitCheckoutSchema>;
 
@@ -324,8 +328,8 @@ export const GitApplyResolveSchema = z.object({
     .optional()
     .describe('仅网页传入已解决文件。MCP/Agent 禁止填写；有冲突请给人网页选边'),
   push: z.boolean().optional().describe('是否推送临时分支，缺省 true'),
-  keepLocal: z.boolean().optional().describe('推送失败时仍保留本地临时分支'),
-  tempBranch: z.string().optional().describe('自定义临时分支名；缺省 merge/<from>-into-<into>')
+  keepLocal: z.boolean().optional().describe('不推送时保留本地枝。推送失败会回到落盘前，不留下半次提交'),
+  tempBranch: z.string().optional().describe('自定义临时分支名；缺省 merge/<from>-into-<into>--<from8>-<into8>')
 });
 export type GitApplyResolveArgs = z.infer<typeof GitApplyResolveSchema>;
 
@@ -380,6 +384,21 @@ export const GitRebaseSchema = z.object({
   branch: z.string().describe('要变基到的分支/提交')
 });
 export type GitRebaseArgs = z.infer<typeof GitRebaseSchema>;
+
+export const GitCherryPickSchema = z.object({
+  ...writeBase,
+  commit: z.string().describe('要拣到当前分支的一个提交')
+});
+export type GitCherryPickArgs = z.infer<typeof GitCherryPickSchema>;
+
+export const GitCherryPickAbortSchema = z.object({ ...writeBase });
+export type GitCherryPickAbortArgs = z.infer<typeof GitCherryPickAbortSchema>;
+
+export const GitCherryPickContinueSchema = z.object({
+  ...writeBase,
+  files: continueFiles
+});
+export type GitCherryPickContinueArgs = z.infer<typeof GitCherryPickContinueSchema>;
 
 export const GitWorktreeListSchema = z.object({ ...readonlyBase });
 export type GitWorktreeListArgs = z.infer<typeof GitWorktreeListSchema>;

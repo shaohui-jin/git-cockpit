@@ -45,6 +45,21 @@ export async function main(argv: string[]): Promise<number> {
   const runtime = createRuntime({ dataDir });
 
   if (command === 'mcp') {
+    const port = Number(process.env.GIT_COCKPIT_PORT) || runtime.config.server.port;
+    const host = process.env.GIT_COCKPIT_HOST ?? '127.0.0.1';
+    try {
+      const health = await fetch(`http://${host}:${port}/api/health`);
+      if (health.ok) {
+        const secret = runtime.config.auth.localSecret;
+        console.error(`[git-cockpit] daemon 已在运行，stdio 退出。`);
+        console.error(`[git-cockpit] Web UI: http://${host}:${port}`);
+        console.error(`[git-cockpit] MCP:    http://${host}:${port}/mcp`);
+        console.error(`[git-cockpit] Header: X-Git-Cockpit-Secret: ${secret}`);
+        return 0;
+      }
+    } catch {
+      /* 没有 daemon，继续 stdio */
+    }
     await startMcpStdio(runtime);
     return 0;
   }

@@ -3,12 +3,14 @@
   "version": "0.1.22",
   "private": true,
   "author": "Git Cockpit",
-  "description": "Git Cockpit 桌面窗壳：拉起或复用本机 daemon，窗口加载现有 Web",
+  "description": "Git Cockpit 桌面窗壳：用本机 Node 拉起或复用 daemon，窗口加载现有 Web",
   "main": "main.cjs",
   "scripts": {
     "dev": "electron .",
-    "prepare:runtime": "node scripts/prepare-runtime.mjs",
     "pack:win": "node scripts/pack-win.mjs"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
   },
   "devDependencies": {
     "electron": "^37.2.0",
@@ -21,21 +23,8 @@
       "output": "release"
     },
     "files": [
-      "main.cjs"
-    ],
-    "afterPack": "./scripts/after-pack.cjs",
-    "extraResources": [
-      {
-        "from": "runtime",
-        "to": "mcp-server",
-        "filter": [
-          "**/*",
-          "!**/*.map",
-          "!**/*.d.ts",
-          "!node_modules",
-          "!node_modules/**"
-        ]
-      }
+      "main.cjs",
+      "package.json"
     ],
     "win": {
       "target": [
@@ -46,6 +35,11 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "shaohui-jin",
+      "repo": "git-cockpit"
     },
     "forceCodeSigning": false
   }

@@ -1,9 +1,11 @@
 /**
- * Windows 安装包：部署 runtime、清残留、再 electron-builder。
+ * Windows 安装包：只打窗壳。daemon 用本机已安装的 git-cockpit，不把 Node 依赖打进安装包。
  * 打包时不能同时开着 desktop:dev，否则会 EBUSY 锁住 default_app.asar。
+ * 解压目录放在系统临时目录：仓库里的 release 会被编辑器盯住，win-unpacked.tmp 改名会 EPERM。
  */
 import { execSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { cpSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -13,10 +15,10 @@ const desktopRoot = path.resolve(here, '..');
 function runningDesktopElectron() {
   try {
     const out = execSync(
-      'wmic process where "name=\'electron.exe\'" get CommandLine /FORMAT:LIST',
+      'wmic process where "name=\'electron.exe\' or name=\'Git Cockpit.exe\'" get CommandLine,Name /FORMAT:LIST',
       { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
     );
-    return /git-cockpit[\\/]apps[\\/]desktop|git-cockpit-desktop/i.test(out);
+    return /git-cockpit[\\/]apps[\\/]desktop|git-cockpit-desktop|Git Cockpit\.exe/i.test(out);
   } catch {
     return false;
   }
@@ -28,25 +30,33 @@ if (!process.env.GITHUB_ACTIONS && runningDesktopElectron()) {
   process.exit(1);
 }
 
-execSync('node scripts/prepare-runtime.mjs', { cwd: desktopRoot, stdio: 'inherit' });
 execSync('node scripts/clean-release.mjs', { cwd: desktopRoot, stdio: 'inherit' });
+
+const stage = path.join(os.tmpdir(), 'git-cockpit-desktop-release');
+rmSync(stage, { recursive: true, force: true });
+mkdirSync(stage, { recursive: true });
+
 const env = { ...process.env };
 delete env.GH_TOKEN;
 delete env.GITHUB_TOKEN;
-execSync('pnpm exec electron-builder --win zip nsis --x64 --publish never', {
-  cwd: desktopRoot,
-  stdio: 'inherit',
-  env
-});
+execSync(
+  `pnpm exec electron-builder --win zip nsis --x64 --publish never --config.directories.output="${stage}"`,
+  { cwd: desktopRoot, stdio: 'inherit', env }
+);
 
-const unpacked = path.join(desktopRoot, 'release', 'win-unpacked', 'resources', 'mcp-server');
-const fastifyPkg = path.join(unpacked, 'node_modules', 'fastify', 'package.json');
-if (!existsSync(fastifyPkg)) {
-  console.error('[desktop] win-unpacked 里没有实体 fastify。安装包在别人机器上会起不了 :3000。');
-  process.exit(1);
+const release = path.join(desktopRoot, 'release');
+mkdirSync(release, { recursive: true });
+for (const name of readdirSync(stage)) {
+  const keep =
+    name === 'win-unpacked' ||
+    name === 'latest.yml' ||
+    name === 'builder-effective-config.yaml' ||
+    name.endsWith('.exe') ||
+    name.endsWith('.zip') ||
+    name.endsWith('.blockmap');
+  if (!keep) continue;
+  cpSync(path.join(stage, name), path.join(release, name), { recursive: true, force: true });
 }
-execSync('node --input-type=module -e "await import(\'fastify\')"', {
-  cwd: path.join(unpacked, 'dist'),
-  stdio: 'inherit'
-});
-console.log('[desktop] win-unpacked 已能从 dist 解析 fastify');
+rmSync(stage, { recursive: true, force: true });
+console.log(`[desktop] 安装包已复制到 ${release}`);
+console.log('[desktop] 安装包只含窗壳。打开时若没有 Node.js 22+ 或 git-cockpit，会先提示。');

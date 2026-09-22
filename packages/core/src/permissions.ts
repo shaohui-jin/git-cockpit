@@ -1,6 +1,6 @@
 import { getCapabilityRegistry } from './capabilities/registry.ts';
 import { PermissionError } from './types.ts';
-import type { GitCockpitConfig, RiskLevel } from './types.ts';
+import type { GitCockpitConfig, PermissionsConfig, RiskLevel } from './types.ts';
 
 /**
  * 未注册 Capability 时的回退目录（core 单测不加载 mcp-server）。
@@ -52,6 +52,9 @@ export const TOOL_RISK_LEVELS: Record<string, RiskLevel> = {
   git_merge_continue: 'write',
   git_rebase_abort: 'write',
   git_rebase_continue: 'write',
+  git_cherry_pick: 'write',
+  git_cherry_pick_abort: 'write',
+  git_cherry_pick_continue: 'write',
   git_tag_create: 'write',
   git_stash: 'write',
   git_stash_apply: 'write',
@@ -74,26 +77,29 @@ export interface PermissionDecision {
   allowed: boolean;
   /** 拒绝时的人性化原因 */
   reason: string;
-  /** true 表示该操作本可执行，但需等待人工审批 */
+  /** true 表示高风险工具被禁用，界面可以带到设置里打开 */
   requiredApproval: boolean;
 }
 
 /**
- * 权限控制层：
- * - disabledTools：工具被禁用，调用即报错，需在配置中开启；
- * - requireApprovalFor：工具需人工审批后方可执行（默认覆盖全部高风险工具）；
- * - 高风险工具且未禁用未审批还需额外预览确认。
+ * 权限只有一份禁用名单。旧配置里的 requireApprovalFor 并进 disabledTools，不再单独生效。
  */
+export function normalizePermissions(p: PermissionsConfig): PermissionsConfig {
+  const disabled = [...new Set([...(p.disabledTools ?? []), ...(p.requireApprovalFor ?? [])])];
+  return {
+    disabledTools: disabled,
+    requireApprovalFor: [],
+    dryRunDefault: p.dryRunDefault ?? false
+  };
+}
 export class PermissionManager {
   private readonly disabledTools: Set<string>;
-  private readonly requireApprovalFor: Set<string>;
   private readonly dryRunDefault: boolean;
 
   constructor(config: Pick<GitCockpitConfig, 'permissions'>) {
-    const p = config.permissions;
-    this.disabledTools = new Set(p.disabledTools ?? []);
-    this.requireApprovalFor = new Set(p.requireApprovalFor ?? []);
-    this.dryRunDefault = p.dryRunDefault ?? false;
+    const p = normalizePermissions(config.permissions);
+    this.disabledTools = new Set(p.disabledTools);
+    this.dryRunDefault = p.dryRunDefault;
   }
 
   getDryRunDefault(): boolean {
@@ -106,18 +112,8 @@ export class PermissionManager {
       return {
         allowed: false,
         // 高风险工具默认禁用，但可通过"开启 + 审批"放行
-        reason:
-          risk === 'dangerous'
-            ? `工具 ${toolName} 属于 ${risk} 风险操作，默认禁用。请在设置中开启并通过审批后执行。`
-            : `工具 ${toolName} 已被禁用。请在配置文件的 permissions.disabledTools 中移除后重试。`,
+        reason: `工具 ${toolName} 已禁用。请到设置的 Git 操作里打开。`,
         requiredApproval: risk === 'dangerous'
-      };
-    }
-    if (this.requireApprovalFor.has(toolName)) {
-      return {
-        allowed: false,
-        reason: `工具 ${toolName} 属于 ${risk} 风险操作，需要人工审批。请在配置中开启或先使用 dry_run 预览影响范围。`,
-        requiredApproval: true
       };
     }
     return { allowed: true, reason: '', requiredApproval: false };
@@ -131,7 +127,7 @@ export class PermissionManager {
     }
   }
 
-  /** 工具当前是否可用（未被禁用，且不需审批） */
+  /** 工具当前是否可用（未禁用） */
   isEnabled(toolName: string): boolean {
     return this.evaluate(toolName).allowed;
   }

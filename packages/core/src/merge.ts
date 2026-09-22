@@ -122,9 +122,27 @@ function slugRef(ref: string, remotes: string[] = ['origin']): string {
     .replace(/^-+|-+$/g, '');
 }
 
-/** 落盘用临时分支名：`merge/<from>-into-<into>` */
-export function defaultTempBranchName(into: string, from: string, remotes: string[] = ['origin']): string {
+/** 旧落盘名：`merge/<from>-into-<into>`。新落盘不再使用，预演仍认得。 */
+export function legacyTempBranchName(into: string, from: string, remotes: string[] = ['origin']): string {
   return `merge/${slugRef(from, remotes)}-into-${slugRef(into, remotes)}`;
+}
+
+/**
+ * 新落盘名：`merge/<from>-into-<into>--<from8>-<into8>`。
+ * 用 `--` 而不是再套一层 `/`，这样旧名字 `merge/<from>-into-<into>` 仍能同时存在。
+ * 没给两侧 SHA 时退回旧名字（只用于查找，不用于新建）。
+ */
+export function defaultTempBranchName(
+  into: string,
+  from: string,
+  remotes: string[] = ['origin'],
+  tips?: { intoSha?: string; fromSha?: string }
+): string {
+  const base = legacyTempBranchName(into, from, remotes);
+  const from8 = (tips?.fromSha ?? '').replace(/[^0-9a-f]/gi, '').slice(0, 8);
+  const into8 = (tips?.intoSha ?? '').replace(/[^0-9a-f]/gi, '').slice(0, 8);
+  if (from8.length < 7 || into8.length < 7) return base;
+  return `${base}--${from8}-${into8}`;
 }
 
 /** 本地 `merge/…` 或远程 `origin/merge/…`（worktree 落盘留下的枝，不是线上目标） */

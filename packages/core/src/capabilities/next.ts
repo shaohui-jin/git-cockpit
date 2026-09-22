@@ -14,18 +14,9 @@ function compact(args: Record<string, unknown>): Record<string, unknown> | undef
   return Object.keys(out).length ? out : undefined;
 }
 
-function omitDryRun(args: Record<string, unknown>): Record<string, unknown> {
-  const { dryRun: _d, ...rest } = args;
-  return rest;
-}
-
 function isWritePreview(result: unknown): boolean {
   const r = asRecord(result);
   return r?.dryRun === true && typeof r.command === 'string';
-}
-
-function confirmWrite(tool: string, args: Record<string, unknown>): NextStep[] {
-  return [{ tool, args: compact({ ...omitDryRun(args), dryRun: false }) }];
 }
 
 /**
@@ -45,6 +36,9 @@ export function suggestNext(
       const op = row?.operation;
       if (op === 'merge') return [{ tool: 'git_merge_continue' }];
       if (op === 'rebase') return [{ tool: 'git_rebase_continue' }];
+      if (op === 'cherry-pick') {
+        return [{ tool: 'git_cherry_pick_continue' }, { tool: 'git_cherry_pick_abort' }];
+      }
       const unstaged = Array.isArray(row?.unstaged) ? row.unstaged : [];
       const untracked = Array.isArray(row?.untracked) ? row.untracked : [];
       if (unstaged.length || untracked.length) {
@@ -55,10 +49,10 @@ export function suggestNext(
       return [];
     }
     case 'git_add':
-      if (dryRun) return confirmWrite(tool, args);
+      if (dryRun) return [];
       return [{ tool: 'git_commit', args: { dryRun: true } }];
     case 'git_commit':
-      if (dryRun) return confirmWrite(tool, args);
+      if (dryRun) return [];
       return [{ tool: 'git_status' }];
     case 'git_merge_preview':
     case 'git_merge_rehearse': {
@@ -106,7 +100,7 @@ export function suggestNext(
       return [];
     }
     case 'git_apply_resolve':
-      if (dryRun) return confirmWrite(tool, args);
+      if (dryRun) return [];
       return [
         {
           tool: 'git_mr_prepare',
@@ -163,7 +157,7 @@ export function suggestNext(
       }
       return [];
     default:
-      if (dryRun) return confirmWrite(tool, args);
+      if (dryRun) return [];
       return [];
   }
 }

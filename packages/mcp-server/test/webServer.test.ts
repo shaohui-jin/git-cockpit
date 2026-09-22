@@ -24,6 +24,16 @@ describe('Web API', () => {
     git = sample.git;
     runtime = createTestRuntime();
     server = await createWebServer(runtime, { staticDir: null, noListen: true });
+    const raw = server.app.inject.bind(server.app);
+    server.app.inject = ((opts: { headers?: Record<string, unknown> }) => {
+      return raw({
+        ...opts,
+        headers: {
+          ...opts.headers,
+          'x-git-cockpit-secret': runtime.config.auth.localSecret
+        }
+      } as never);
+    }) as typeof server.app.inject;
   });
 
   afterAll(async () => {
@@ -37,6 +47,27 @@ describe('Web API', () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.ok).toBe(true);
+  });
+
+  it('没有密钥时接口 401，bootstrap 不给带 Origin 的请求', async () => {
+    const runtime2 = createTestRuntime();
+    const bare = await createWebServer(runtime2, { staticDir: null, noListen: true });
+    try {
+      const denied = await bare.app.inject({ method: 'GET', url: '/api/repos' });
+      expect(denied.statusCode).toBe(401);
+      const boot = await bare.app.inject({ method: 'GET', url: '/api/bootstrap' });
+      expect(boot.statusCode).toBe(200);
+      expect(boot.json().secret).toBe(runtime2.config.auth.localSecret);
+      const cross = await bare.app.inject({
+        method: 'GET',
+        url: '/api/bootstrap',
+        headers: { origin: 'http://evil.example' }
+      });
+      expect(cross.statusCode).toBe(403);
+    } finally {
+      await bare.close();
+      disposeTestRuntime(runtime2);
+    }
   });
 
   it('GET /docs 提供 OpenAPI 文档', async () => {
@@ -176,7 +207,7 @@ describe('Web API', () => {
     expect(status.json().isClean).toBe(true);
   });
 
-  it('危险工具经 Web 入口返回 403（需要审批）', async () => {
+  it('危险工具经 Web 入口返回 403（已禁用）', async () => {
     const repos = (await server.app.inject({ method: 'GET', url: '/api/repos' })).json();
     const id = repos.repos[0].id;
     const res = await server.app.inject({
@@ -563,6 +594,15 @@ describe('Web API - 无仓库场景', () => {
   it('status 对不存在仓库返回 404', async () => {
     const runtime = createTestRuntime();
     const server = await createWebServer(runtime, { staticDir: null, noListen: true });
+    const raw = server.app.inject.bind(server.app);
+    server.app.inject = ((opts: { headers?: Record<string, unknown> }) =>
+      raw({
+        ...opts,
+        headers: {
+          ...opts.headers,
+          'x-git-cockpit-secret': runtime.config.auth.localSecret
+        }
+      } as never)) as typeof server.app.inject;
     try {
       const res = await server.app.inject({ method: 'GET', url: '/api/repos/999/status' });
       expect(res.statusCode).toBe(404);

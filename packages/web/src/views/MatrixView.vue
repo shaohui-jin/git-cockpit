@@ -43,7 +43,7 @@ const OUTCOME_TEXT: Record<SurveyOutcome, string> = {
 const STAGE_TEXT: Record<CellStage, string> = {
   open: '',
   ready: '',
-  local: '已解决·本地',
+  local: '本地临时枝',
   resolved: '已处理',
   page: '已开创建页',
   mr: '已提 MR'
@@ -215,10 +215,12 @@ function pushTemp(cell: MergeSurveyCell): void {
 function cellLabel(cell: MergeSurveyCell): string {
   const n = cell.conflictPaths.length;
   const extra = n > 0 ? ` ${n}` : '';
+  const outcome = `${OUTCOME_TEXT[cell.outcome]}${extra}`;
   const stage = session.stageOf(cell);
+  if (stage === 'local' || stage === 'resolved') return `${outcome} · ${STAGE_TEXT[stage]}`;
   const stageText = STAGE_TEXT[stage];
-  if (stageText) return `${stageText}${extra}`;
-  return `${OUTCOME_TEXT[cell.outcome]}${extra}`;
+  if (stageText) return stageText;
+  return outcome;
 }
 
 function cellTitle(cell: MergeSurveyCell): string {
@@ -295,7 +297,7 @@ function isActive(cell: MergeSurveyCell): boolean {
         >{{ b }}</el-tag>
       </div>
       <p class="tip">
-        每对只跑 merge-tree，不改工作区。点「去预演」选边后只记到本地临时分支（不推送），回矩阵显示「已解决·本地」。
+        每对只跑 merge-tree，不改工作区。点「去预演」选边后只记到本地临时分支（不推送）。格子同时显示预演结果和进度：tip 没变时预演仍是冲突。
         矩阵上再统一：先清剩余冲突，再推送临时分支、申请 MR。不切换当前工作区。
       </p>
     </section>

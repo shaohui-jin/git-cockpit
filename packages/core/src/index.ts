@@ -29,6 +29,7 @@ export {
   branchNameForMr,
   classifyMergePair,
   defaultTempBranchName,
+  legacyTempBranchName,
   isMergeTempRef,
   isSameBranchForMr,
   parseLandedMergeMessage,

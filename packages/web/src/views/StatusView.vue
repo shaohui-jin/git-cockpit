@@ -101,6 +101,9 @@ const worktreeBranch = ref('');
 const worktreeStart = ref('');
 const resetVisible = ref(false);
 const resetTarget = ref('');
+const checkoutAsVisible = ref(false);
+const checkoutStart = ref('');
+const checkoutLocalName = ref('');
 const mergeVisible = ref(false);
 const mergeBranch = ref('');
 const tagVisible = ref(false);
@@ -331,8 +334,13 @@ async function run(tool: string, params: Record<string, unknown> = {}): Promise<
 }
 
 async function onConfirmed(): Promise<void> {
+  const tool = pending.value?.tool;
   const res = await executeConfirmed();
-  if (res?.success) await refresh();
+  const conflict = res?.error?.code === 'CHERRY_PICK_CONFLICT';
+  if (res?.success || conflict) await refresh();
+  if (tool === 'git_cherry_pick' && status.value?.operation === 'cherry-pick') {
+    contentMode.value = 'workspace';
+  }
 }
 
 /** 文件行内操作 */
@@ -535,6 +543,35 @@ function removeWorktree(w: WorktreeInfo): void {
 function checkoutNode(n: BranchTreeNode): void {
   if (n.branch) void run('git_checkout', { branch: n.branch.name });
 }
+function onBranchDblclick(n: BranchTreeNode): void {
+  if (!n.branch || n.branch.current) return;
+  if (n.branch.remote) openCheckoutAs(n);
+  else checkoutNode(n);
+}
+function defaultLocalName(remoteName: string): string {
+  const slash = remoteName.indexOf('/');
+  return slash === -1 ? remoteName : remoteName.slice(slash + 1);
+}
+function openCheckoutAs(n: BranchTreeNode): void {
+  if (!n.branch?.remote) return;
+  checkoutStart.value = n.branch.name;
+  checkoutLocalName.value = defaultLocalName(n.branch.name);
+  checkoutAsVisible.value = true;
+}
+function confirmCheckoutAs(): void {
+  const name = checkoutLocalName.value.trim();
+  const start = checkoutStart.value;
+  if (!name || !start) {
+    ElMessage.warning('请输入本地分支名');
+    return;
+  }
+  checkoutAsVisible.value = false;
+  void run('git_checkout', { branch: start, newBranch: name });
+}
+function mergeNode(n: BranchTreeNode): void {
+  if (!n.branch || n.branch.current) return;
+  void run('git_merge', { branch: n.branch.name });
+}
 function pull(): void {
   void run('git_pull');
 }
@@ -547,22 +584,37 @@ function push(): void {
 
 function workspaceContinue(): void {
   const op = status.value?.operation;
-  if (op !== 'merge' && op !== 'rebase') return;
+  if (op !== 'merge' && op !== 'rebase' && op !== 'cherry-pick') return;
   const files = workspacePanel.value?.buildFiles() ?? [];
-  const tool = op === 'merge' ? 'git_merge_continue' : 'git_rebase_continue';
+  const tool =
+    op === 'merge' ? 'git_merge_continue' : op === 'rebase' ? 'git_rebase_continue' : 'git_cherry_pick_continue';
   void run(tool, files.length ? { files } : {});
 }
 
 function workspaceAbort(): void {
   const op = status.value?.operation;
-  if (op !== 'merge' && op !== 'rebase') return;
-  void run(op === 'merge' ? 'git_merge_abort' : 'git_rebase_abort');
+  if (op !== 'merge' && op !== 'rebase' && op !== 'cherry-pick') return;
+  const tool =
+    op === 'merge' ? 'git_merge_abort' : op === 'rebase' ? 'git_rebase_abort' : 'git_cherry_pick_abort';
+  void run(tool);
+}
+
+function cherryPickCommit(hash: string): void {
+  void run('git_cherry_pick', { commit: hash });
+}
+
+function operationTitle(op: string): string {
+  if (op === 'merge') return '工作区 merge 进行中';
+  if (op === 'rebase') return '工作区 rebase 进行中';
+  return '工作区 cherry-pick 进行中';
 }
 function onBranchCommand(cmd: string | number | object, n: BranchTreeNode): void {
   const c = String(cmd);
   if (c === 'pull') pull();
   else if (c === 'push') push();
   else if (c === 'checkout') checkoutNode(n);
+  else if (c === 'checkout-as') openCheckoutAs(n);
+  else if (c === 'merge') mergeNode(n);
   else if (c === 'delete') deleteBranch(n, false);
   else if (c === 'delete-force') deleteBranch(n, true);
 }
@@ -580,8 +632,8 @@ function closeBranchMenu(): void {
 function openBranchMenu(ev: MouseEvent, n: BranchTreeNode): void {
   ev.preventDefault();
   ev.stopPropagation();
-  const w = 100;
-  const items = n.branch?.current ? 2 : n.remote ? 1 : 3;
+  const w = 168;
+  const items = n.branch?.current ? 2 : n.remote ? 2 : 4;
   const h = items * 32 + 8;
   let x = ev.clientX;
   let y = ev.clientY;
@@ -801,7 +853,7 @@ onUnmounted(() => {
                   class="branch-node"
                   :class="{ current: data.branch?.current, remote: data.remote }"
                   :title="`${data.fullName}（右键操作）`"
-                  @dblclick="data.branch?.current || checkoutNode(data)"
+                  @dblclick="onBranchDblclick(data)"
                   @contextmenu="openBranchMenu($event, data)"
                 >
                   <span class="node-name">{{ data.label }}</span>
@@ -845,7 +897,11 @@ onUnmounted(() => {
         </div>
 
         <div v-else-if="contentMode === 'log'" class="log-pane">
-          <CommitLogPanel ref="logPanel" />
+          <CommitLogPanel
+            ref="logPanel"
+            :operation="status?.operation ?? 'none'"
+            @pick="cherryPickCommit"
+          />
         </div>
 
         <template v-else>
@@ -868,6 +924,9 @@ onUnmounted(() => {
               <el-tooltip content="git fetch --prune，更新远程跟踪分支，不改工作区" placement="top">
                 <el-button plain @click="fetchRemote">Fetch</el-button>
               </el-tooltip>
+              <el-tooltip content="把当前分支的上游更新合并进来。没有上游时会失败。" placement="top">
+                <el-button plain @click="pull">拉取</el-button>
+              </el-tooltip>
               <el-button plain @click="tagVisible = true">打标签</el-button>
               <el-button type="danger" plain @click="resetVisible = true">硬重置</el-button>
               <el-button type="danger" plain @click="run('git_clean')">清理未跟踪</el-button>
@@ -883,7 +942,7 @@ onUnmounted(() => {
 
         <el-alert
           v-if="status?.operation && status.operation !== 'none'"
-          :title="status.operation === 'merge' ? '工作区 merge 进行中' : '工作区 rebase 进行中'"
+          :title="operationTitle(status.operation)"
           :description="
             (status.conflicted.length ? `还有 ${status.conflicted.length} 个冲突文件。` : '冲突已处理，可以继续。') +
             ' 选边写回当前工作区后点继续；或中止这次操作。不是底栏「合并」的 merge-tree 预演。'
@@ -1045,7 +1104,7 @@ onUnmounted(() => {
                 <div v-for="b in backups.branches" :key="'b-' + b" class="stash-row">
                   <div class="stash-main">
                     <span class="stash-ref">{{ b }}</span>
-                    <span class="stash-msg">备份分支</span>
+                    <span class="stash-msg">检出不会把工作区自动恢复成操作前，也不会执行 reset --hard</span>
                   </div>
                   <div class="stash-actions">
                     <el-button size="small" text type="primary" @click="checkoutBackup(b)">检出</el-button>
@@ -1054,7 +1113,7 @@ onUnmounted(() => {
                 <div v-for="s in backups.stashes" :key="'s-' + s" class="stash-row">
                   <div class="stash-main">
                     <span class="stash-ref">{{ s }}</span>
-                    <span class="stash-msg">备份 stash</span>
+                    <span class="stash-msg">应用不会重置当前分支</span>
                   </div>
                   <div class="stash-actions">
                     <el-button size="small" text type="success" @click="applyBackupStash(s)">应用</el-button>
@@ -1115,7 +1174,11 @@ onUnmounted(() => {
           <li class="el-dropdown-menu__item" @click="runBranchMenu('pull')">拉取</li>
           <li class="el-dropdown-menu__item" @click="runBranchMenu('push')">推送</li>
         </template>
-        <li v-else class="el-dropdown-menu__item" @click="runBranchMenu('checkout')">切换</li>
+        <template v-else>
+          <li v-if="branchMenu.node.remote" class="el-dropdown-menu__item" @click="runBranchMenu('checkout-as')">检出为本地分支</li>
+          <li v-else class="el-dropdown-menu__item" @click="runBranchMenu('checkout')">切换</li>
+          <li class="el-dropdown-menu__item" @click="runBranchMenu('merge')">合并到当前分支</li>
+        </template>
         <template v-if="branchMenuCanDelete">
           <li class="el-dropdown-menu__item el-dropdown-menu__item--divided" @click="runBranchMenu('delete')">删除</li>
           <li class="el-dropdown-menu__item gc-danger" @click="runBranchMenu('delete-force')">强制删除</li>
@@ -1230,6 +1293,21 @@ onUnmounted(() => {
       <template #footer>
         <el-button @click="resetVisible = false">取消</el-button>
         <el-button type="danger" @click="confirmReset">下一步（dry-run 预览）</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="checkoutAsVisible" title="检出为本地分支" width="480px">
+      <el-alert
+        class="mb"
+        :title="`从 ${checkoutStart} 新建并检出本地分支，并跟踪该远程。`"
+        type="info"
+        :closable="false"
+        show-icon
+      />
+      <el-input v-model="checkoutLocalName" placeholder="本地分支名" />
+      <template #footer>
+        <el-button @click="checkoutAsVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmCheckoutAs">下一步（dry-run 预览）</el-button>
       </template>
     </el-dialog>
 

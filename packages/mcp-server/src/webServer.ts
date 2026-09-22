@@ -10,6 +10,7 @@ import * as fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import Fastify from 'fastify';
 import type { FastifyInstance, FastifyReply } from 'fastify';
+import { timingSafeEqual } from 'node:crypto';
 import cors from '@fastify/cors';
 import fastifyStatic from '@fastify/static';
 import {
@@ -96,6 +97,14 @@ function queryList(q: Record<string, string | string[] | undefined>, key: string
     .filter(Boolean);
 }
 
+function headerMatches(got: string | undefined, expect: string): boolean {
+  if (!got || !expect) return false;
+  const a = Buffer.from(got);
+  const b = Buffer.from(expect);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+
 export async function createWebServer(
   runtime: Runtime,
   options: { host?: string; port?: number; staticDir?: string | null; noListen?: boolean } = {}
@@ -116,7 +125,21 @@ export async function createWebServer(
       }
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Mcp-Session-Id', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Mcp-Session-Id', 'Authorization', 'X-Git-Cockpit-Secret']
+  });
+
+  app.addHook('onRequest', async (req, reply) => {
+    const pathOnly = req.url.split('?')[0] ?? '';
+    const guarded = pathOnly === '/mcp' || pathOnly.startsWith('/mcp/') || pathOnly.startsWith('/api/');
+    if (!guarded) return;
+    if (req.method === 'OPTIONS') return;
+    if (pathOnly === '/api/health' || pathOnly === '/api/bootstrap') return;
+    if (req.method === 'GET' && pathOnly === '/api/events' && !req.headers.origin) return;
+    const header = req.headers['x-git-cockpit-secret'];
+    const got = Array.isArray(header) ? header[0] : header;
+    if (!headerMatches(got, runtime.config.auth.localSecret)) {
+      return reply.code(401).send({ error: '需要本机密钥（请求头 X-Git-Cockpit-Secret）' });
+    }
   });
 
   await registerApiDocs(app);
@@ -137,6 +160,13 @@ export async function createWebServer(
     version,
     uptimeMs: process.uptime() * 1000
   }));
+
+  app.get('/api/bootstrap', async (req, reply) => {
+    if (req.headers.origin) {
+      return reply.code(403).send({ error: 'bootstrap 不给跨站页面' });
+    }
+    return { secret: runtime.config.auth.localSecret };
+  });
 
   app.get('/api/jobs', async () => ({
     jobs: jobs.list().map((j) => jobs.summary(j))

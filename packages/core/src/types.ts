@@ -49,12 +49,12 @@ export interface RepoStatus {
   /** 全部文件（合并列表） */
   files: FileStatus[];
   isClean: boolean;
-  /** 工作区是否处于 merge / rebase（不含 cherry-pick） */
+  /** 工作区是否处于 merge / rebase / cherry-pick */
   operation: WorkspaceOperation;
 }
 
-/** 当前工作区进行中的 git 操作；cherry-pick / revert 本期不处理 */
-export type WorkspaceOperation = 'none' | 'merge' | 'rebase';
+/** 当前工作区进行中的 git 操作 */
+export type WorkspaceOperation = 'none' | 'merge' | 'rebase' | 'cherry-pick';
 
 /** 已打开仓库的轻量脉搏（工作台 / git_repo_overview） */
 export interface RepoOverview {
@@ -467,12 +467,8 @@ export interface ServerConfig {
 }
 
 export interface GitConfig {
-  /**
-   * 预留字段，目前不生效。每仓 GitService 内部队列永远串行（保护 index）；
-   * 跨仓本就可并行。不要把它理解成「同仓并发写」。
-   */
-  maxConcurrentOperations: number;
   backupOnDangerousOps: boolean;
+  /** 空名单不限制路径。非空时打开的仓库必须等于其中一条或位于其下。MCP 的 repoPath 同样校验。 */
   allowedRepos: string[];
 }
 
@@ -651,12 +647,14 @@ export interface GitCockpitConfig {
   logging: LoggingConfig;
   mr: MrConfig;
   llm: LlmConfig;
+  /** 本机 HTTP 访问密钥。明文只在 config.json，设置快照里打码。 */
+  auth: { localSecret: string };
 }
 
 export const DEFAULT_CONFIG: GitCockpitConfig = {
   server: { host: 'localhost', port: 3000 },
   storage: { dataDir: '~/.git-cockpit' },
-  git: { maxConcurrentOperations: 1, backupOnDangerousOps: true, allowedRepos: [] },
+  git: { backupOnDangerousOps: true, allowedRepos: [] },
   permissions: {
     disabledTools: [
       'git_reset_hard',
@@ -665,7 +663,7 @@ export const DEFAULT_CONFIG: GitCockpitConfig = {
       'git_branch_delete_force',
       'git_rebase'
     ],
-    requireApprovalFor: ['git_reset_hard', 'git_clean', 'git_push_force', 'git_branch_delete_force', 'git_rebase'],
+    requireApprovalFor: [],
     dryRunDefault: false
   },
   logging: { level: 'info', redact: ['password', 'token', 'authorization', 'apikey', 'api_key'] },
@@ -676,7 +674,8 @@ export const DEFAULT_CONFIG: GitCockpitConfig = {
     repoMethods: {},
     template: null
   },
-  llm: { provider: 'openai', model: 'gpt-4.1', apiKey: '', baseUrl: '' }
+  llm: { provider: 'openai', model: 'gpt-4.1', apiKey: '', baseUrl: '' },
+  auth: { localSecret: '' }
 };
 
 /** Git 操作相关错误（携带用户友好信息） */

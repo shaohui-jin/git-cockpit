@@ -114,7 +114,7 @@ function injectToolPaths(spec: OpenApiDoc): void {
         responses: {
           '200': { description: '成功（result 或 dry-run preview）' },
           '400': { description: '失败或参数错误' },
-          '403': { description: '工具禁用或需要审批' },
+          '403': { description: '工具已禁用' },
           '404': { description: '未知工具或仓库不存在' }
         }
       }

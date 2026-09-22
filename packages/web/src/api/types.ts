@@ -22,7 +22,7 @@ export interface RepoStatus {
   conflicted: string[];
   files: FileStatus[];
   isClean: boolean;
-  operation?: 'none' | 'merge' | 'rebase';
+  operation?: 'none' | 'merge' | 'rebase' | 'cherry-pick';
 }
 
 export interface OpenedRepo {
@@ -230,7 +230,7 @@ export interface RepoOverview {
   behind: number;
   dirtyCount: number;
   conflictCount: number;
-  operation: 'none' | 'merge' | 'rebase';
+  operation: 'none' | 'merge' | 'rebase' | 'cherry-pick';
   tempMergeBranchCount: number;
   activityStart: string;
   activity: number[];
@@ -406,7 +406,7 @@ export interface ConflictFile {
 }
 
 export interface WorkspaceConflicts {
-  operation: 'none' | 'merge' | 'rebase';
+  operation: 'none' | 'merge' | 'rebase' | 'cherry-pick';
   into: string;
   from: string;
   oursLabel: string;

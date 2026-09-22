@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { useSettingsStore } from '@/stores/settings';
+import * as api from '@/api/client';
 import MrTemplateSettings from '@/components/MrTemplateSettings.vue';
 import { useReposStore } from '@/stores/repos';
 import type { MrMethod, ToolSummary } from '@/api/types';
@@ -31,13 +32,11 @@ const activeTab = computed<SettingsTab>({
 
 interface GitDraft {
   disabledTools: string[];
-  requireApprovalFor: string[];
   dryRunDefault: boolean;
   allowedReposText: string;
 }
 const gitDraft = reactive<GitDraft>({
   disabledTools: [],
-  requireApprovalFor: [],
   dryRunDefault: false,
   allowedReposText: ''
 });
@@ -60,7 +59,6 @@ const gitDirty = computed(() => {
   if (!p) return false;
   return (
     JSON.stringify([...gitDraft.disabledTools].sort()) !== JSON.stringify([...p.disabledTools].sort()) ||
-    JSON.stringify([...gitDraft.requireApprovalFor].sort()) !== JSON.stringify([...p.requireApprovalFor].sort()) ||
     gitDraft.dryRunDefault !== p.dryRunDefault ||
     parseAllowedRepos(gitDraft.allowedReposText).join('\n') !== settings.allowedRepos.join('\n')
   );
@@ -188,10 +186,6 @@ function toolEnabled(t: ToolSummary): boolean {
   return !gitDraft.disabledTools.includes(t.name);
 }
 
-function toolNeedsApproval(t: ToolSummary): boolean {
-  return gitDraft.requireApprovalFor.includes(t.name);
-}
-
 const methodOptions = computed(() => [
   { id: 'cli' as const, title: cliCardTitle(), ready: cliReady.value },
   { id: 'token' as const, title: tokenCardTitle(), ready: tokenReady.value },
@@ -257,7 +251,6 @@ function syncGitDraft(): void {
   const p = settings.permissions;
   if (!p) return;
   gitDraft.disabledTools = [...p.disabledTools];
-  gitDraft.requireApprovalFor = [...p.requireApprovalFor];
   gitDraft.dryRunDefault = p.dryRunDefault;
   gitDraft.allowedReposText = settings.allowedRepos.join('\n');
   loaded.value = true;
@@ -330,7 +323,6 @@ async function toggleEnabled(t: ToolSummary, enabled: boolean): Promise<void> {
     gitDraft.disabledTools = gitDraft.disabledTools.filter((n) => n !== t.name);
   } else {
     if (!gitDraft.disabledTools.includes(t.name)) gitDraft.disabledTools.push(t.name);
-    gitDraft.requireApprovalFor = gitDraft.requireApprovalFor.filter((n) => n !== t.name);
   }
 }
 
@@ -338,11 +330,14 @@ function toggleChip(t: ToolSummary): void {
   void toggleEnabled(t, !toolEnabled(t));
 }
 
-function toggleApproveChip(t: ToolSummary): void {
-  if (!toolEnabled(t) || t.riskLevel !== 'dangerous') return;
-  const i = gitDraft.requireApprovalFor.indexOf(t.name);
-  if (i < 0) gitDraft.requireApprovalFor.push(t.name);
-  else gitDraft.requireApprovalFor.splice(i, 1);
+async function copyAccessSecret(): Promise<void> {
+  const { secret } = await api.getBootstrap();
+  if (!secret) {
+    ElMessage.warning('读不到本机密钥。开发代理会从 config.json 注入，打包页面请用同一来源打开。');
+    return;
+  }
+  await navigator.clipboard.writeText(secret);
+  ElMessage.success('已复制本机访问密钥');
 }
 
 async function saveGit(): Promise<void> {
@@ -351,7 +346,7 @@ async function saveGit(): Promise<void> {
       {
         permissions: {
           disabledTools: [...gitDraft.disabledTools],
-          requireApprovalFor: [...gitDraft.requireApprovalFor],
+          requireApprovalFor: [],
           dryRunDefault: gitDraft.dryRunDefault
         },
         git: { allowedRepos: parseAllowedRepos(gitDraft.allowedReposText) }
@@ -788,14 +783,18 @@ async function clearLlmKey(): Promise<void> {
             :rows="6"
             placeholder="一行一个本地路径。留空 = 不限制"
           />
-          <p class="hint">非空时，打开路径必须等于其中一条或位于其下。MCP 带 repoPath 同样校验。</p>
+          <p class="hint">非空时，打开路径必须等于其中一条或位于其下。空名单不限制路径，MCP 带的 repoPath 同样不限制。</p>
+          <div class="row">
+            <el-button @click="copyAccessSecret">复制本机访问密钥</el-button>
+          </div>
+          <p class="hint">HTTP 的 /api 与 /mcp 要带请求头 X-Git-Cockpit-Secret。探活不校验。能读到 config.json 的本机进程不受这道头限制。</p>
           <div v-if="loaded" class="row">
             <el-button type="primary" :loading="settings.saving" :disabled="!gitDirty" @click="saveGit">保存</el-button>
             <el-button :disabled="!gitDirty" @click="syncGitDraft">放弃</el-button>
           </div>
         </aside>
         <div class="gc-glass pad git-main" v-loading="settings.loading">
-          <p class="hint git-main-hint">点芯片启用。高危左边红条；点「审」表示执行前要确认。悬停看说明。高风险默认关，执行前自动备份。</p>
+          <p class="hint git-main-hint">点芯片启用或禁用。高危左边红条，默认关。打开后执行前仍会自动备份。没有审批队列。</p>
           <div v-for="g in gitToolGroups" :key="g.name" class="git-pack">
             <p class="git-pack-h">{{ g.name }} <span>{{ g.items.length }}</span></p>
             <div class="git-wall">
@@ -809,12 +808,6 @@ async function clearLlmKey(): Promise<void> {
                 @click="toggleChip(t)"
               >
                 {{ toolChipLabel(t.name) }}
-                <span
-                  v-if="t.riskLevel === 'dangerous'"
-                  class="chip-ask"
-                  :class="{ on: toolNeedsApproval(t) }"
-                  @click.stop="toggleApproveChip(t)"
-                >审</span>
               </button>
             </div>
           </div>

@@ -49,15 +49,17 @@ describe('PermissionManager', () => {
     expect(() => pm.assertAllowed('git_commit')).toThrow(PermissionError);
   });
 
-  it('从禁用列表移除高风险工具后需要审批', () => {
+  it('requireApprovalFor 并进禁用，没有第二道审批', () => {
     const pm = new PermissionManager(
       makeConfig({
         disabledTools: [],
         requireApprovalFor: ['git_reset_hard']
       })
     );
-    expect(pm.evaluate('git_reset_hard').requiredApproval).toBe(true);
-    expect(pm.evaluate('git_clean').allowed).toBe(true); // 未禁用也未要求审批
+    const hard = pm.evaluate('git_reset_hard');
+    expect(hard.allowed).toBe(false);
+    expect(hard.requiredApproval).toBe(true);
+    expect(pm.evaluate('git_clean').allowed).toBe(true);
   });
 
   it('未知工具按 write 风险处理', () => {

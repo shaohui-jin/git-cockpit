@@ -8,7 +8,12 @@ import type { Runtime } from '../runtime.ts';
 import { formatResultForMcp } from './format.ts';
 import { executeTool } from './handlers.ts';
 
-const HIDE_FILES_ON_MCP = new Set(['git_apply_resolve', 'git_merge_continue', 'git_rebase_continue']);
+const HIDE_FILES_ON_MCP = new Set([
+  'git_apply_resolve',
+  'git_merge_continue',
+  'git_rebase_continue',
+  'git_cherry_pick_continue'
+]);
 
 function mcpInputSchema(def: Capability): unknown {
   if (!HIDE_FILES_ON_MCP.has(def.name)) return def.schema;

@@ -12,7 +12,7 @@ export interface PendingAction {
 
 /**
  * 通用写操作流程：dry-run 预览 → 确认对话框 → 真实执行。
- * 统一处理：权限拒绝（403 / requiredApproval 引导去设置开启与审批）、错误提示。
+ * 统一处理：权限拒绝（403 / requiredApproval 引导去设置开启）、错误提示。
  */
 export function useToolAction(repoId: () => number | null) {
   const router = useRouter();
@@ -86,7 +86,7 @@ export function useToolAction(repoId: () => number | null) {
       if (exec.error.requiredApproval) {
         ElMessageBox.confirm(
           `操作 ${exec.tool} 属于高风险操作，当前默认禁用，需要在设置中开启后才能执行。是否前往设置？`,
-          '需要审批',
+          '该工具已禁用',
           { confirmButtonText: '去开启', cancelButtonText: '取消', type: 'warning' }
         )
           .then(() => router.push({ path: '/settings', query: { tab: 'git' } }))

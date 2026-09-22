@@ -4,7 +4,8 @@
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { DEFAULT_CONFIG, expandHome, normalizeLlmConfig, normalizeMrConfig } from '@shaohui_jin/git-cockpit-core';
+import { randomBytes } from 'node:crypto';
+import { DEFAULT_CONFIG, expandHome, normalizeLlmConfig, normalizeMrConfig, normalizePermissions } from '@shaohui_jin/git-cockpit-core';
 import type { GitCockpitConfig, MrConfigRaw } from '@shaohui_jin/git-cockpit-core';
 
 export type DeepPartial<T> = {
@@ -50,6 +51,10 @@ export class ConfigStore {
       ...this.load(file, overrides),
       storage: { dataDir: dir }
     };
+    if (!/^[0-9a-f]{64}$/.test(this.config.auth?.localSecret ?? '')) {
+      this.config.auth = { localSecret: randomBytes(32).toString('hex') };
+      this.save();
+    }
   }
 
   private load(file: string, overrides?: DeepPartial<GitCockpitConfig>): GitCockpitConfig {
@@ -66,6 +71,10 @@ export class ConfigStore {
     if (overrides) merged = deepMerge(merged, overrides);
     merged.mr = normalizeMrConfig(merged.mr as MrConfigRaw);
     merged.llm = normalizeLlmConfig(merged.llm);
+    merged.permissions = normalizePermissions(merged.permissions);
+    const git = merged.git as GitCockpitConfig['git'] & { maxConcurrentOperations?: number };
+    delete git.maxConcurrentOperations;
+    merged.git = git;
     return merged;
   }
 
@@ -79,8 +88,11 @@ export class ConfigStore {
     this.config = {
       ...this.config,
       mr: normalizeMrConfig(this.config.mr as MrConfigRaw),
-      llm: normalizeLlmConfig(this.config.llm)
+      llm: normalizeLlmConfig(this.config.llm),
+      permissions: normalizePermissions(this.config.permissions)
     };
+    const git = this.config.git as GitCockpitConfig['git'] & { maxConcurrentOperations?: number };
+    delete git.maxConcurrentOperations;
     this.save();
     return this.config;
   }

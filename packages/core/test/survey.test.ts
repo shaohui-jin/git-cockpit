@@ -71,23 +71,35 @@ describe('surveyMerges / suggestMergeOrder', () => {
     expect(byFrom['no-such-branch']?.error).toBeTruthy();
   });
 
-  it('已有 merge/* 临时分支会标在冲突格上', async () => {
+  it('对不上当前 tip 的旧名字不算进度；落盘后的新名字会计上', async () => {
     const { dir, git } = await createSurveyRepo();
     await git.branch(['merge/feat-c-into-main']);
     const svc = await GitService.open(dir);
-    const result = await svc.surveyMerges({
+    const bare = await svc.surveyMerges({
       intos: ['main'],
       froms: ['feat-c'],
       fetch: false,
       cache: false
     });
-    const cell = result.cells[0];
-    expect(cell?.outcome).toBe('conflicts');
-    expect(cell?.tempBranch).toEqual({
-      name: 'merge/feat-c-into-main',
-      local: true,
-      remote: false
+    expect(bare.cells[0]?.outcome).toBe('conflicts');
+    expect(bare.cells[0]?.tempBranch).toBeUndefined();
+
+    const applied = await svc.applyResolve({
+      into: 'main',
+      from: 'feat-c',
+      push: false,
+      files: [{ path: 'a.txt', resolvedContent: 'both\n' }]
     });
+    if ('dryRun' in applied) throw new Error('不应返回 dry-run');
+    expect(applied.tempBranch).toMatch(/^merge\/feat-c-into-main--[0-9a-f]{8}-[0-9a-f]{8}$/);
+    const landed = await svc.surveyMerges({
+      intos: ['main'],
+      froms: ['feat-c'],
+      fetch: false,
+      cache: false
+    });
+    expect(landed.cells[0]?.outcome).toBe('conflicts');
+    expect(landed.cells[0]?.tempBranch?.name).toBe(applied.tempBranch);
   });
 
   it('建议顺序：把能干净合入的提前，工作区不动且不新建分支', async () => {

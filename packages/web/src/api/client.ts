@@ -60,12 +60,35 @@ export class ApiError extends Error {
   }
 }
 
+let secretPromise: Promise<string> | null = null;
+
+function loadSecret(): Promise<string> {
+  if (!secretPromise) {
+    secretPromise = fetch('/api/bootstrap')
+      .then(async (res) => {
+        if (!res.ok) return '';
+        const body = (await res.json()) as { secret?: string };
+        return typeof body.secret === 'string' ? body.secret : '';
+      })
+      .catch(() => '');
+  }
+  return secretPromise;
+}
+
+export async function getBootstrap(): Promise<{ secret: string }> {
+  return { secret: await loadSecret() };
+}
+
 async function request<T>(method: string, url: string, body?: unknown): Promise<T> {
   let res: Response;
+  const secret = await loadSecret();
+  const headers: Record<string, string> = {};
+  if (secret) headers['X-Git-Cockpit-Secret'] = secret;
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
   try {
     res = await fetch(url, {
       method,
-      headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+      headers: Object.keys(headers).length ? headers : undefined,
       body: body !== undefined ? JSON.stringify(body) : undefined
     });
   } catch (err) {
@@ -417,9 +440,15 @@ export async function streamChat(
   handlers: ChatSseHandlers,
   signal?: AbortSignal
 ): Promise<void> {
+  const secret = await loadSecret();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Accept: 'text/event-stream'
+  };
+  if (secret) headers['X-Git-Cockpit-Secret'] = secret;
   const res = await fetch('/api/chat', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+    headers,
     body: JSON.stringify(body),
     signal
   });

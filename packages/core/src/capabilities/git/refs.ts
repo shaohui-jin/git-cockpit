@@ -27,11 +27,14 @@ export const refsCapabilities: Capability[] = [
   },
   {
     name: 'git_checkout',
-    description: '切换到指定分支。若本地更改会被覆盖将拒绝并给出提示。支持 dry_run 预览。',
+    description: '切换到指定分支。newBranch 给出时从起点新建并检出本地分支（远程起点会跟踪）。本地更改会被覆盖时拒绝。',
     risk: 'write',
     schema: S.GitCheckoutSchema,
     handler: async (args: Args, ctx) =>
-      ctx.git.checkoutBranch(args.branch as string, { dryRun: args.dryRun as boolean | undefined })
+      ctx.git.checkoutBranch(args.branch as string, {
+        dryRun: args.dryRun as boolean | undefined,
+        newBranch: args.newBranch as string | undefined
+      })
   },
   {
     name: 'git_branch_create',

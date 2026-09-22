@@ -15,6 +15,19 @@ import { TOOL_DEF_MAP, TOOL_DEFS } from '../src/tools/index.ts';
 import type { Runtime } from '../src/index.ts';
 import type { SimpleGit } from 'simple-git';
 
+/** MCP 真写要先有一次相同参数的干跑票据。 */
+async function mcpWrite(
+  def: Parameters<typeof executeTool>[0],
+  args: Record<string, unknown>,
+  ctx: Parameters<typeof executeTool>[2]
+) {
+  if (args.dryRun !== true && def.risk !== 'readonly') {
+    const preview = await executeTool(def, { ...args, dryRun: true }, ctx);
+    if (!preview.success) return preview;
+  }
+  return executeTool(def, args, ctx);
+}
+
 describe('executeTool 安全链路', () => {
   let runtime: Runtime;
   let repo: { dir: string; git: SimpleGit };
@@ -68,11 +81,11 @@ describe('executeTool 安全链路', () => {
 
   it('执行 git_add + git_commit 完成一次真实提交', async () => {
     const addDef = TOOL_DEF_MAP.get('git_add')!;
-    const addExec = await executeTool(addDef, { paths: ['new.txt'] }, { runtime, source: 'mcp' });
+    const addExec = await mcpWrite(addDef, { paths: ['new.txt'] }, { runtime, source: 'mcp' });
     expect(addExec.success).toBe(true);
 
     const commitDef = TOOL_DEF_MAP.get('git_commit')!;
-    const commitExec = await executeTool(
+    const commitExec = await mcpWrite(
       commitDef,
       { message: 'feat: add new.txt', paths: ['new.txt'] },
       { runtime, source: 'mcp' }
@@ -108,7 +121,7 @@ describe('executeTool 安全链路', () => {
 
     const headBefore = (await repo.git.revparse(['--short', 'HEAD'])).trim();
     const def = TOOL_DEF_MAP.get('git_reset_hard')!;
-    const exec = await executeTool(def, { target: `${headBefore}^` }, { runtime, source: 'mcp' });
+    const exec = await mcpWrite(def, { target: `${headBefore}^` }, { runtime, source: 'mcp' });
     expect(exec.success).toBe(true);
     // 备份分支应包含 backup/pre-op- 前缀
     const branches = await runtime.repoManager.getCurrent();
@@ -137,7 +150,7 @@ describe('executeTool 安全链路', () => {
     const runtime2 = createTestRuntime();
     try {
       const def = TOOL_DEF_MAP.get('git_status')!;
-      const exec = await executeTool(def, {}, { runtime: runtime2, source: 'mcp' });
+      const exec = await mcpWrite(def, {}, { runtime: runtime2, source: 'mcp' });
       expect(exec.success).toBe(false);
       expect(exec.error?.code).toBe('NO_ACTIVE_REPO');
     } finally {
@@ -167,7 +180,7 @@ describe('git_merge_preview / git_apply_resolve', () => {
       expect((clean.result as { clean: boolean }).clean).toBe(true);
 
       const applyDef = TOOL_DEF_MAP.get('git_apply_resolve')!;
-      const applied = await executeTool(
+      const applied = await mcpWrite(
         applyDef,
         { into: 'main', from: 'feature/x', fetch: false, push: false, dryRun: false },
         { runtime, source: 'mcp' }
@@ -185,7 +198,7 @@ describe('git_merge_preview / git_apply_resolve', () => {
       const sample = await createSampleRepo();
       await runtime.repoManager.open(sample.dir);
       const applyDef = TOOL_DEF_MAP.get('git_apply_resolve')!;
-      const exec = await executeTool(
+      const exec = await mcpWrite(
         applyDef,
         {
           into: 'main',
@@ -263,7 +276,7 @@ async function landTempRemote(
 ): Promise<string> {
   await divergeFeature(sample);
   const applyDef = TOOL_DEF_MAP.get('git_apply_resolve')!;
-  const applied = await executeTool(
+  const applied = await mcpWrite(
     applyDef,
     { into, from, push: false, dryRun: false },
     { runtime, source: 'mcp' }
@@ -286,7 +299,7 @@ describe('git_mr_prepare / git_mr_create', () => {
       const sample = await createSampleRepo();
       await runtime.repoManager.open(sample.dir);
       const def = TOOL_DEF_MAP.get('git_mr_prepare')!;
-      const exec = await executeTool(
+      const exec = await mcpWrite(
         def,
         { into: 'main', from: 'feature/x', dryRun: false },
         { runtime, source: 'mcp' }
@@ -321,7 +334,7 @@ describe('git_mr_prepare / git_mr_create', () => {
       expect(blocked.error?.code).toBe('NOT_LANDED');
 
       await landTempRemote(runtime, sample);
-      const exec = await executeTool(
+      const exec = await mcpWrite(
         def,
         { into: 'main', from: 'feature/x', dryRun: true },
         { runtime, source: 'mcp' }
@@ -390,7 +403,7 @@ describe('git_mr_prepare / git_mr_create', () => {
       await runtime.repoManager.open(sample.dir);
       await landTempRemote(runtime, sample);
       const def = TOOL_DEF_MAP.get('git_mr_create')!;
-      const exec = await executeTool(
+      const exec = await mcpWrite(
         def,
         { into: 'main', from: 'feature/x', dryRun: true },
         { runtime, source: 'mcp' }
@@ -409,7 +422,7 @@ describe('git_mr_prepare / git_mr_create', () => {
       await runtime.repoManager.open(sample.dir);
       await landTempRemote(runtime, sample);
       const def = TOOL_DEF_MAP.get('git_mr_create')!;
-      const exec = await executeTool(
+      const exec = await mcpWrite(
         def,
         { into: 'main', from: 'feature/x', dryRun: true },
         { runtime, source: 'mcp' }
@@ -441,7 +454,7 @@ describe('git_mr_prepare / git_mr_create', () => {
       bindRepoMrMethod(runtime, sample.dir, 'token');
       await landTempRemote(runtime, sample);
       const def = TOOL_DEF_MAP.get('git_mr_create')!;
-      const exec = await executeTool(
+      const exec = await mcpWrite(
         def,
         { into: 'main', from: 'feature/x', dryRun: false },
         { runtime, source: 'mcp' }
@@ -475,7 +488,7 @@ describe('git_mr_prepare / git_mr_create', () => {
       bindRepoMrMethod(runtime, sample.dir, 'token');
       await landTempRemote(runtime, sample);
       const def = TOOL_DEF_MAP.get('git_mr_create')!;
-      const exec = await executeTool(
+      const exec = await mcpWrite(
         def,
         { into: 'main', from: 'feature/x', dryRun: false },
         { runtime, source: 'mcp' }

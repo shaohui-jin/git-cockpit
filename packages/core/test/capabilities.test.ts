@@ -120,6 +120,29 @@ describe('executeCapability', () => {
     expect(exec.result).toEqual({ repoPath: '/opened' });
     expect(seen).toMatchObject({ repoId: 7, argsPath: 'D:/x' });
   });
+
+  it('MCP 写操作要先干跑，网页不用', async () => {
+    const write: Capability = {
+      name: 'git_touch',
+      description: 'touch',
+      risk: 'write',
+      needsRepo: false,
+      schema: z.object({ n: z.number(), dryRun: z.boolean().optional() }),
+      handler: async (args) => ({ n: args.n, dryRun: args.dryRun === true })
+    };
+    const host = fakeHost();
+    const denied = await executeCapability(write, { n: 1, dryRun: false }, { source: 'mcp', host });
+    expect(denied.error?.code).toBe('NEED_DRY_RUN');
+    const preview = await executeCapability(write, { n: 1, dryRun: true }, { source: 'mcp', host });
+    expect(preview.success).toBe(true);
+    const ok = await executeCapability(write, { n: 1, dryRun: false }, { source: 'mcp', host });
+    expect(ok.success).toBe(true);
+    expect(ok.result).toEqual({ n: 1, dryRun: false });
+    const spent = await executeCapability(write, { n: 1, dryRun: false }, { source: 'mcp', host });
+    expect(spent.error?.code).toBe('NEED_DRY_RUN');
+    const web = await executeCapability(write, { n: 2, dryRun: false }, { source: 'web', host });
+    expect(web.success).toBe(true);
+  });
 });
 
 describe('TOOL_DEFS 按域', () => {
@@ -127,7 +150,9 @@ describe('TOOL_DEFS 按域', () => {
     const names = TOOL_DEFS.map((d) => d.name);
     expect(names).toContain('git_worktree_list');
     expect(names).toContain('git_worktree_add');
-    expect(names).toContain('git_worktree_remove');
+    expect(names).toContain('git_cherry_pick');
+    expect(names).toContain('git_cherry_pick_continue');
+    expect(names).toContain('git_cherry_pick_abort');
     expect(new Set(names).size).toBe(names.length);
   });
 });

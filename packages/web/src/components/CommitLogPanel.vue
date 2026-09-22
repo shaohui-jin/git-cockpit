@@ -26,6 +26,9 @@ const showCommit = ref<CommitInfo | null>(null);
 const showDiff = ref<DiffResult | null>(null);
 const bodyOpen = ref(false);
 
+const props = defineProps<{ operation?: 'none' | 'merge' | 'rebase' | 'cherry-pick' }>();
+const emit = defineEmits<{ pick: [hash: string] }>();
+
 const currentBranch = computed(() => branchStore.current?.name ?? '');
 
 async function loadLog(): Promise<void> {
@@ -177,6 +180,16 @@ defineExpose({ refresh: loadLog, loading });
         <div class="diff-wrap">
           <DiffViewer v-if="showDiff" :patch="showDiff.rawPatch" />
           <el-empty v-else description="无差异" :image-size="60" />
+        </div>
+        <div class="pick-bar">
+          <el-button
+            type="primary"
+            :disabled="(props.operation ?? 'none') !== 'none'"
+            @click="showCommit && emit('pick', showCommit.hash)"
+          >
+            拣选到当前分支
+          </el-button>
+          <span v-if="(props.operation ?? 'none') !== 'none'" class="pick-hint">工作区正忙，先继续或中止</span>
         </div>
       </template>
     </el-drawer>
@@ -352,5 +365,15 @@ defineExpose({ refresh: loadLog, loading });
 }
 .diff-wrap {
   min-height: 200px;
+}
+.pick-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--gc-pad);
+  margin-top: var(--gc-pad);
+}
+.pick-hint {
+  color: var(--el-text-color-secondary);
+  font-size: var(--gc-text);
 }
 </style>

@@ -10,6 +10,7 @@ import { jobsCapabilities } from './jobs.ts';
 import { mergeCapabilities } from './merge.ts';
 import { mrCapabilities } from './mr.ts';
 import { rebaseCapabilities } from './rebase.ts';
+import { cherryPickCapabilities } from './cherryPick.ts';
 import { refsCapabilities } from './refs.ts';
 import { syncCapabilities } from './sync.ts';
 import { worktreeCapabilities } from './worktree.ts';
@@ -21,6 +22,7 @@ export const TOOL_DEFS: Capability[] = [
   ...writeCapabilities,
   ...mergeCapabilities,
   ...rebaseCapabilities,
+  ...cherryPickCapabilities,
   ...syncCapabilities,
   ...mrCapabilities,
   ...jobsCapabilities,

@@ -525,7 +525,7 @@ watch([pairInto, pairFrom], () => {
         <p class="tip">
           选边已写到临时分支
           <span class="mono">{{ recordedCell?.tempBranch?.name ?? 'merge/…' }}</span>
-          （未推送）。原始 from / into 仍然冲突，这是正常的。回矩阵看「已解决·本地」，再统一处理。
+          （未推送）。原始 from / into 的预演仍可能是冲突，这是正常的。回矩阵看「冲突 · 本地临时枝」，再统一处理。
         </p>
         <div class="hero-actions">
           <el-button type="primary" @click="backToMatrix">返回矩阵</el-button>

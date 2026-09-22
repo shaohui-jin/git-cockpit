@@ -115,12 +115,15 @@ export function summarizeForAgent(
 /** 把干运行/真实结果统一包成 MCP 文本输出 */
 export function formatResultForMcp(exec: ExecutionResult): string {
   if (!exec.success) {
-    const prefix = exec.error?.requiredApproval ? '需要审批' : '操作失败';
+    const prefix = exec.error?.requiredApproval ? '该工具已禁用' : '操作失败';
     return `${prefix}：${exec.error?.message ?? '未知错误'}`;
   }
   const parts: string[] = [];
   if (exec.dryRun) {
     parts.push('[dry-run 预览] 未实际执行任何操作');
+    if (exec.source === 'mcp') {
+      parts.push('预览已记下。把命令给人看，等人明确说执行后，再用相同参数 dry_run=false。');
+    }
   }
   if (exec.backupCreated) {
     parts.push(

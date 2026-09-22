@@ -2,6 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { GitOperationError, GitService } from '../src/index.ts';
+import { simpleGit } from 'simple-git';
 import { cleanupTmp, commitFile, createSampleRepo, initRepo, makeTmpDir } from './helpers.ts';
 
 describe('GitService 打开与校验', () => {
@@ -237,6 +238,25 @@ describe('GitService 写操作与 dry-run', () => {
     await svc.deleteBranch('dev');
     const { branches } = await svc.listBranches();
     expect(branches.some((b) => b.name === 'dev')).toBe(false);
+  });
+
+  it('从远程跟踪枝检出为新本地名并跟踪；同名则拒绝', async () => {
+    const git = simpleGit(dir);
+    await git.addConfig('remote.origin.url', dir);
+    await git.addConfig('remote.origin.fetch', '+refs/heads/*:refs/remotes/origin/*');
+    const sha = (await git.revparse(['feature/x'])).trim();
+    await git.raw(['update-ref', 'refs/remotes/origin/feature/x', sha]);
+    await svc.checkoutBranch('origin/feature/x', { newBranch: 'pay' });
+    const listed = await svc.listBranches();
+    expect(listed.current).toBe('pay');
+    expect(listed.branches.find((b) => b.name === 'pay')?.upstream).toBe('origin/feature/x');
+    await expect(svc.checkoutBranch('origin/feature/x', { newBranch: 'main' })).rejects.toMatchObject({
+      code: 'BRANCH_EXISTS'
+    });
+  });
+
+  it('没有上游时拉取说明原因', async () => {
+    await expect(svc.pull()).rejects.toMatchObject({ code: 'NO_UPSTREAM' });
   });
 
   it('删除未合并分支被拒绝', async () => {

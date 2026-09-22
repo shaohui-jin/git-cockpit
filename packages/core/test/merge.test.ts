@@ -5,9 +5,11 @@ import {
   GitOperationError,
   GitService,
   classifyMergePair,
+  defaultTempBranchName,
   evaluateMrMergeGate,
   isMergeTempRef,
   isSameBranchForMr,
+  legacyTempBranchName,
   parseLandedMergeMessage
 } from '../src/index.ts';
 import { cleanupTmp, commitFile, createConflictRepo, createSampleRepo } from './helpers.ts';
@@ -24,6 +26,18 @@ describe('merge 临时枝档位', () => {
     expect(isMergeTempRef('merge/a-into-b')).toBe(true);
     expect(isMergeTempRef('origin/merge/a-into-b')).toBe(true);
     expect(isMergeTempRef('origin/npm_and_yarn/marked-18.0.6')).toBe(false);
+  });
+
+  it('新名字带两侧短 SHA，斜杠和连字符不再撞名', () => {
+    const tips = { fromSha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', intoSha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' };
+    expect(legacyTempBranchName('main', 'feature/foo')).toBe('merge/feature-foo-into-main');
+    expect(legacyTempBranchName('main', 'feature-foo')).toBe('merge/feature-foo-into-main');
+    expect(defaultTempBranchName('main', 'feature/foo', ['origin'], tips)).toBe(
+      'merge/feature-foo-into-main--aaaaaaaa-bbbbbbbb'
+    );
+    expect(defaultTempBranchName('main', 'feature-foo', ['origin'], { ...tips, fromSha: 'cccccccccccccccccccccccccccccccccccccccc' })).toBe(
+      'merge/feature-foo-into-main--cccccccc-bbbbbbbb'
+    );
   });
 
   it('解析落盘提交说明', () => {
@@ -274,6 +288,23 @@ describe('worktree 落盘', () => {
     expect(fs.readFileSync(path.join(dir, 'a.txt'), 'utf8')).toBe('ours\n');
     const merged = await git.show([`${result.tempBranch}:a.txt`]);
     expect(merged).toBe('resolved\n');
+  });
+
+  it('再次落盘失败时临时枝回到旧 tip', async () => {
+    const { dir, git } = await createConflictRepo();
+    const svc = await GitService.open(dir);
+    const first = await svc.applyResolve({
+      into: 'main',
+      from: 'feature',
+      push: false,
+      files: [{ path: 'a.txt', resolvedContent: 'resolved\n' }]
+    });
+    if ('dryRun' in first) throw new Error('不应返回 dry-run');
+    const old = (await git.revparse([first.tempBranch])).trim();
+    await expect(
+      svc.applyResolve({ into: 'main', from: 'feature', push: false, files: [] })
+    ).rejects.toMatchObject({ code: 'HAS_CONFLICTS' });
+    expect((await git.revparse([first.tempBranch])).trim()).toBe(old);
   });
 });
 
