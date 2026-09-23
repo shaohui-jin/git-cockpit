@@ -1,7 +1,12 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { GitOperationError, GitService } from '../src/index.ts';
+import {
+  ensureNonInteractiveGitEnv,
+  GitOperationError,
+  GitService,
+  nonInteractiveGitEnv
+} from '../src/index.ts';
 import { simpleGit } from 'simple-git';
 import { cleanupTmp, commitFile, createSampleRepo, initRepo, makeTmpDir } from './helpers.ts';
 
@@ -420,6 +425,51 @@ describe('GitService 串行队列', () => {
       svc.getGraph()
     ]);
     expect(results.length).toBe(5);
+    cleanupTmp();
+  });
+});
+
+describe('非交互 git 环境', () => {
+  it('nonInteractiveGitEnv 关闭终端凭据提示并保留原有变量', () => {
+    const env = nonInteractiveGitEnv({ PATH: '/usr/bin', FOO: 'bar' });
+    expect(env.GIT_TERMINAL_PROMPT).toBe('0');
+    expect(env.PATH).toBe('/usr/bin');
+    expect(env.FOO).toBe('bar');
+  });
+
+  it('nonInteractiveGitEnv 覆盖调用方误传的 GIT_TERMINAL_PROMPT', () => {
+    expect(nonInteractiveGitEnv({ GIT_TERMINAL_PROMPT: '1' }).GIT_TERMINAL_PROMPT).toBe('0');
+  });
+
+  it('nonInteractiveGitEnv 默认以 process.env 为基底，不丢 PATH', () => {
+    const env = nonInteractiveGitEnv();
+    expect(env.GIT_TERMINAL_PROMPT).toBe('0');
+    // simple-git 的 env() 是整体替换，若基底丢了 PATH 会让子进程 spawn git ENOENT。
+    expect(env.PATH).toBe(process.env.PATH);
+  });
+
+  it('ensureNonInteractiveGitEnv 把变量写进进程环境且幂等', () => {
+    const saved = process.env.GIT_TERMINAL_PROMPT;
+    try {
+      process.env.GIT_TERMINAL_PROMPT = '1';
+      ensureNonInteractiveGitEnv();
+      expect(process.env.GIT_TERMINAL_PROMPT).toBe('0');
+    } finally {
+      if (saved === undefined) delete process.env.GIT_TERMINAL_PROMPT;
+      else process.env.GIT_TERMINAL_PROMPT = saved;
+    }
+  });
+
+  it('GitService 打开仓库走进程级非交互环境，且不因 GIT_PAGER 之类的变量报错', async () => {
+    // 回归保护：曾用 simple-git 的 env() 传 {...process.env}，
+    // 因 process.env 含 GIT_PAGER 而抛 allowUnsafePager，导致所有命令失败。
+    const dir = makeTmpDir('noninteractive-');
+    const git = await initRepo(dir);
+    await commitFile(git, dir, 'a.txt', 'hello\n', 'feat: a');
+    const svc = await GitService.open(dir);
+    const res = await svc.runAllowFail(['rev-parse', '--show-toplevel']);
+    expect(res.code).toBe(0);
+    expect(res.stdout.trim()).toContain('noninteractive-');
     cleanupTmp();
   });
 });

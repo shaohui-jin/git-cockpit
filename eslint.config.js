@@ -11,7 +11,8 @@ export default tseslint.config(
       '**/web/src/assets/**',
       '**/playwright-report/**',
       '**/test-results/**',
-      '**/e2e/test/tmp/**'
+      '**/e2e/test/tmp/**',
+      '**/test/tmp/**'
     ]
   },
   js.configs.recommended,
@@ -42,6 +43,23 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-empty-object-type': 'off'
+    }
+  },
+  {
+    // Electron 主进程 / 预加载脚本是 CommonJS，不能用 ESM 规则与浏览器 globals 判
+    files: ['apps/desktop/**/*.cjs'],
+    languageOptions: {
+      sourceType: 'commonjs',
+      globals: {
+        require: 'readonly',
+        module: 'writable',
+        exports: 'writable',
+        __dirname: 'readonly',
+        __filename: 'readonly'
+      }
+    },
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off'
     }
   }
 );

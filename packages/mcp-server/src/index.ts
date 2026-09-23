@@ -3,6 +3,10 @@
  * 命令行入口见 ./cli.ts。
  */
 export { createRuntime, disposeRuntime } from './runtime.ts';
+export { McpSessionContext } from './mcpSession.ts';
+export type { McpRepoBinding } from './mcpSession.ts';
+export { resolveDaemonEndpoint, formatDaemonUrl } from './daemonEndpoint.ts';
+export type { DaemonEndpoint } from './daemonEndpoint.ts';
 export type { Runtime, RuntimeOptions } from './runtime.ts';
 export { createMcpServer, startMcpStdio, McpHttpHandler, MCP_SERVER_INFO } from './mcpServer.ts';
 export { createWebServer } from './webServer.ts';

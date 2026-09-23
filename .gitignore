@@ -5,6 +5,7 @@ node_modules/
 # build output
 dist/
 coverage/
+tsup.config.bundled_*.mjs
 
 # runtime data
 .git-cockpit/
@@ -22,6 +23,9 @@ packages/e2e/test/tmp/
 packages/e2e/test-results/
 packages/e2e/playwright-report/
 packages/e2e/blob-report/
+
+# 单元测试临时目录（vitest 每个 worker 一个子目录）
+packages/*/test/tmp/
 
 # editor / OS
 .idea/

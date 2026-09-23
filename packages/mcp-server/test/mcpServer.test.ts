@@ -9,7 +9,8 @@
  */
 import { afterAll, describe, expect, it } from 'vitest';
 import { TOOL_DEFS, createMcpServer, MCP_PROMPTS } from '../src/index.ts';
-import { createTestRuntime, disposeTestRuntime, cleanupTmp } from './helpers.ts';
+import { createSampleRepo, createTestRuntime, disposeTestRuntime, cleanupTmp } from './helpers.ts';
+import { McpSessionContext } from '../src/mcpSession.ts';
 import type { Runtime } from '../src/index.ts';
 
 type ServerLike = ReturnType<typeof createMcpServer>;
@@ -46,7 +47,8 @@ describe('createMcpServer 工具注册', () => {
   it('注册的工具数量与 TOOL_DEFS 一致', () => {
     withServer((_runtime, server) => {
       const reg = (server as unknown as { _registeredTools: Record<string, unknown> })._registeredTools;
-      expect(Object.keys(reg).length).toBe(TOOL_DEFS.length);
+      expect(Object.keys(reg).length).toBe(TOOL_DEFS.length + 1);
+      expect(reg.git_repo_select).toBeDefined();
     });
   });
 
@@ -57,6 +59,29 @@ describe('createMcpServer 工具注册', () => {
         expect(reg[def.name], `缺少工具 ${def.name}`).toBeDefined();
       }
     });
+  });
+});
+
+describe('MCP session 仓库上下文', () => {
+  it('绑定后不受全局最近打开仓库变化影响，删除后不静默回退', async () => {
+    const runtime = createTestRuntime();
+    const first = await createSampleRepo();
+    const second = await createSampleRepo();
+    try {
+      const firstHandle = await runtime.repoManager.open(first.dir);
+      await runtime.repoManager.open(second.dir);
+      const session = new McpSessionContext(runtime);
+      const bound = await session.select({ repoId: firstHandle.record.id });
+      expect(bound?.repoId).toBe(firstHandle.record.id);
+      expect(session.getBinding()?.repoPath).toBe(firstHandle.service.repoPath);
+      const secondHandle = await runtime.repoManager.open(second.dir);
+      expect(session.getBinding()?.repoId).not.toBe(secondHandle.record.id);
+      runtime.repoManager.remove(firstHandle.record.id);
+      await expect(session.select({ repoId: firstHandle.record.id })).rejects.toThrow(/仓库不存在/);
+      expect(session.getBinding()?.repoId).toBe(firstHandle.record.id);
+    } finally {
+      disposeTestRuntime(runtime);
+    }
   });
 });
 

@@ -22,12 +22,13 @@ npm install -g @shaohui_jin/git-cockpit-mcp-server
 ```bash
 git-cockpit start   # 启动常驻服务：Web UI + MCP Server（Streamable HTTP），默认 http://localhost:3000
 git-cockpit mcp     # 以 stdio 模式运行 MCP Server（供 Claude Desktop / Cursor 等客户端连接）
+                    # 已有常驻服务时自动桥接过去，多客户端共用一个后端
 git-cockpit version # 输出版本号
 ```
 
 启动后浏览器访问 `http://localhost:3000` 即可使用 Web 界面；`/mcp` 端点提供 MCP Streamable HTTP 接入。
 
-### 接入 MCP 客户端（stdio）
+### 接入 MCP 客户端（stdio，推荐）
 
 以 Claude Desktop / Cursor 为例，在 MCP 配置中加入：
 
@@ -42,7 +43,28 @@ git-cockpit version # 输出版本号
 }
 ```
 
-网页和聊天窗口要一起用时，改跑 `git-cockpit start`，客户端连 `http://localhost:3000/mcp`。不要再开一个 `git-cockpit mcp` 抢同一仓。
+**唯一 daemon 机制**：`git-cockpit mcp` 探活到已有 daemon 就转发 stdio 请求；没有 daemon 则由当前命令启动一个 daemon，再桥接到它。
+客户端 stdin 关闭时，如果 daemon 是本命令启动的，会一并关闭；桥接失败不会静默创建第二套 Runtime。多个客户端因此可以稳定共用同一个 Git Cockpit、
+任务队列与仓库锁，客户端配置里不需要写密钥。多仓库时先读取 `git-cockpit://repos`，再调用
+`git_repo_select({ "repoId": 1 })` 绑定当前 MCP session；后续省略仓库参数时不会串到其他客户端的仓库。
+
+### 接入 MCP 客户端（Streamable HTTP）
+
+`/mcp` 与 `/api/*` 一样受本机密钥保护，URL 方式**必须带请求头**：
+
+```json
+{
+  "mcpServers": {
+    "git-cockpit-http": {
+      "url": "http://localhost:3000/mcp",
+      "headers": { "X-Git-Cockpit-Secret": "<你的 localSecret>" }
+    }
+  }
+}
+```
+
+密钥在 `~/.git-cockpit/config.json` 的 `auth.localSecret`，也可在 Web 界面的「设置」里点 **复制本机访问密钥**。
+密钥不对会得到 **401**；手写请求时 `Accept` 必须同时含 `application/json` 与 `text/event-stream`，否则 **406**。
 
 **不要**和 Git Insight（或其它会直接改同一仓的 Git MCP）同时用于同一个仓库。
 
@@ -62,6 +84,8 @@ git-cockpit version # 输出版本号
 `git_merge_preview` → `git_apply_resolve` / `git_push` → `git_mr_prepare` → `git_mr_create`（只 dry_run）。
 
 宿主可插入这四条 Prompt（`safe_commit` / `merge_preview_apply` / `workspace_continue` / `open_mr`），正文即上面四段。只读状态也可读 Resource：`git-cockpit://repos`、`git-cockpit://repo/current`、`git-cockpit://jobs`、`git-cockpit://jobs/{id}`。
+
+多仓库时先读 `git-cockpit://repos` 拿 `repoId`，再 `git_repo_select({ "repoId": 1 })` 绑定当前 MCP session；之后省略 `repoId/repoPath` 的工具都作用在这个仓。要临时操作别的仓，单次调用传 `repoId` 即可，不会改变绑定。
 
 默认只给摘要；要某文件正文加 `path` 或 `detail=true`。
 

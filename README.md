@@ -34,7 +34,7 @@ pnpm test:e2e
 
 ```bash
 git-cockpit start    # 启动常驻服务：Web UI + MCP Server（Streamable HTTP），默认 http://localhost:3000
-git-cockpit mcp      # 以 stdio 方式运行 MCP Server（供 Claude Desktop / Cursor 连接）
+git-cockpit mcp      # 连接或启动唯一 daemon，并桥接 stdio MCP（供 Claude Desktop / Cursor 连接）
 git-cockpit version  # 输出版本号
 git-cockpit help     # 显示帮助
 ```
@@ -54,7 +54,7 @@ git cockpit mcp     # 等价 git-cockpit mcp
 
 Git Cockpit 提供 **stdio** 与 **Streamable HTTP** 两种 MCP 接入方式。
 
-### 方式一：stdio（单机直连）
+### 方式一：stdio（推荐，零配置）
 
 ```bash
 git-cockpit mcp
@@ -75,7 +75,12 @@ git-cockpit mcp
 
 > 若客户端无法直接解析全局命令（部分 Windows 环境），可用 `npm root -g` 查看全局 bin 目录，改用完整路径或 `git-cockpit.cmd`。
 
-### 方式二：Streamable HTTP（常驻服务，多客户端共享）
+**唯一 daemon 机制**：`git-cockpit mcp` 先探活 daemon；已有 daemon 就把 stdio 上的 JSON-RPC 转发给它，
+没有 daemon 则由当前命令启动一个 daemon，再桥接到它。客户端 stdin 关闭时，如果 daemon 是本命令启动的，
+会一并关闭；不会在桥接失败后静默创建第二套 Runtime。因此多个客户端（Cursor + Claude Desktop + 网页）
+可以稳定共用同一个 Git Cockpit、任务队列与仓库锁，客户端配置里也**不需要写密钥**（桥进程从本地配置读取）。
+
+### 方式二：Streamable HTTP（常驻服务）
 
 ```bash
 git-cockpit start
@@ -83,19 +88,34 @@ git-cockpit start
 # MCP:     http://localhost:3000/mcp
 ```
 
-客户端通过 `/mcp` 端点接入（URL 方式）：
+`/mcp` 与 `/api/*` 一样受本地密钥保护，**URL 方式必须带请求头**：
 
 ```json
 {
   "mcpServers": {
     "git-cockpit-http": {
-      "url": "http://localhost:3000/mcp"
+      "url": "http://localhost:3000/mcp",
+      "headers": {
+        "X-Git-Cockpit-Secret": "<你的 localSecret>"
+      }
     }
   }
 }
 ```
 
-**多窗口一起用**（网页 + Cursor，或两个聊天窗口）：只跑 `git-cockpit start`，都连上面这个 `/mcp`。不要再开一个 `git-cockpit mcp`——那是另一个进程，和网页不共用同一份任务队列。
+密钥在数据目录的 `config.json`（默认 `~/.git-cockpit/config.json`）的 `auth.localSecret`，
+也可在 Web UI 的「设置」里点 **复制本机访问密钥**。Cursor 支持 `${env:VAR}` 插值，可写成 `"${env:GIT_COCKPIT_SECRET}"` 避免明文入库。
+
+> 密钥不对会得到 **401**；不带密钥会被拒。手写请求时注意 `Accept` 必须同时含 `application/json` 与 `text/event-stream`，否则 **406**（SDK 约定）。
+> daemon 对 POST 使用 JSON 响应模式，`curl` 可直接看到完整正文。
+
+**多窗口一起用**（网页 + Cursor，或两个聊天窗口）：跑 `git-cockpit start`，客户端连 `/mcp`；
+或按方式一统一用 `git-cockpit mcp`，所有客户端会落到同一个 daemon。
+
+**多仓库 MCP 的稳定用法**：MCP 客户端连接后先读取 `git-cockpit://repos`，再调用
+`git_repo_select({ "repoId": 1 })` 绑定当前 MCP session。后续工具省略 `repoId/repoPath` 时使用该 session
+绑定的仓库，不会因另一个客户端打开了别的仓库而串仓；普通工具显式传 `repoId/repoPath` 只影响当前调用，
+不会改变 session 绑定。若绑定仓库被删除或不再允许访问，会明确报错，不会静默切换到另一仓库。
 
 **不要**和 Git Insight（或其它会直接改同一仓的 Git MCP）同时用于同一个仓库。
 

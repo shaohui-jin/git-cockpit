@@ -3,6 +3,7 @@
  */
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Runtime } from '../runtime.ts';
+import { McpSessionContext } from '../mcpSession.ts';
 import { collectRepoOverviews } from '../overview.ts';
 
 const MIME = 'application/json';
@@ -28,7 +29,11 @@ function overviewWithoutDays(runtime: Runtime) {
   );
 }
 
-export function registerMcpResources(server: McpServer, runtime: Runtime): void {
+export function registerMcpResources(
+  server: McpServer,
+  runtime: Runtime,
+  session: McpSessionContext = new McpSessionContext(runtime)
+): void {
   const register = server.registerResource.bind(server);
 
   register(
@@ -41,15 +46,21 @@ export function registerMcpResources(server: McpServer, runtime: Runtime): void 
   register(
     'repo-current',
     'git-cockpit://repo/current',
-    { title: '最近打开仓', description: '最近打开仓库的工作区摘要，不含文件列表正文', mimeType: MIME },
+    { title: '当前 session 仓', description: '当前 MCP session 绑定仓库的工作区摘要；未绑定时兼容最近打开仓库', mimeType: MIME },
     async (uri) => {
-      const handle = await runtime.repoManager.getCurrent();
+      const binding = session.getBinding();
+      const handle = binding
+        ? await runtime.repoManager.getById(binding.repoId)
+        : await runtime.repoManager.getCurrent();
       if (!handle) {
         return jsonContents(uri.href, { available: false, hint: '没有已打开的仓库' });
       }
       const s = await handle.service.getStatus();
       return jsonContents(uri.href, {
         available: true,
+        bound: Boolean(binding),
+        scope: binding ? 'session' : 'legacy-current',
+        repoId: handle.record.id,
         path: handle.record.path,
         current: s.current,
         tracking: s.tracking,

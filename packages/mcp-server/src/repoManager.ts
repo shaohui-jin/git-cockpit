@@ -30,6 +30,7 @@ export class RepoManager {
   /** repo 根路径（规范化绝对路径） -> repoId */
   private readonly pathToId = new Map<string, number>();
   private readonly idToService = new Map<number, GitService>();
+  private readonly opening = new Map<string, Promise<RepoHandle>>();
   private readonly eventBus: EventEmitter;
 
   constructor(private readonly options: RepoManagerOptions) {
@@ -71,20 +72,41 @@ export class RepoManager {
     }
   }
 
-  /** 打开仓库：校验并记录；重复打开返回既有实例 */
+  /** 打开仓库：同一路径并发请求共享同一个 GitService 实例。 */
   async open(repoPath: string): Promise<RepoHandle> {
+    const requestedKey = normalizePath(repoPath);
+    const inFlight = this.opening.get(requestedKey);
+    if (inFlight) return inFlight;
+
+    const task = this.openInternal(repoPath, requestedKey);
+    this.opening.set(requestedKey, task);
+    try {
+      return await task;
+    } finally {
+      this.opening.delete(requestedKey);
+    }
+  }
+
+  private async openInternal(repoPath: string, requestedKey: string): Promise<RepoHandle> {
+    const knownId = this.pathToId.get(requestedKey);
+    if (knownId !== undefined && knownId !== 0) {
+      const known = await this.getById(knownId);
+      if (known) {
+        this.options.repoStore.open(known.service.repoPath); // 刷新最近打开时间
+        return { service: known.service, record: this.options.repoStore.getById(knownId) ?? known.record };
+      }
+    }
+
     const service = await GitService.open(repoPath);
     assertRepoAllowed(service.repoPath, this.options.getConfig().git.allowedRepos);
     const root = service.repoPath;
     const key = normalizePath(root);
     const existingId = this.pathToId.get(key);
     if (existingId !== undefined && existingId !== 0) {
-      const record = this.options.repoStore.getById(existingId);
-      if (record) {
-        this.options.repoStore.open(root); // 刷新最近打开时间
-        this.idToService.set(record.id, service);
-        this.attach(service);
-        return { service, record: this.options.repoStore.getById(record.id) ?? record };
+      const existing = await this.getById(existingId);
+      if (existing) {
+        this.options.repoStore.open(root);
+        return { service: existing.service, record: this.options.repoStore.getById(existingId) ?? existing.record };
       }
     }
     const record = this.options.repoStore.open(root);

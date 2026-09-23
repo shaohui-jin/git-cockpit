@@ -134,6 +134,38 @@ export interface WritePreview {
 }
 
 /**
+ * 非交互 git 环境变量（供直接 spawn 的场景使用）。
+ *
+ * daemon 是无人值守进程：只要某条命令触发凭据提示（私有远程的 fetch / push / pull 等），
+ * git 就会阻塞在 stdin 上等待输入，而 `simple-git` 的 `raw()` 没有超时，
+ * 整个仓库队列会被这一条命令永久卡住。
+ *
+ * 这里统一禁用终端提示；凭据 helper 与 askpass 机制仍然生效（`GIT_TERMINAL_PROMPT`
+ * 只关掉"在终端上问用户"，不影响 credential.helper）。
+ */
+export function nonInteractiveGitEnv(base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  return { ...base, GIT_TERMINAL_PROMPT: '0' };
+}
+
+/**
+ * 把 `GIT_TERMINAL_PROMPT=0` 写进**进程环境**（幂等）。
+ *
+ * 为什么不直接用 simple-git 的 `git.env()` 传这个变量——它有两个坑：
+ * 1. 是**整体替换**而非追加，`env('X','0')` 会让子进程丢掉 PATH（表现为 `spawn git ENOENT`）；
+ * 2. 会校验并拒绝一批"不安全"变量（GIT_PAGER / GIT_EDITOR / GIT_SSH 等），
+ *    而 `{...process.env}` 里往往正好带着它们（例如本机 `GIT_PAGER=cat`），直接抛
+ *    `Use of "GIT_PAGER" is not permitted without enabling allowUnsafePager`。
+ *
+ * 改为进程级设置后，simple-git 的默认继承与 `spawnGit` 都能拿到，且不触发上述校验。
+ */
+let nonInteractiveEnvApplied = false;
+export function ensureNonInteractiveGitEnv(): void {
+  if (nonInteractiveEnvApplied) return;
+  nonInteractiveEnvApplied = true;
+  process.env.GIT_TERMINAL_PROMPT = '0';
+}
+
+/**
  * Git 操作服务：基于 simple-git 封装。
  *
  * - 所有操作通过内部串行队列串行执行，避免并发导致索引损坏；
@@ -152,6 +184,7 @@ export class GitService extends EventEmitter {
     super();
     this.repoPath = repoPath;
     this.gitDir = gitDir;
+    ensureNonInteractiveGitEnv();
     this.git = simpleGit({
       baseDir: repoPath,
       binary: 'git',
@@ -164,6 +197,7 @@ export class GitService extends EventEmitter {
    * 打开一个 Git 仓库。会校验路径合法且确实是 Git 仓库（返回标准化的真实仓库根目录）。
    */
   static async open(repoPath: string, options: GitServiceOptions = {}): Promise<GitService> {
+    ensureNonInteractiveGitEnv();
     const resolved = path.resolve(repoPath);
     if (!fs.existsSync(resolved) || !fs.statSync(resolved).isDirectory()) {
       throw new GitOperationError(`目录不存在: ${resolved}`, 'REPO_NOT_FOUND');
@@ -2656,7 +2690,7 @@ function spawnGit(cwd: string, args: string[], env?: NodeJS.ProcessEnv, timeoutM
       cwd,
       windowsHide: true,
       shell: false,
-      env: env ?? process.env
+      env: nonInteractiveGitEnv(env ?? process.env)
     });
     let stdout = '';
     let stderr = '';

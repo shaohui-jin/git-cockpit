@@ -130,7 +130,8 @@ export async function executeCapability(
     let repoPath = '';
     if (def.needsRepo !== false) {
       const handle = await host.resolveRepo({
-        repoId: ctx.repoId,
+        // Web 路由传入的 ctx.repoId 是权威；MCP 才允许工具参数 repoId 覆盖 session 默认仓库。
+        repoId: ctx.repoId ?? (ctx.source === 'mcp' && typeof args.repoId === 'number' ? args.repoId : undefined),
         repoPath: ctx.repoPath,
         argsPath: args.repoPath as string | undefined
       });

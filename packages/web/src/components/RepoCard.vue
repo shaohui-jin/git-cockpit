@@ -13,7 +13,7 @@ const props = defineProps<{
   dragOver?: boolean;
 }>();
 
-const emit = defineEmits<{
+type RepoCardEmits = {
   select: [];
   enter: [];
   merge: [];
@@ -23,7 +23,19 @@ const emit = defineEmits<{
   dragover: [e: DragEvent];
   drop: [e: DragEvent];
   dragend: [];
-}>();
+};
+
+/** 从 emits 定义推导「无 payload」事件名 */
+type VoidEmitKey<T> = {
+  [K in keyof T]: T[K] extends [] ? K : never;
+}[keyof T];
+
+type MenuAction = Extract<VoidEmitKey<RepoCardEmits>, 'enter' | 'merge' | 'fetch' | 'remove'>;
+
+const emit = defineEmits<RepoCardEmits>();
+
+// Vue 的 emit 是 intersect overload，union 变量无法直接匹配；断言成泛型单签名即可。
+const emitVoid = emit as <K extends MenuAction>(event: K) => void;
 
 const missing = () => props.overview?.available === false;
 const moreBtn = ref<HTMLButtonElement | null>(null);
@@ -81,9 +93,9 @@ async function toggleMenu(e: MouseEvent): Promise<void> {
   menu.y = y;
 }
 
-function run(action: 'enter' | 'merge' | 'fetch' | 'remove'): void {
+function run(action: MenuAction): void {
   closeMenu();
-  emit(action);
+  emitVoid(action);
 }
 
 function onWinClick(e: MouseEvent): void {

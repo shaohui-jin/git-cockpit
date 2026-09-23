@@ -5,6 +5,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 const PREAMBLE = [
   '不要用终端 git 代替「预演、落盘、开 PR」。',
+  '多仓库时先调用 `git_repo_select({ repoId })` 绑定当前 MCP session；显式 repoId/repoPath 只影响单次调用。',
   '默认只给摘要；要看某文件正文时再说路径，或加 `detail=true`。写操作先干跑（`dry_run=true`）。高风险操作默认关着。'
 ].join('\n');
 

@@ -1,13 +1,20 @@
 /**
  * Capability 工具参数 Schema（zod）。
- * 所有工具均支持可选的 repoPath（缺省使用当前打开的仓库）与 dryRun（缺省为配置默认）。
+ * 所有仓库型工具均支持可选的 repoId/repoPath；未提供时由调用方上下文或当前打开仓库解析。
  */
 import { z } from 'zod';
+
+const repoId = z
+  .number()
+  .int()
+  .positive()
+  .optional()
+  .describe('已打开仓库的稳定 id；不提供时使用 MCP session 绑定仓库或当前打开的仓库。');
 
 const repoPath = z
   .string()
   .optional()
-  .describe('仓库绝对路径。不提供时使用当前打开的仓库。');
+  .describe('仓库绝对路径；不提供时使用 MCP session 绑定仓库或当前打开的仓库。');
 
 const dryRun = z
   .boolean()
@@ -27,8 +34,8 @@ const maxCount = z
   .optional()
   .describe('最多返回的提交数量。');
 
-/** 全部只读工具共享的 schema（仅 repoPath 可选） */
-const readonlyBase = { repoPath };
+/** 全部只读工具共享的仓库选择字段。 */
+const readonlyBase = { repoId, repoPath };
 
 export const GitStatusSchema = z.object({ ...readonlyBase });
 export type GitStatusArgs = z.infer<typeof GitStatusSchema>;
@@ -156,7 +163,7 @@ export const GitMergeOrderSchema = z.object({
 export type GitMergeOrderArgs = z.infer<typeof GitMergeOrderSchema>;
 
 /** 写操作公共参数 */
-const writeBase = { repoPath, dryRun };
+const writeBase = { repoId, repoPath, dryRun };
 const pathsField = z.array(z.string()).default([]).describe('文件路径列表；缺省为空即全部文件');
 
 export const GitAddSchema = z.object({ ...writeBase, paths: pathsField });

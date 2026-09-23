@@ -846,6 +846,10 @@ export async function createWebServer(
     reply.hijack();
     await mcpHttp.handle(req.raw, reply.raw, req.body);
   });
+  app.delete('/mcp', { schema: { hide: true } }, async (req, reply) => {
+    reply.hijack();
+    await mcpHttp.handle(req.raw, reply.raw, undefined);
+  });
 
   // SPA fallback（静态托管存在时）
   if (staticDir) {
