@@ -30,6 +30,10 @@ let installProc = null;
 let installReady = false;
 let installCancelled = false;
 let pendingLog = '';
+/** 主窗正常标题；下载/安装进度结束后恢复。 */
+let baseMainTitle = '';
+/** 非空表示正在显示宿主级进度（任务栏 + 标题），second-instance 不要覆盖标题。 */
+let hostProgressLabel = null;
 
 function probeUrl(url) {
   return new Promise((resolve) => {
@@ -584,10 +588,12 @@ async function ensureDaemon() {
     if (!agreed) throw new Error('__install_declined__');
 
     openInstallWindow();
+    setHostProgress('安装服务', null);
     let installed;
     try {
       installed = await installDaemon(systemNode.path);
     } finally {
+      clearHostProgress();
       closeInstallWindow();
     }
     if (!installed.ok) {
@@ -634,6 +640,35 @@ async function resolveUiOrigin() {
   return `http://${HOSTS[0]}:${preferVite ? DEV_UI_PORT : PORT}`;
 }
 
+function hostProgressWindow() {
+  if (mainWindow && !mainWindow.isDestroyed()) return mainWindow;
+  if (installWindow && !installWindow.isDestroyed()) return installWindow;
+  return null;
+}
+
+/** 方案 D：Windows 任务栏进度 + 窗口标题。percent 为 0–100；null 表示 npm 类无百分比任务。 */
+function setHostProgress(label, percent) {
+  hostProgressLabel = label;
+  const win = hostProgressWindow();
+  if (!win) return;
+  if (typeof percent === 'number' && Number.isFinite(percent)) {
+    win.setProgressBar(Math.min(1, Math.max(0, percent / 100)));
+    win.setTitle(`Git Cockpit · ${label} ${Math.round(percent)}%`);
+    return;
+  }
+  win.setProgressBar(2);
+  win.setTitle(`Git Cockpit · ${label}…`);
+}
+
+function clearHostProgress() {
+  hostProgressLabel = null;
+  for (const win of [mainWindow, installWindow]) {
+    if (!win || win.isDestroyed()) continue;
+    win.setProgressBar(-1);
+    if (win === mainWindow && baseMainTitle) win.setTitle(baseMainTitle);
+  }
+}
+
 function createWindow(origin) {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -645,10 +680,12 @@ function createWindow(origin) {
     }
   });
   const url = `${origin}/#/dashboard`;
-  mainWindow.setTitle(`Git Cockpit · ${origin}`);
+  baseMainTitle = `Git Cockpit · ${origin}`;
+  mainWindow.setTitle(baseMainTitle);
   void mainWindow.loadURL(url);
   mainWindow.on('closed', () => {
     mainWindow = null;
+    baseMainTitle = '';
   });
 }
 
@@ -684,7 +721,10 @@ app.on('second-instance', () => {
   mainWindow.focus();
   void resolveUiOrigin().then((origin) => {
     void mainWindow.loadURL(`${origin}/#/dashboard`);
-    mainWindow.setTitle(`Git Cockpit · ${origin}`);
+    if (!hostProgressLabel) {
+      baseMainTitle = `Git Cockpit · ${origin}`;
+      mainWindow.setTitle(baseMainTitle);
+    }
   });
 });
 
@@ -732,11 +772,17 @@ function offerUpdate() {
           buttons: ['下载', '稍后']
         })
         .then(({ response }) => {
-          if (response === 0) void autoUpdater.downloadUpdate();
+          if (response !== 0) return;
+          setHostProgress('下载桌面包', null);
+          void autoUpdater.downloadUpdate();
         })
         .catch(() => undefined);
     });
+    autoUpdater.on('download-progress', (info) => {
+      setHostProgress('下载桌面包', info.percent);
+    });
     autoUpdater.on('update-downloaded', () => {
+      clearHostProgress();
       const extra = spawnedByUs ? '' : '\n\n本窗口没有拉起 :3000。若外部 git-cockpit start 占着端口，请先自己关掉它。';
       dialog
         .showMessageBox({
@@ -750,6 +796,9 @@ function offerUpdate() {
           autoUpdater.quitAndInstall();
         })
         .catch(() => undefined);
+    });
+    autoUpdater.on('error', () => {
+      clearHostProgress();
     });
   }
   autoUpdater.checkForUpdates().catch(() => undefined);
@@ -868,7 +917,7 @@ async function runDaemonUpgrade(currentVersion, latestVersion) {
     return;
   }
 
-  openInstallWindow();
+  setHostProgress('升级服务', null);
   try {
     const stopped = await shutdownDaemon(health.host, secret);
     if (!stopped && spawnedByUs && child && !child.killed) {
@@ -919,7 +968,7 @@ async function runDaemonUpgrade(currentVersion, latestVersion) {
     const hint = logFile ? `\n\n日志：${logFile}` : '';
     dialog.showErrorBox('Git Cockpit', `${err instanceof Error ? err.message : String(err)}${hint}`);
   } finally {
-    closeInstallWindow();
+    clearHostProgress();
   }
 }
 

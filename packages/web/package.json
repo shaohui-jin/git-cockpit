@@ -1,6 +1,6 @@
 {
   "name": "@shaohui_jin/git-cockpit-web",
-  "version": "0.1.25",
+  "version": "0.1.26",
   "private": true,
   "type": "module",
   "description": "Git Cockpit Web 前端：工作台、状态/合并/任务/日志/设置视图",
