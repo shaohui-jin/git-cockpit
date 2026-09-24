@@ -90,9 +90,7 @@ export function suggestNext(
       const conflict = cells
         .map(asRecord)
         .find(
-          (c) =>
-            c &&
-            (c.outcome === 'conflicts' || (Array.isArray(c.conflictPaths) && c.conflictPaths.length > 0))
+          (c) => c && (c.outcome === 'conflicts' || (Array.isArray(c.conflictPaths) && c.conflictPaths.length > 0))
         );
       if (conflict) {
         return [{ tool: 'git_merge_rehearse', args: compact({ into: conflict.into, from: conflict.from }) }];
@@ -115,7 +113,9 @@ export function suggestNext(
       const gate = asRecord(row?.mergeGate);
       if (gate?.ok !== true) {
         if (gate?.code === 'TEMP_NOT_PUSHED') {
-          return [{ tool: 'git_push', args: compact({ branch: args.sourceBranch ?? row?.sourceBranch, dryRun: true }) }];
+          return [
+            { tool: 'git_push', args: compact({ branch: args.sourceBranch ?? row?.sourceBranch, dryRun: true }) }
+          ];
         }
         if (gate?.code === 'NOT_LANDED') {
           return [

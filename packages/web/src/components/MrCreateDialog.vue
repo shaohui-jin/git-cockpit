@@ -31,7 +31,7 @@ let previewTimer: ReturnType<typeof setTimeout> | undefined;
 
 const visible = computed({
   get: () => props.modelValue,
-  set: (v: boolean) => emit('update:modelValue', v),
+  set: (v: boolean) => emit('update:modelValue', v)
 });
 
 const template = computed(() => prepare.value?.template ?? null);
@@ -107,9 +107,9 @@ async function refreshPreview(): Promise<void> {
         agentFill: template.value.agentFill,
         filename: '',
         sourceMd: '',
-        fields: template.value.fields,
+        fields: template.value.fields
       },
-      { ...values },
+      { ...values }
     );
     previewMd.value = result.preview;
   } catch (e) {
@@ -132,7 +132,7 @@ async function loadPrepare(): Promise<void> {
     const result = await api.mrPrepare(props.repoId, {
       into: props.into,
       from: props.from,
-      sourceBranch: props.sourceBranch || undefined,
+      sourceBranch: props.sourceBranch || undefined
     });
     prepare.value = result;
     title.value = result.title;
@@ -152,7 +152,7 @@ function submit(): void {
   const payload: Record<string, unknown> = {
     into: props.into,
     from: props.from,
-    title: title.value.trim(),
+    title: title.value.trim()
   };
   if (props.sourceBranch) payload.sourceBranch = props.sourceBranch;
   if (reviewers.value.length) payload.reviewers = reviewers.value;
@@ -166,7 +166,7 @@ watch(
   () => [props.modelValue, props.repoId, props.into, props.from, props.sourceBranch] as const,
   ([open]) => {
     if (open) void loadPrepare();
-  },
+  }
 );
 
 watch(values, () => schedulePreview(), { deep: true });
@@ -178,13 +178,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <el-dialog
-    v-model="visible"
-    width="920px"
-    class="mr-create-dialog"
-    destroy-on-close
-    append-to-body
-  >
+  <el-dialog v-model="visible" width="920px" class="mr-create-dialog" destroy-on-close append-to-body>
     <template #header>
       <div class="dlg-head">
         <p class="gc-eyebrow">申请 MR</p>
@@ -195,13 +189,7 @@ onUnmounted(() => {
     <el-skeleton v-if="loading" :rows="6" animated />
     <template v-else-if="prepare">
       <p class="pair">{{ into }} ← {{ from }}</p>
-      <el-alert
-        v-if="prepare.cliError"
-        type="warning"
-        :closable="false"
-        :title="prepare.cliError"
-        class="mb"
-      />
+      <el-alert v-if="prepare.cliError" type="warning" :closable="false" :title="prepare.cliError" class="mb" />
       <el-alert
         v-if="prepare.cliInstallUrl && !prepare.cli"
         type="info"
@@ -310,7 +298,9 @@ onUnmounted(() => {
       </div>
     </template>
     <template #footer>
-      <span v-if="missingRequired.length" class="missing">还缺：{{ missingRequired.map((f) => f.label).join('、') }}</span>
+      <span v-if="missingRequired.length" class="missing"
+        >还缺：{{ missingRequired.map((f) => f.label).join('、') }}</span
+      >
       <el-button @click="visible = false">取消</el-button>
       <el-button type="primary" :disabled="!canSubmit" @click="submit">{{
         browserMethod ? '打开创建页' : '创建'
@@ -323,15 +313,25 @@ onUnmounted(() => {
 .dlg-head .gc-eyebrow {
   margin: 0 0 4px;
 }
-.mb { margin-bottom: var(--gc-gap); }
-.pair { margin: 0 0 var(--gc-gap); color: var(--el-text-color-secondary); font-family: ui-monospace, monospace; }
+.mb {
+  margin-bottom: var(--gc-gap);
+}
+.pair {
+  margin: 0 0 var(--gc-gap);
+  color: var(--el-text-color-secondary);
+  font-family: ui-monospace, monospace;
+}
 .split {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(240px, 0.9fr);
   gap: var(--gc-pad);
 }
-.pane { min-width: 0; }
-.req { color: var(--el-color-danger); }
+.pane {
+  min-width: 0;
+}
+.req {
+  color: var(--el-color-danger);
+}
 .md-block {
   margin-bottom: var(--gc-gap);
   padding: var(--gc-gap) var(--gc-pad);
@@ -355,8 +355,17 @@ onUnmounted(() => {
   top: 0;
   max-height: calc(100vh - 160px);
 }
-.preview header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gc-gap); }
-.preview-actions { display: flex; align-items: center; gap: var(--gc-gap); }
+.preview header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--gc-gap);
+}
+.preview-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--gc-gap);
+}
 .preview pre {
   margin: 0;
   flex: 1;
@@ -367,7 +376,10 @@ onUnmounted(() => {
   line-height: 1.5;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
-.muted { font-size: var(--gc-text); color: var(--el-text-color-secondary); }
+.muted {
+  font-size: var(--gc-text);
+  color: var(--el-text-color-secondary);
+}
 .missing {
   float: left;
   line-height: var(--gc-control);
@@ -375,6 +387,8 @@ onUnmounted(() => {
   color: var(--el-color-danger);
 }
 @media (max-width: 800px) {
-  .split { grid-template-columns: 1fr; }
+  .split {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

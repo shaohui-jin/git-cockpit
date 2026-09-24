@@ -4,7 +4,11 @@ import type { Runtime } from './runtime.ts';
 const CONCURRENCY = 4;
 
 export function unavailableOverview(path: string, extra: Partial<RepoOverview> = {}): RepoOverview {
-  const name = path.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || path;
+  const name =
+    path
+      .replace(/[\\/]+$/, '')
+      .split(/[\\/]/)
+      .pop() || path;
   return {
     path,
     name,
@@ -36,17 +40,31 @@ async function mapPool<T, R>(items: T[], n: number, fn: (t: T) => Promise<R>): P
   return out;
 }
 
+async function overviewForRecord(
+  runtime: Runtime,
+  record: { id: number; path: string; lastOpenedAt: string }
+): Promise<RepoOverview> {
+  try {
+    const handle = await runtime.repoManager.getById(record.id);
+    if (!handle) {
+      return unavailableOverview(record.path, { id: record.id, lastOpenedAt: record.lastOpenedAt });
+    }
+    const o = await handle.service.getOverview();
+    return { ...o, id: record.id, lastOpenedAt: record.lastOpenedAt };
+  } catch {
+    return unavailableOverview(record.path, { id: record.id, lastOpenedAt: record.lastOpenedAt });
+  }
+}
+
+/** 单个已打开仓库的脉搏；不在列表中返回 null */
+export async function collectRepoOverviewForId(runtime: Runtime, id: number): Promise<RepoOverview | null> {
+  const record = runtime.repoManager.list().find((r) => r.id === id);
+  if (!record) return null;
+  return overviewForRecord(runtime, record);
+}
+
 export async function collectRepoOverviews(runtime: Runtime): Promise<RepoOverview[]> {
   const repos = runtime.repoManager.list();
   if (!repos.length) return [];
-  return mapPool(repos, CONCURRENCY, async (r) => {
-    try {
-      const handle = await runtime.repoManager.getById(r.id);
-      if (!handle) return unavailableOverview(r.path, { id: r.id, lastOpenedAt: r.lastOpenedAt });
-      const o = await handle.service.getOverview();
-      return { ...o, id: r.id, lastOpenedAt: r.lastOpenedAt };
-    } catch {
-      return unavailableOverview(r.path, { id: r.id, lastOpenedAt: r.lastOpenedAt });
-    }
-  });
+  return mapPool(repos, CONCURRENCY, (r) => overviewForRecord(runtime, r));
 }

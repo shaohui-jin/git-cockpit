@@ -9,9 +9,7 @@ describe('suggestNext', () => {
   });
 
   it('git_status 工作区 merge → continue', () => {
-    expect(suggestNext('git_status', { operation: 'merge', isClean: false })).toEqual([
-      { tool: 'git_merge_continue' }
-    ]);
+    expect(suggestNext('git_status', { operation: 'merge', isClean: false })).toEqual([{ tool: 'git_merge_continue' }]);
   });
 
   it('git_add dry-run 不再给出真执行；成功后才建议 git_commit', () => {
@@ -70,9 +68,7 @@ describe('suggestNext', () => {
         pairTempBranch: { name: 'merge/x', remote: true },
         recoveredPair: { into: 'main', from: 'feat' }
       })
-    ).toEqual([
-      { tool: 'git_mr_prepare', args: { into: 'main', from: 'feat', sourceBranch: 'merge/x' } }
-    ]);
+    ).toEqual([{ tool: 'git_mr_prepare', args: { into: 'main', from: 'feat', sourceBranch: 'merge/x' } }]);
   });
 
   it('git_merge_survey 有 jobId → git_job_get；冲突格 → rehearse', () => {
@@ -89,9 +85,7 @@ describe('suggestNext', () => {
   it('git_apply_resolve 成功 → git_mr_prepare；mergeGate.ok 才 create；干跑不再确认开单', () => {
     expect(
       suggestNext('git_apply_resolve', { into: 'main', from: 'feat', tempBranch: 'merge/feat' }, { from: 'feat' })
-    ).toEqual([
-      { tool: 'git_mr_prepare', args: { into: 'main', from: 'feat', sourceBranch: 'merge/feat' } }
-    ]);
+    ).toEqual([{ tool: 'git_mr_prepare', args: { into: 'main', from: 'feat', sourceBranch: 'merge/feat' } }]);
     expect(
       suggestNext(
         'git_mr_prepare',
@@ -100,11 +94,7 @@ describe('suggestNext', () => {
       )
     ).toEqual([{ tool: 'git_push', args: { branch: 'merge/feat', dryRun: true } }]);
     expect(
-      suggestNext(
-        'git_mr_prepare',
-        { mergeGate: { ok: false, code: 'NOT_LANDED' } },
-        { into: 'main', from: 'feat' }
-      )
+      suggestNext('git_mr_prepare', { mergeGate: { ok: false, code: 'NOT_LANDED' } }, { into: 'main', from: 'feat' })
     ).toEqual([{ tool: 'git_apply_resolve', args: { into: 'main', from: 'feat', dryRun: true } }]);
     expect(
       suggestNext(
@@ -114,7 +104,11 @@ describe('suggestNext', () => {
       )
     ).toEqual([]);
     expect(
-      suggestNext('git_mr_prepare', { mergeGate: { ok: true } }, { into: 'main', from: 'feat', sourceBranch: 'merge/feat' })
+      suggestNext(
+        'git_mr_prepare',
+        { mergeGate: { ok: true } },
+        { into: 'main', from: 'feat', sourceBranch: 'merge/feat' }
+      )
     ).toEqual([
       {
         tool: 'git_mr_create',
@@ -134,7 +128,11 @@ describe('suggestNext', () => {
       }
     ]);
     expect(
-      suggestNext('git_mr_create', { dryRun: true, command: 'gh pr create' }, { into: 'main', from: 'feat', dryRun: true })
+      suggestNext(
+        'git_mr_create',
+        { dryRun: true, command: 'gh pr create' },
+        { into: 'main', from: 'feat', dryRun: true }
+      )
     ).toEqual([]);
   });
 });

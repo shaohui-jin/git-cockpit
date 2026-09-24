@@ -56,7 +56,8 @@ if (!existsSync(release)) {
   process.exit(1);
 }
 
-const wanted = (name) => name.endsWith('.exe') || name.endsWith('.zip') || name === 'latest.yml' || name.endsWith('.blockmap');
+const wanted = (name) =>
+  name.endsWith('.exe') || name.endsWith('.zip') || name === 'latest.yml' || name.endsWith('.blockmap');
 const files = readdirSync(release)
   .filter(wanted)
   .map((name) => {

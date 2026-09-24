@@ -71,7 +71,10 @@ export function splitRemoteTipName(
 ): { remoteName: string; shortName: string } | null {
   const name = tipName.trim();
   if (!name.includes('/')) return null;
-  const sorted = [...knownRemotes].map((r) => r.trim()).filter(Boolean).sort((a, b) => b.length - a.length);
+  const sorted = [...knownRemotes]
+    .map((r) => r.trim())
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length);
   for (const remote of sorted) {
     const prefix = `${remote}/`;
     if (name.startsWith(prefix) && name.length > prefix.length) {

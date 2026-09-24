@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { maskToken } from '../src/mrToken.ts';
-import {
-  applyLlmEnvOverrides,
-  normalizeLlmConfig,
-  publicLlmConfig,
-  validateLlmApiKeyFormat
-} from '../src/llm.ts';
+import { applyLlmEnvOverrides, normalizeLlmConfig, publicLlmConfig, validateLlmApiKeyFormat } from '../src/llm.ts';
 
 describe('llm 配置', () => {
   it('缺省与脏数据回落到 openai / gpt-4.1', () => {

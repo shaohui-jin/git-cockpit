@@ -13,17 +13,7 @@ import BranchTreeSelect from '@/components/BranchTreeSelect.vue';
 
 const repos = useReposStore();
 const session = useMergeSessionStore();
-const {
-  intos,
-  froms,
-  fetchRemote,
-  loading,
-  survey,
-  order,
-  active,
-  orderView,
-  surveyStale
-} = storeToRefs(session);
+const { intos, froms, fetchRemote, loading, survey, order, active, orderView, surveyStale } = storeToRefs(session);
 
 const emit = defineEmits<{
   createMr: [payload: { into: string; from: string; sourceBranch: string }];
@@ -163,9 +153,7 @@ const nextActionText = computed(() => {
     return `推送临时分支（剩 ${localCells.value.length}）`;
   }
   if (mrReadyCells.value.length > 0) {
-    return mrReadyCells.value.length > 1
-      ? `申请 MR（剩 ${mrReadyCells.value.length}）`
-      : '申请 MR';
+    return mrReadyCells.value.length > 1 ? `申请 MR（剩 ${mrReadyCells.value.length}）` : '申请 MR';
   }
   return '';
 });
@@ -269,20 +257,18 @@ function isActive(cell: MergeSurveyCell): boolean {
           <el-switch v-model="fetchRemote" />
         </div>
         <div class="field field-actions">
-          <el-button :loading="loading" :disabled="!session.canSurvey" type="primary" @click="runSurvey">跑矩阵</el-button>
+          <el-button :loading="loading" :disabled="!session.canSurvey" type="primary" @click="runSurvey"
+            >跑矩阵</el-button
+          >
           <el-button :loading="loading" :disabled="!session.canOrder" @click="runOrder">建议顺序</el-button>
         </div>
       </div>
       <div class="chips">
         <span class="chip-label">INTO</span>
         <span v-if="intos.length === 0" class="hint">未选</span>
-        <el-tag
-          v-for="b in intos"
-          :key="`i-${b}`"
-          size="small"
-          closable
-          @close="session.dropChip('into', b)"
-        >{{ b }}</el-tag>
+        <el-tag v-for="b in intos" :key="`i-${b}`" size="small" closable @close="session.dropChip('into', b)">{{
+          b
+        }}</el-tag>
       </div>
       <div class="chips">
         <span class="chip-label">FROM</span>
@@ -294,11 +280,12 @@ function isActive(cell: MergeSurveyCell): boolean {
           closable
           type="info"
           @close="session.dropChip('from', b)"
-        >{{ b }}</el-tag>
+          >{{ b }}</el-tag
+        >
       </div>
       <p class="tip">
-        每对只跑 merge-tree，不改工作区。点「去预演」选边后只记到本地临时分支（不推送）。格子同时显示预演结果和进度：tip 没变时预演仍是冲突。
-        矩阵上再统一：先清剩余冲突，再推送临时分支、申请 MR。不切换当前工作区。
+        每对只跑 merge-tree，不改工作区。点「去预演」选边后只记到本地临时分支（不推送）。格子同时显示预演结果和进度：tip
+        没变时预演仍是冲突。 矩阵上再统一：先清剩余冲突，再推送临时分支、申请 MR。不切换当前工作区。
       </p>
     </section>
 
@@ -312,7 +299,9 @@ function isActive(cell: MergeSurveyCell): boolean {
           :closable="false"
           class="stale-alert"
         >
-          <el-button type="primary" :loading="loading" :disabled="!session.canSurvey" @click="runSurvey">重新跑矩阵</el-button>
+          <el-button type="primary" :loading="loading" :disabled="!session.canSurvey" @click="runSurvey"
+            >重新跑矩阵</el-button
+          >
         </el-alert>
         <div class="summary">
           <span>{{ summary.total }} 组</span>
@@ -327,12 +316,9 @@ function isActive(cell: MergeSurveyCell): boolean {
             </el-radio-group>
           </template>
           <span class="summary-spacer" />
-          <el-button
-            v-if="nextActionText"
-            type="primary"
-            :disabled="!canRun || loading"
-            @click="nextMatrixAction"
-          >{{ nextActionText }}</el-button>
+          <el-button v-if="nextActionText" type="primary" :disabled="!canRun || loading" @click="nextMatrixAction">{{
+            nextActionText
+          }}</el-button>
         </div>
         <table class="grid">
           <thead>
@@ -356,7 +342,11 @@ function isActive(cell: MergeSurveyCell): boolean {
                     v-if="col.cell"
                     type="button"
                     class="cell"
-                    :class="[`is-${col.cell.outcome}`, `is-stage-${session.stageOf(col.cell)}`, { active: isActive(col.cell) }]"
+                    :class="[
+                      `is-${col.cell.outcome}`,
+                      `is-stage-${session.stageOf(col.cell)}`,
+                      { active: isActive(col.cell) }
+                    ]"
                     :title="cellTitle(col.cell)"
                     @click="session.active = col.cell"
                   >
@@ -372,8 +362,9 @@ function isActive(cell: MergeSurveyCell): boolean {
         <h3 class="mono">{{ active.from }} → {{ active.into }}</h3>
         <p>{{ OUTCOME_TEXT[active.outcome] }}{{ active.error ? ` · ${active.error}` : '' }}</p>
         <p v-if="active.tempBranch" class="tip">
-          临时分支 {{ active.tempBranch.name }}
-          （{{ active.tempBranch.local ? '本地' : '' }}{{ active.tempBranch.local && active.tempBranch.remote ? ' / ' : '' }}{{ active.tempBranch.remote ? '远程' : '' }}）
+          临时分支 {{ active.tempBranch.name }} （{{ active.tempBranch.local ? '本地' : ''
+          }}{{ active.tempBranch.local && active.tempBranch.remote ? ' / ' : ''
+          }}{{ active.tempBranch.remote ? '远程' : '' }}）
         </p>
         <ul v-if="active.conflictPaths.length" class="paths">
           <li v-for="p in active.conflictPaths" :key="p" class="mono">{{ p }}</li>
@@ -383,17 +374,12 @@ function isActive(cell: MergeSurveyCell): boolean {
           v-if="active.outcome === 'conflicts' || active.outcome === 'clean'"
           type="primary"
           @click="goPreview(active)"
-        >去预演</el-button>
-        <el-button
-          v-if="session.stageOf(active) === 'local'"
-          :disabled="loading"
-          @click="pushTemp(active)"
-        >推送临时分支</el-button>
-        <el-button
-          v-if="session.canCreateMr(active)"
-          :disabled="loading"
-          @click="requestMr(active)"
-        >申请 MR</el-button>
+          >去预演</el-button
+        >
+        <el-button v-if="session.stageOf(active) === 'local'" :disabled="loading" @click="pushTemp(active)"
+          >推送临时分支</el-button
+        >
+        <el-button v-if="session.canCreateMr(active)" :disabled="loading" @click="requestMr(active)">申请 MR</el-button>
       </aside>
     </div>
   </div>

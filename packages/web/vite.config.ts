@@ -11,9 +11,7 @@ const backendHost = process.env.GIT_COCKPIT_HOST ?? '127.0.0.1';
 
 function localSecret(): string {
   const raw = process.env.GIT_COCKPIT_DATA_DIR;
-  const dir = raw
-    ? raw.replace(/^~(?=$|[/\\])/, os.homedir())
-    : path.join(os.homedir(), '.git-cockpit');
+  const dir = raw ? raw.replace(/^~(?=$|[/\\])/, os.homedir()) : path.join(os.homedir(), '.git-cockpit');
   try {
     const cfg = JSON.parse(fs.readFileSync(path.join(dir, 'config.json'), 'utf8')) as {
       auth?: { localSecret?: string };

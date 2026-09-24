@@ -17,7 +17,11 @@ export function isChatWriteTool(name: string): boolean {
 }
 
 /** 模型不得自开 detail；要正文必须带 path。聊天侧强制覆盖。 */
-export function sanitizeChatArgs(tool: string, raw: Record<string, unknown>, repoPath: string): Record<string, unknown> {
+export function sanitizeChatArgs(
+  tool: string,
+  raw: Record<string, unknown>,
+  repoPath: string
+): Record<string, unknown> {
   const args: Record<string, unknown> = { ...raw };
   delete args.repoPath;
   delete args.dryRun;

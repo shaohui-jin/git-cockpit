@@ -153,19 +153,19 @@ git-cockpit start
 
 ### 端点一览
 
-| 端点 | 说明 |
-| --- | --- |
-| `/mcp` | MCP Streamable HTTP 接入点（常驻服务模式） |
-| `/api/*` | Web 前端 REST API（仓库、状态、设置、日志） |
-| `/` | Web 管理界面（工作台 / 状态 / 合并 / 任务 / 操作日志 / 设置） |
+| 端点     | 说明                                                          |
+| -------- | ------------------------------------------------------------- |
+| `/mcp`   | MCP Streamable HTTP 接入点（常驻服务模式）                    |
+| `/api/*` | Web 前端 REST API（仓库、状态、设置、日志）                   |
+| `/`      | Web 管理界面（工作台 / 状态 / 合并 / 任务 / 操作日志 / 设置） |
 
 ### 环境变量
 
-| 变量 | 说明 | 默认 |
-| --- | --- | --- |
+| 变量                   | 说明                                 | 默认             |
+| ---------------------- | ------------------------------------ | ---------------- |
 | `GIT_COCKPIT_DATA_DIR` | 数据目录（仓库列表、审计日志、备份） | `~/.git-cockpit` |
-| `GIT_COCKPIT_PORT` | 常驻服务端口 | `3000` |
-| `GIT_COCKPIT_HOST` | 监听地址 | `localhost` |
+| `GIT_COCKPIT_PORT`     | 常驻服务端口                         | `3000`           |
+| `GIT_COCKPIT_HOST`     | 监听地址                             | `localhost`      |
 
 ### 安全机制
 
@@ -175,9 +175,9 @@ git-cockpit start
 
 发布到 npm 的是 **2 个包**（web 不单独发布，其构建产物内嵌进 mcp-server）：
 
-| 包 | npm 名称 | 版本维护位置 | 发布 tag |
-| --- | --- | --- | --- |
-| core | `@shaohui_jin/git-cockpit-core` | `packages/core/package.json` | `core-v{version}` |
+| 包         | npm 名称                              | 版本维护位置                       | 发布 tag                |
+| ---------- | ------------------------------------- | ---------------------------------- | ----------------------- |
+| core       | `@shaohui_jin/git-cockpit-core`       | `packages/core/package.json`       | `core-v{version}`       |
 | mcp-server | `@shaohui_jin/git-cockpit-mcp-server` | `packages/mcp-server/package.json` | `mcp-server-v{version}` |
 
 **判据**：GitHub Actions 检查远程是否已存在对应 tag——不存在才构建 → 发布 npm → 打 tag；tag 在**发布成功之后**才推送，失败重试不浪费版本号。

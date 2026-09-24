@@ -56,7 +56,9 @@ export class AuditLogger {
   }
 
   /** 分页查询操作日志（最新的在前） */
-  list(options: { limit?: number; offset?: number; tool?: string; source?: OperationSource } = {}): OperationLogEntry[] {
+  list(
+    options: { limit?: number; offset?: number; tool?: string; source?: OperationSource } = {}
+  ): OperationLogEntry[] {
     const where: string[] = [];
     const params: (string | number)[] = [];
     if (options.tool) {

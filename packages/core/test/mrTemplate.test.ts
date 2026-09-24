@@ -28,11 +28,7 @@ describe('parseMrTemplateMarkdown', () => {
       ['preflight_note', 'markdown']
     ]);
     expect(t.fields.find((f) => f.id === 'self_review')?.options).toEqual(['低', '中', '高']);
-    expect(t.fields.find((f) => f.id === 'verification')?.items?.map((i) => i.required)).toEqual([
-      false,
-      false,
-      false
-    ]);
+    expect(t.fields.find((f) => f.id === 'verification')?.items?.map((i) => i.required)).toEqual([false, false, false]);
     expect(t.fields.find((f) => f.id === 'preflight')?.items?.every((i) => i.required)).toBe(true);
     const note = t.fields.find((f) => f.id === 'preflight_note');
     expect(note?.content).toContain('AI Coding Review');

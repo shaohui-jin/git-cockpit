@@ -40,7 +40,13 @@ export async function initRepo(dir: string): Promise<SimpleGit> {
   return git;
 }
 
-export async function commitFile(git: SimpleGit, dir: string, file: string, content: string, message: string): Promise<void> {
+export async function commitFile(
+  git: SimpleGit,
+  dir: string,
+  file: string,
+  content: string,
+  message: string
+): Promise<void> {
   const fullPath = path.resolve(dir, file);
   fs.mkdirSync(path.dirname(fullPath), { recursive: true });
   fs.writeFileSync(fullPath, content, 'utf8');

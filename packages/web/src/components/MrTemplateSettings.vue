@@ -230,7 +230,13 @@ async function clearTemplate(): Promise<void> {
     </header>
 
     <div v-if="pasteOpen" class="tmpl-paste-bar">
-      <el-input class="gc-grow-input" v-model="pasteText" type="textarea" :rows="4" placeholder="粘贴 MR 模板 Markdown" />
+      <el-input
+        class="gc-grow-input"
+        v-model="pasteText"
+        type="textarea"
+        :rows="4"
+        placeholder="粘贴 MR 模板 Markdown"
+      />
       <el-button type="primary" :loading="parsing" @click="importPaste">识别</el-button>
     </div>
 

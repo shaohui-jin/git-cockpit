@@ -11,8 +11,10 @@ import { TOOL_DEFS } from './tools/index.ts';
 
 const REST_META: Record<string, { summary: string; tags: string[] }> = {
   'get /api/health': { summary: '探活', tags: ['系统'] },
+  'post /api/shutdown': { summary: '优雅退出 daemon（本机密钥；有 running 任务时 409）', tags: ['系统'] },
   'get /api/repos': { summary: '已打开仓库列表', tags: ['仓库'] },
-  'get /api/repos/overview': { summary: '已打开仓库脉搏（工作台）', tags: ['仓库'] },
+  'get /api/repos/overview': { summary: '已打开仓库脉搏（工作台，全量）', tags: ['仓库'] },
+  'get /api/repos/{id}/overview': { summary: '单个仓库脉搏（工作台增量）', tags: ['仓库'] },
   'post /api/jobs': { summary: '提交后台任务（clone / survey / fetch）', tags: ['仓库'] },
   'post /api/repos/open': { summary: '打开本地仓库', tags: ['仓库'] },
   'delete /api/repos/{id}': { summary: '关闭并移除仓库', tags: ['仓库'] },

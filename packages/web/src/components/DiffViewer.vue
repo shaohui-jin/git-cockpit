@@ -114,7 +114,12 @@ watch(
 <template>
   <div class="diff-viewer">
     <div v-if="files.length" class="diff-files">
-      <section v-for="(file, i) in files" :key="fileKey(file, i)" class="diff-file" :class="{ 'is-open': isOpen(file, i) }">
+      <section
+        v-for="(file, i) in files"
+        :key="fileKey(file, i)"
+        class="diff-file"
+        :class="{ 'is-open': isOpen(file, i) }"
+      >
         <button type="button" class="diff-file-head" @click="toggle(file, i)">
           <span class="diff-file-chevron" aria-hidden="true">{{ isOpen(file, i) ? '▾' : '▸' }}</span>
           <span class="diff-file-path mono" :title="displayPath(file)">{{ displayPath(file) }}</span>
@@ -133,7 +138,10 @@ watch(
         />
       </section>
     </div>
-    <pre v-else-if="parseFailed" class="diff-fallback mono"><template v-for="(l, i) in patch.split('\n')" :key="i">{{ l }}
+    <pre
+      v-else-if="parseFailed"
+      class="diff-fallback mono"
+    ><template v-for="(l, i) in patch.split('\n')" :key="i">{{ l }}
 </template></pre>
   </div>
 </template>

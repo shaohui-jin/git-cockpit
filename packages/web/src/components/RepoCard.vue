@@ -151,16 +151,14 @@ onUnmounted(() => {
           <span class="stat-behind" :class="{ on: overview.behind > 0 }">{{ overview.behind }}↓</span>
         </span>
         <span class="stat-dirty" :class="{ on: overview.dirtyCount > 0 }">{{ overview.dirtyCount }} 更改</span>
-        <span v-if="overview.tempMergeBranchCount > 0" class="stat-draft">{{ overview.tempMergeBranchCount }} 合并草稿</span>
+        <span v-if="overview.tempMergeBranchCount > 0" class="stat-draft"
+          >{{ overview.tempMergeBranchCount }} 合并草稿</span
+        >
       </template>
       <span v-for="b in extraBadges()" :key="b" class="card-badge">{{ b }}</span>
     </div>
     <div class="card-foot">
-      <ActivityHeatmap
-        :days="overview?.activity"
-        :start="overview?.activityStart"
-        :total="overview?.activityTotal"
-      />
+      <ActivityHeatmap :days="overview?.activity" :start="overview?.activityStart" :total="overview?.activityTotal" />
       <span class="card-opened" :title="repo.lastOpenedAt">打开 {{ formatOpened(repo.lastOpenedAt) }}</span>
     </div>
   </div>
@@ -173,30 +171,16 @@ onUnmounted(() => {
       :style="{ left: menu.x + 'px', top: menu.y + 'px' }"
       @click.stop
     >
-      <li
-        class="el-dropdown-menu__item"
-        :class="{ 'is-disabled': missing() }"
-        @click="missing() || run('enter')"
-      >
+      <li class="el-dropdown-menu__item" :class="{ 'is-disabled': missing() }" @click="missing() || run('enter')">
         进入工作区
       </li>
-      <li
-        class="el-dropdown-menu__item"
-        :class="{ 'is-disabled': missing() }"
-        @click="missing() || run('merge')"
-      >
+      <li class="el-dropdown-menu__item" :class="{ 'is-disabled': missing() }" @click="missing() || run('merge')">
         预演合并
       </li>
-      <li
-        class="el-dropdown-menu__item"
-        :class="{ 'is-disabled': missing() }"
-        @click="missing() || run('fetch')"
-      >
+      <li class="el-dropdown-menu__item" :class="{ 'is-disabled': missing() }" @click="missing() || run('fetch')">
         抓取这一仓远程
       </li>
-      <li class="el-dropdown-menu__item gc-danger" @click="run('remove')">
-        移除（不删磁盘）
-      </li>
+      <li class="el-dropdown-menu__item gc-danger" @click="run('remove')">移除（不删磁盘）</li>
     </ul>
   </Teleport>
 </template>

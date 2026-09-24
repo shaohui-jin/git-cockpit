@@ -13,15 +13,31 @@ import MrCreateDialog from '@/components/MrCreateDialog.vue';
 import BranchTreeSelect from '@/components/BranchTreeSelect.vue';
 import ConflictResolvePanel from '@/components/ConflictResolvePanel.vue';
 import MatrixView from '@/views/MatrixView.vue';
-import type { ApplyResolveResult, BranchInfo, CreateMrResult, MergePreviewResult, PrepareMrResult, ToolExecResult } from '@/api/types';
+import type {
+  ApplyResolveResult,
+  BranchInfo,
+  CreateMrResult,
+  MergePreviewResult,
+  PrepareMrResult,
+  ToolExecResult
+} from '@/api/types';
 import { copyToClipboard } from '@/utils/clipboard';
 import { isMergeTempBranchName } from '@/utils/branchTree';
 
 const repos = useReposStore();
 const branchStore = useBranchesStore();
 const session = useMergeSessionStore();
-const { mode, pairInto, pairFrom, fetchRemote, trail, trailCurrent, trailRemaining, fromMatrix, loading: matrixLoading } =
-  storeToRefs(session);
+const {
+  mode,
+  pairInto,
+  pairFrom,
+  fetchRemote,
+  trail,
+  trailCurrent,
+  trailRemaining,
+  fromMatrix,
+  loading: matrixLoading
+} = storeToRefs(session);
 const route = useRoute();
 const router = useRouter();
 const repoId = (): number | null => repos.currentId;
@@ -44,15 +60,11 @@ const resolvePanel = ref<{ buildFiles: () => Array<{ path: string; resolvedConte
 const resolvePending = ref(0);
 const redoRecorded = ref(false);
 
-const currentPairDone = computed(() =>
-  session.isPairDone({ into: pairInto.value, from: pairFrom.value })
+const currentPairDone = computed(() => session.isPairDone({ into: pairInto.value, from: pairFrom.value }));
+const recordedCell = computed(
+  () => session.survey?.cells.find((c) => c.into === pairInto.value && c.from === pairFrom.value) ?? null
 );
-const recordedCell = computed(() =>
-  session.survey?.cells.find((c) => c.into === pairInto.value && c.from === pairFrom.value) ?? null
-);
-const showRecorded = computed(
-  () => fromMatrix.value && currentPairDone.value && !redoRecorded.value && !preview.value
-);
+const showRecorded = computed(() => fromMatrix.value && currentPairDone.value && !redoRecorded.value && !preview.value);
 
 const hasRemote = computed(() => branchStore.hasRemote);
 const truncatedConflicts = computed(() =>
@@ -199,8 +211,7 @@ async function runPreview(): Promise<void> {
 
 async function runApply(): Promise<void> {
   if (!canApply.value || !preview.value) return;
-  const files =
-    preview.value.outcome === 'conflicts' ? (resolvePanel.value?.buildFiles() ?? []) : [];
+  const files = preview.value.outcome === 'conflicts' ? (resolvePanel.value?.buildFiles() ?? []) : [];
   if (preview.value.outcome === 'conflicts' && files.length === 0) {
     ElMessage.warning('请先完成选边');
     return;
@@ -302,9 +313,7 @@ async function onConfirmed(): Promise<void> {
     mrPrep.value = null;
     session.markPairDone({ into: pairInto.value, from: pairFrom.value });
     ElMessage.success(
-      fromMatrix.value || !applyResult.value.pushed
-        ? '已记到本地临时分支，回矩阵统一处理'
-        : '已落盘并推送临时分支'
+      fromMatrix.value || !applyResult.value.pushed ? '已记到本地临时分支，回矩阵统一处理' : '已落盘并推送临时分支'
     );
     if (fromMatrix.value) {
       redoRecorded.value = false;
@@ -451,7 +460,9 @@ watch([pairInto, pairFrom], () => {
           <button type="button" :class="{ on: mode === 'pair' }" @click="mode = 'pair'">单对预演</button>
           <button type="button" :class="{ on: mode === 'matrix' }" @click="mode = 'matrix'">矩阵</button>
         </div>
-        <el-button v-if="mode === 'pair' && canRun" :loading="loading" type="primary" @click="runPreview">预演</el-button>
+        <el-button v-if="mode === 'pair' && canRun" :loading="loading" type="primary" @click="runPreview"
+          >预演</el-button
+        >
       </div>
     </div>
 
@@ -463,18 +474,28 @@ watch([pairInto, pairFrom], () => {
         <span class="trail-arrow">→</span>
         <span class="online">{{ trailCurrent.into }}</span>
       </span>
-      <el-tag v-if="trailRemaining > 0" type="warning" effect="plain" size="small">剩 {{ trailRemaining }} 条待处理</el-tag>
+      <el-tag v-if="trailRemaining > 0" type="warning" effect="plain" size="small"
+        >剩 {{ trailRemaining }} 条待处理</el-tag
+      >
       <el-tag v-else type="success" effect="plain" size="small">这批冲突都走完了</el-tag>
       <span class="trail-spacer" />
       <el-button size="small" :disabled="busy || trail.index === 0" @click="trailGo(-1)">上一条</el-button>
-      <el-button size="small" :disabled="busy || trail.index >= trail.pairs.length - 1" @click="trailGo(1)">下一条</el-button>
+      <el-button size="small" :disabled="busy || trail.index >= trail.pairs.length - 1" @click="trailGo(1)"
+        >下一条</el-button
+      >
       <el-button size="small" type="primary" :disabled="busy" @click="trailNextPending">
         {{ trailRemaining > 0 ? '处理下一条' : '回矩阵' }}
       </el-button>
     </div>
 
     <el-alert v-if="loadError && mode === 'pair'" :title="loadError" type="error" :closable="false" show-icon />
-    <el-alert v-else-if="session.loadError && mode === 'matrix'" :title="session.loadError" type="error" :closable="false" show-icon />
+    <el-alert
+      v-else-if="session.loadError && mode === 'matrix'"
+      :title="session.loadError"
+      type="error"
+      :closable="false"
+      show-icon
+    />
 
     <div v-if="!canRun" class="empty gc-glass">
       <strong>还没选仓库</strong>
@@ -488,180 +509,189 @@ watch([pairInto, pairFrom], () => {
 
     <template v-else>
       <div class="pair-col">
-      <section class="gc-glass river">
-        <div class="lane theirs">
-          <small>我的 from</small>
-          <BranchTreeSelect v-model="pairFrom" exclude-merge-temp placeholder="选择我的分支" />
-        </div>
-        <div class="flow">
-          <svg viewBox="0 0 200 80" preserveAspectRatio="none" aria-hidden="true">
-            <path d="M0 20 C 80 20, 80 40, 200 40" />
-            <path d="M0 60 C 80 60, 80 40, 200 40" />
-          </svg>
-          <span class="stamp" :class="stampClass">{{ stampText }}</span>
-        </div>
-        <div class="lane ours">
-          <small>合入 into</small>
-          <BranchTreeSelect v-model="pairInto" remote-first exclude-merge-temp placeholder="选择合入目标" />
-        </div>
-      </section>
-      <div class="river-tools">
-        <label class="fetch">
-          先 fetch
-          <el-switch v-model="fetchRemote" />
-        </label>
-        <p class="tip">
-          <template v-if="fromMatrix">
-            从矩阵进来：选边后点「完成冲突处理」，只记到本地临时分支（不推送、不改工作区当前分支），然后回矩阵统一看。
-          </template>
-          <template v-else>
-            预演使用 <span class="mono">git merge-tree</span>，不会改工作区。方向：把「我的分支」合入「合入目标」。
-          </template>
-        </p>
-      </div>
-
-      <section v-if="showRecorded" class="gc-glass pad next-pane">
-        <p class="gc-eyebrow">已记入本地</p>
-        <p class="tip">
-          选边已写到临时分支
-          <span class="mono">{{ recordedCell?.tempBranch?.name ?? 'merge/…' }}</span>
-          （未推送）。原始 from / into 的预演仍可能是冲突，这是正常的。回矩阵看「冲突 · 本地临时枝」，再统一处理。
-        </p>
-        <div class="hero-actions">
-          <el-button type="primary" @click="backToMatrix">返回矩阵</el-button>
-          <el-button @click="redoRecordedPreview">重新预演</el-button>
-        </div>
-      </section>
-
-      <section v-if="preview && !applyResult" class="gc-glass pad next-pane fill">
-        <div class="result-head">
-          <p class="gc-eyebrow">{{ outcomeLabel || '预演结果' }}</p>
-          <span class="mono sha">{{ preview.into }} ({{ preview.intoSha.slice(0, 7) }}) ← {{ preview.from }} ({{ preview.fromSha.slice(0, 7) }})</span>
-          <el-tag v-if="preview.fetchAttempted && !preview.fetched" type="warning" effect="plain" size="small">远程未更新</el-tag>
-          <span class="grow" />
-          <el-button v-if="canApply" type="primary" @click="runApply">
-            {{ fromMatrix ? '完成冲突处理' : '落盘并推送' }}
-          </el-button>
-          <el-button v-if="canPushTemp" type="primary" @click="runPushTempFromPreview">推送临时分支</el-button>
-          <el-button v-if="canOpenMr" type="primary" @click="runCreatePr">申请 MR</el-button>
-          <el-button v-if="preview.recoveredPair && situation === 'looking_at_temp'" @click="restoreRecoveredPair">
-            切回原 pair
-          </el-button>
-        </div>
-
-        <p v-if="situation === 'looking_at_temp'" class="tip tip-inline">
-          合入目标是上次 worktree 落盘留下的临时分支，不是线上目标。
-          <template v-if="preview.recoveredPair">
-            原方向：{{ preview.recoveredPair.from }} → {{ preview.recoveredPair.into }}。
-          </template>
-          已推送则可申请 MR；不要再落盘。
-        </p>
-        <p v-else-if="situation === 'temp_remote'" class="tip tip-inline">
-          这对分支已有远程临时枝
-          <span class="mono">{{ preview.pairTempBranch?.name }}</span>
-          ，无需再落盘，直接申请 MR。
-        </p>
-        <p v-else-if="situation === 'temp_local'" class="tip tip-inline">
-          选边已记在本地临时枝
-          <span class="mono">{{ preview.pairTempBranch?.name }}</span>
-          。推送后即可申请 MR，无需再落盘。
-        </p>
-        <p v-else-if="situation === 'already_merged'" class="tip tip-inline">
-          「我的分支」已经包含在合入目标里，没有可合并的新提交，无需操作。
-        </p>
-        <p v-else-if="preview.outcome === 'conflicts'" class="tip tip-inline">
-          {{ truncatedConflicts
-            ? '冲突文件超过展示上限，无法在网页选边。请缩小范围或提高 maxFiles。'
-            : fromMatrix
-              ? '红块选边后点「完成冲突处理」：写入本地临时分支，不推送，随后回矩阵。'
-              : '红块用 ≫ / ≪ 选线上或我的；绿=新增、蓝=修改，已自动进入结果。' }}
-        </p>
-        <p v-else-if="preview.outcome === 'unrelated'" class="tip tip-inline">
-          两条历史没有共同祖先，不能当作干净合并落盘。
-        </p>
-        <p v-else-if="preview.clean" class="tip tip-inline">
-          {{ fromMatrix
-            ? '可干净合并。点「完成冲突处理」会记到本地临时分支（不推送），再回矩阵。'
-            : '可干净合并。落盘会在独立 worktree 提交到临时分支，主工作区保持不变。' }}
-        </p>
-
-        <ConflictResolvePanel
-          v-if="situation === 'conflicts' && preview.conflictFiles.length"
-          ref="resolvePanel"
-          :files="preview.conflictFiles"
-          :repo-id="repoId()"
-          :into="pairInto"
-          :from="pairFrom"
-          @progress="resolvePending = $event.pending"
-        />
-        <p v-else-if="situation === 'already_merged'" class="hint-empty">没有可合并的新提交，无需操作。</p>
-        <p v-else-if="preview.clean && canApply" class="hint-empty">没有冲突文件。落盘只写临时枝，不改你正在看的分支。</p>
-      </section>
-
-      <section v-if="applyResult" class="gc-glass pad next-pane fill">
-        <div class="result-head">
-          <p class="gc-eyebrow">已落盘{{ applyResult.pushed ? ' · 已推送' : ' · 仅本地' }}</p>
-          <span class="mono sha">{{ applyResult.tempBranch }}</span>
-        </div>
-        <dl class="apply-meta">
-          <div>
-            <dt>临时分支</dt>
-            <dd class="mono">{{ applyResult.tempBranch }}</dd>
+        <section class="gc-glass river">
+          <div class="lane theirs">
+            <small>我的 from</small>
+            <BranchTreeSelect v-model="pairFrom" exclude-merge-temp placeholder="选择我的分支" />
           </div>
-          <div>
-            <dt>提交</dt>
-            <dd class="mono">{{ applyResult.commitSha.slice(0, 7) }}</dd>
+          <div class="flow">
+            <svg viewBox="0 0 200 80" preserveAspectRatio="none" aria-hidden="true">
+              <path d="M0 20 C 80 20, 80 40, 200 40" />
+              <path d="M0 60 C 80 60, 80 40, 200 40" />
+            </svg>
+            <span class="stamp" :class="stampClass">{{ stampText }}</span>
           </div>
-        </dl>
-        <p v-if="applyResult.createMrUrl" class="apply-link">
-          <a :href="applyResult.createMrUrl" target="_blank" rel="noreferrer">打开创建 MR/PR 页面</a>
-        </p>
-        <el-alert
-          v-if="mrPrep?.cliError && !mrPrep.cli"
-          type="warning"
-          :closable="false"
-          :title="mrPrep.cliError"
-        />
-        <p v-if="mrPrep?.cliInstallUrl && !mrPrep.cli" class="apply-link">
-          官方下载：
-          <a :href="mrPrep.cliInstallUrl" target="_blank" rel="noreferrer">{{ mrPrep.cliInstallUrl }}</a>
-        </p>
-        <div class="apply-actions">
-          <el-button type="primary" @click="runCreatePr">创建 PR/MR</el-button>
-          <el-button @click="runPreview">重新预演</el-button>
+          <div class="lane ours">
+            <small>合入 into</small>
+            <BranchTreeSelect v-model="pairInto" remote-first exclude-merge-temp placeholder="选择合入目标" />
+          </div>
+        </section>
+        <div class="river-tools">
+          <label class="fetch">
+            先 fetch
+            <el-switch v-model="fetchRemote" />
+          </label>
+          <p class="tip">
+            <template v-if="fromMatrix">
+              从矩阵进来：选边后点「完成冲突处理」，只记到本地临时分支（不推送、不改工作区当前分支），然后回矩阵统一看。
+            </template>
+            <template v-else>
+              预演使用 <span class="mono">git merge-tree</span>，不会改工作区。方向：把「我的分支」合入「合入目标」。
+            </template>
+          </p>
         </div>
-      </section>
 
-      <section v-if="prResult" class="gc-glass pad next-pane">
-        <div class="result-head">
-          <p class="gc-eyebrow">{{ prResult.via === 'browser' ? 'MR 正文 · 浏览器创建页' : '已开单' }}</p>
-          <span class="mono sha">{{ prResult.sourceBranch }} → {{ prResult.targetBranch }}</span>
-        </div>
-        <el-alert
-          v-for="(msg, i) in prResult.messages"
-          :key="i"
-          class="mb"
-          :type="msg.includes('建议') ? 'warning' : 'info'"
-          :closable="false"
-          :title="msg"
-        />
-        <p v-if="prResult.url" class="apply-link">
-          <a :href="prResult.url" target="_blank" rel="noreferrer">{{
-            prResult.via === 'browser' ? '打开创建页' : `已创建${prResult.number != null ? ' #' + prResult.number : ''}`
-          }}</a>
-        </p>
-        <p v-if="prResult.cliInstallUrl" class="apply-link">
-          未检测到本机 CLI，请自行安装：
-          <a :href="prResult.cliInstallUrl" target="_blank" rel="noreferrer">{{ prResult.cliInstallUrl }}</a>
-        </p>
-        <div v-if="prResult.via === 'browser' && prResult.body?.trim()" class="pr-body">
-          <header>
-            <strong>待粘贴正文</strong>
-            <el-button size="small" @click="copyPrBody">复制正文</el-button>
-          </header>
-          <pre>{{ prResult.body }}</pre>
-        </div>
-      </section>
+        <section v-if="showRecorded" class="gc-glass pad next-pane">
+          <p class="gc-eyebrow">已记入本地</p>
+          <p class="tip">
+            选边已写到临时分支
+            <span class="mono">{{ recordedCell?.tempBranch?.name ?? 'merge/…' }}</span>
+            （未推送）。原始 from / into 的预演仍可能是冲突，这是正常的。回矩阵看「冲突 · 本地临时枝」，再统一处理。
+          </p>
+          <div class="hero-actions">
+            <el-button type="primary" @click="backToMatrix">返回矩阵</el-button>
+            <el-button @click="redoRecordedPreview">重新预演</el-button>
+          </div>
+        </section>
+
+        <section v-if="preview && !applyResult" class="gc-glass pad next-pane fill">
+          <div class="result-head">
+            <p class="gc-eyebrow">{{ outcomeLabel || '预演结果' }}</p>
+            <span class="mono sha"
+              >{{ preview.into }} ({{ preview.intoSha.slice(0, 7) }}) ← {{ preview.from }} ({{
+                preview.fromSha.slice(0, 7)
+              }})</span
+            >
+            <el-tag v-if="preview.fetchAttempted && !preview.fetched" type="warning" effect="plain" size="small"
+              >远程未更新</el-tag
+            >
+            <span class="grow" />
+            <el-button v-if="canApply" type="primary" @click="runApply">
+              {{ fromMatrix ? '完成冲突处理' : '落盘并推送' }}
+            </el-button>
+            <el-button v-if="canPushTemp" type="primary" @click="runPushTempFromPreview">推送临时分支</el-button>
+            <el-button v-if="canOpenMr" type="primary" @click="runCreatePr">申请 MR</el-button>
+            <el-button v-if="preview.recoveredPair && situation === 'looking_at_temp'" @click="restoreRecoveredPair">
+              切回原 pair
+            </el-button>
+          </div>
+
+          <p v-if="situation === 'looking_at_temp'" class="tip tip-inline">
+            合入目标是上次 worktree 落盘留下的临时分支，不是线上目标。
+            <template v-if="preview.recoveredPair">
+              原方向：{{ preview.recoveredPair.from }} → {{ preview.recoveredPair.into }}。
+            </template>
+            已推送则可申请 MR；不要再落盘。
+          </p>
+          <p v-else-if="situation === 'temp_remote'" class="tip tip-inline">
+            这对分支已有远程临时枝
+            <span class="mono">{{ preview.pairTempBranch?.name }}</span>
+            ，无需再落盘，直接申请 MR。
+          </p>
+          <p v-else-if="situation === 'temp_local'" class="tip tip-inline">
+            选边已记在本地临时枝
+            <span class="mono">{{ preview.pairTempBranch?.name }}</span>
+            。推送后即可申请 MR，无需再落盘。
+          </p>
+          <p v-else-if="situation === 'already_merged'" class="tip tip-inline">
+            「我的分支」已经包含在合入目标里，没有可合并的新提交，无需操作。
+          </p>
+          <p v-else-if="preview.outcome === 'conflicts'" class="tip tip-inline">
+            {{
+              truncatedConflicts
+                ? '冲突文件超过展示上限，无法在网页选边。请缩小范围或提高 maxFiles。'
+                : fromMatrix
+                  ? '红块选边后点「完成冲突处理」：写入本地临时分支，不推送，随后回矩阵。'
+                  : '红块用 ≫ / ≪ 选线上或我的；绿=新增、蓝=修改，已自动进入结果。'
+            }}
+          </p>
+          <p v-else-if="preview.outcome === 'unrelated'" class="tip tip-inline">
+            两条历史没有共同祖先，不能当作干净合并落盘。
+          </p>
+          <p v-else-if="preview.clean" class="tip tip-inline">
+            {{
+              fromMatrix
+                ? '可干净合并。点「完成冲突处理」会记到本地临时分支（不推送），再回矩阵。'
+                : '可干净合并。落盘会在独立 worktree 提交到临时分支，主工作区保持不变。'
+            }}
+          </p>
+
+          <ConflictResolvePanel
+            v-if="situation === 'conflicts' && preview.conflictFiles.length"
+            ref="resolvePanel"
+            :files="preview.conflictFiles"
+            :repo-id="repoId()"
+            :into="pairInto"
+            :from="pairFrom"
+            @progress="resolvePending = $event.pending"
+          />
+          <p v-else-if="situation === 'already_merged'" class="hint-empty">没有可合并的新提交，无需操作。</p>
+          <p v-else-if="preview.clean && canApply" class="hint-empty">
+            没有冲突文件。落盘只写临时枝，不改你正在看的分支。
+          </p>
+        </section>
+
+        <section v-if="applyResult" class="gc-glass pad next-pane fill">
+          <div class="result-head">
+            <p class="gc-eyebrow">已落盘{{ applyResult.pushed ? ' · 已推送' : ' · 仅本地' }}</p>
+            <span class="mono sha">{{ applyResult.tempBranch }}</span>
+          </div>
+          <dl class="apply-meta">
+            <div>
+              <dt>临时分支</dt>
+              <dd class="mono">{{ applyResult.tempBranch }}</dd>
+            </div>
+            <div>
+              <dt>提交</dt>
+              <dd class="mono">{{ applyResult.commitSha.slice(0, 7) }}</dd>
+            </div>
+          </dl>
+          <p v-if="applyResult.createMrUrl" class="apply-link">
+            <a :href="applyResult.createMrUrl" target="_blank" rel="noreferrer">打开创建 MR/PR 页面</a>
+          </p>
+          <el-alert v-if="mrPrep?.cliError && !mrPrep.cli" type="warning" :closable="false" :title="mrPrep.cliError" />
+          <p v-if="mrPrep?.cliInstallUrl && !mrPrep.cli" class="apply-link">
+            官方下载：
+            <a :href="mrPrep.cliInstallUrl" target="_blank" rel="noreferrer">{{ mrPrep.cliInstallUrl }}</a>
+          </p>
+          <div class="apply-actions">
+            <el-button type="primary" @click="runCreatePr">创建 PR/MR</el-button>
+            <el-button @click="runPreview">重新预演</el-button>
+          </div>
+        </section>
+
+        <section v-if="prResult" class="gc-glass pad next-pane">
+          <div class="result-head">
+            <p class="gc-eyebrow">{{ prResult.via === 'browser' ? 'MR 正文 · 浏览器创建页' : '已开单' }}</p>
+            <span class="mono sha">{{ prResult.sourceBranch }} → {{ prResult.targetBranch }}</span>
+          </div>
+          <el-alert
+            v-for="(msg, i) in prResult.messages"
+            :key="i"
+            class="mb"
+            :type="msg.includes('建议') ? 'warning' : 'info'"
+            :closable="false"
+            :title="msg"
+          />
+          <p v-if="prResult.url" class="apply-link">
+            <a :href="prResult.url" target="_blank" rel="noreferrer">{{
+              prResult.via === 'browser'
+                ? '打开创建页'
+                : `已创建${prResult.number != null ? ' #' + prResult.number : ''}`
+            }}</a>
+          </p>
+          <p v-if="prResult.cliInstallUrl" class="apply-link">
+            未检测到本机 CLI，请自行安装：
+            <a :href="prResult.cliInstallUrl" target="_blank" rel="noreferrer">{{ prResult.cliInstallUrl }}</a>
+          </p>
+          <div v-if="prResult.via === 'browser' && prResult.body?.trim()" class="pr-body">
+            <header>
+              <strong>待粘贴正文</strong>
+              <el-button size="small" @click="copyPrBody">复制正文</el-button>
+            </header>
+            <pre>{{ prResult.body }}</pre>
+          </div>
+        </section>
       </div>
     </template>
 
@@ -929,7 +959,9 @@ watch([pairInto, pairFrom], () => {
   font-size: var(--gc-text);
   color: var(--el-text-color-secondary);
 }
-.mb { margin-bottom: var(--gc-gap); }
+.mb {
+  margin-bottom: var(--gc-gap);
+}
 .pr-body {
   margin-top: var(--gc-pad);
   padding: var(--gc-gap) var(--gc-pad);

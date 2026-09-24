@@ -91,11 +91,11 @@ git-cockpit version # 输出版本号
 
 ### 环境变量
 
-| 变量 | 说明 | 默认 |
-| --- | --- | --- |
+| 变量                   | 说明                                 | 默认             |
+| ---------------------- | ------------------------------------ | ---------------- |
 | `GIT_COCKPIT_DATA_DIR` | 数据目录（仓库列表、审计日志、备份） | `~/.git-cockpit` |
-| `GIT_COCKPIT_PORT` | Web 服务端口 | `3000` |
-| `GIT_COCKPIT_HOST` | 监听地址 | `localhost` |
+| `GIT_COCKPIT_PORT`     | Web 服务端口                         | `3000`           |
+| `GIT_COCKPIT_HOST`     | 监听地址                             | `localhost`      |
 
 ## 主要特性
 

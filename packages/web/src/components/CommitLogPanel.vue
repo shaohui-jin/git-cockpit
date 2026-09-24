@@ -102,12 +102,14 @@ defineExpose({ refresh: loadLog, loading });
         <el-radio-button value="all">全部分支</el-radio-button>
         <el-radio-button value="branch">指定分支</el-radio-button>
       </el-radio-group>
-      <BranchTreeSelect
-        v-if="mode === 'branch'"
-        v-model="selectedBranch"
-        placeholder="选择分支"
+      <BranchTreeSelect v-if="mode === 'branch'" v-model="selectedBranch" placeholder="选择分支" />
+      <el-input
+        v-model="pathFilter"
+        clearable
+        placeholder="按路径过滤（可选）"
+        class="path-input"
+        @keyup.enter="loadLog"
       />
-      <el-input v-model="pathFilter" clearable placeholder="按路径过滤（可选）" class="path-input" @keyup.enter="loadLog" />
       <el-select v-model="maxCount" class="count-select">
         <el-option label="最近 20 条" :value="20" />
         <el-option label="最近 50 条" :value="50" />
@@ -138,7 +140,9 @@ defineExpose({ refresh: loadLog, loading });
         @keyup.enter="openCommit(row)"
       >
         <span class="mono" :title="row.hash">{{ row.shortHash }}</span>
-        <span class="subject" :title="row.refs ? `${row.subject}  ·  ${row.refs}` : row.subject">{{ row.subject }}</span>
+        <span class="subject" :title="row.refs ? `${row.subject}  ·  ${row.refs}` : row.subject">{{
+          row.subject
+        }}</span>
         <span :title="`${row.authorName} <${row.authorEmail}>`">{{ row.authorName }}</span>
         <span>{{ formatDate(row.authorDate) }}</span>
       </div>
@@ -153,7 +157,9 @@ defineExpose({ refresh: loadLog, loading });
       </template>
       <template v-if="showCommit">
         <div class="commit-meta">
-          <span class="commit-meta-item" :title="`${showCommit.authorName} <${showCommit.authorEmail}>`">{{ showCommit.authorName }}</span>
+          <span class="commit-meta-item" :title="`${showCommit.authorName} <${showCommit.authorEmail}>`">{{
+            showCommit.authorName
+          }}</span>
           <span class="sep">·</span>
           <span class="commit-meta-item">{{ formatDate(showCommit.authorDate) }}</span>
           <template v-if="showCommit.refs">
@@ -168,12 +174,7 @@ defineExpose({ refresh: loadLog, loading });
             <span v-if="showDiff.truncated" class="warn">已截断</span>
           </template>
         </div>
-        <button
-          v-if="showCommit.body"
-          type="button"
-          class="commit-body-toggle"
-          @click="bodyOpen = !bodyOpen"
-        >
+        <button v-if="showCommit.body" type="button" class="commit-body-toggle" @click="bodyOpen = !bodyOpen">
           {{ bodyOpen ? '收起说明' : '展开说明' }}
         </button>
         <pre v-if="bodyOpen && showCommit.body" class="commit-body">{{ showCommit.body }}</pre>

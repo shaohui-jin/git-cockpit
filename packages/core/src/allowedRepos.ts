@@ -20,8 +20,5 @@ export function isRepoAllowed(repoPath: string, allowedRepos: string[] | undefin
 
 export function assertRepoAllowed(repoPath: string, allowedRepos: string[] | undefined): void {
   if (isRepoAllowed(repoPath, allowedRepos)) return;
-  throw new GitOperationError(
-    `仓库不在 allowedRepos 白名单内：${path.resolve(repoPath)}`,
-    'REPO_NOT_ALLOWED'
-  );
+  throw new GitOperationError(`仓库不在 allowedRepos 白名单内：${path.resolve(repoPath)}`, 'REPO_NOT_ALLOWED');
 }

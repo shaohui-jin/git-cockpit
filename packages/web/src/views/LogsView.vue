@@ -142,7 +142,10 @@ onMounted(() => {
 .th,
 .tr {
   display: grid;
-  grid-template-columns: 150px 56px minmax(160px, 1.1fr) minmax(140px, 1fr) minmax(140px, 1fr) minmax(160px, 1.2fr) 72px;
+  grid-template-columns: 150px 56px minmax(160px, 1.1fr) minmax(140px, 1fr) minmax(140px, 1fr) minmax(
+      160px,
+      1.2fr
+    ) 72px;
   gap: var(--gc-gap);
   padding: 0 var(--gc-pad);
   min-height: var(--gc-line);

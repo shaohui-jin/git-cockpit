@@ -20,11 +20,7 @@ export interface ChainRunner {
   commitTree: (tree: string, parents: string[]) => Promise<string>;
 }
 
-export async function runChain(
-  runner: ChainRunner,
-  into: string,
-  order: readonly string[]
-): Promise<MergeChainResult> {
+export async function runChain(runner: ChainRunner, into: string, order: readonly string[]): Promise<MergeChainResult> {
   const remotes = runner.remoteNames.length ? runner.remoteNames : ['origin'];
   const steps: MergeChainStep[] = [];
   let cursor = runner.intoSha;
@@ -50,11 +46,7 @@ export async function runChain(
     }
 
     const preview = await runner.previewBySha(cursor, fromSha);
-    const outcome: SurveyOutcome = preview.unrelatedHistories
-      ? 'unrelated'
-      : preview.clean
-        ? 'clean'
-        : 'conflicts';
+    const outcome: SurveyOutcome = preview.unrelatedHistories ? 'unrelated' : preview.clean ? 'clean' : 'conflicts';
 
     if (outcome !== 'clean' || !preview.resultTree) {
       const paths = preview.conflictPaths;
@@ -68,8 +60,7 @@ export async function runChain(
       blockedAt = from;
       blockedPaths = paths;
       if (!preview.resultTree) {
-        blockedReason =
-          outcome === 'unrelated' ? '两条历史没有共同祖先' : 'merge-tree 没有产出结果树，无法继续往下推';
+        blockedReason = outcome === 'unrelated' ? '两条历史没有共同祖先' : 'merge-tree 没有产出结果树，无法继续往下推';
       }
       break;
     }

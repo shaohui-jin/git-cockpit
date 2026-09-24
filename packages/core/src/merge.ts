@@ -6,7 +6,14 @@ import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { GitOperationError } from './types.ts';
-import type { ConflictFile, GitCommandResult, MergeOutcome, MergePairSituation, MrMergeGate, TempBranchState } from './types.ts';
+import type {
+  ConflictFile,
+  GitCommandResult,
+  MergeOutcome,
+  MergePairSituation,
+  MrMergeGate,
+  TempBranchState
+} from './types.ts';
 
 const MAX_CHARS = 24_000;
 const HUNK_END = '>>>>>>>';
@@ -57,10 +64,7 @@ export function parseGitVersion(stdout: string): GitVersion {
 export function assertMergeTreeVersion(version: GitVersion): void {
   const ok = version.major > 2 || (version.major === 2 && version.minor >= 38);
   if (!ok) {
-    throw new GitOperationError(
-      `合并预演需要 Git >= 2.38（当前 ${version.raw}）。请升级 Git 后重试。`,
-      'GIT_TOO_OLD'
-    );
+    throw new GitOperationError(`合并预演需要 Git >= 2.38（当前 ${version.raw}）。请升级 Git 后重试。`, 'GIT_TOO_OLD');
   }
 }
 
@@ -93,7 +97,10 @@ export function branchNameForMr(ref: string, remotes: string[] = ['origin']): st
 export function pickRemoteName(into: string, remoteNames: string[], explicit?: string): string {
   const named = explicit?.trim();
   if (named) return named;
-  const names = [...remoteNames].map((r) => r.trim()).filter(Boolean).sort((a, b) => b.length - a.length);
+  const names = [...remoteNames]
+    .map((r) => r.trim())
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length);
   const ref = into.trim();
   if (ref) {
     for (const name of names) {
@@ -151,9 +158,7 @@ export function isMergeTempRef(ref: string, remotes: string[] = ['origin']): boo
 }
 
 /** 落盘提交说明：`merge: from into into via temp` / `resolve: merge from into into via temp` */
-export function parseLandedMergeMessage(
-  body: string
-): { from: string; into: string; tempBranch: string } | null {
+export function parseLandedMergeMessage(body: string): { from: string; into: string; tempBranch: string } | null {
   const text = body.replace(/\r\n/g, '\n').trim();
   const resolve = text.match(/^resolve: merge (.+) into (.+) via (.+)$/m);
   if (resolve?.[1] && resolve[2] && resolve[3]) {
@@ -272,11 +277,7 @@ export function toHttpsRemoteUrl(remoteUrl: string): string | null {
  * 把 git remote URL 转成浏览器「新建 MR/PR」页。无法识别时返回 null。
  * GitHub 走 compare；其余按 GitLab `-/merge_requests/new` 拼。
  */
-export function buildCreateMrUrl(
-  remoteUrl: string,
-  sourceBranch: string,
-  targetBranch: string
-): string | null {
+export function buildCreateMrUrl(remoteUrl: string, sourceBranch: string, targetBranch: string): string | null {
   const https = toHttpsRemoteUrl(remoteUrl);
   if (!https) return null;
   try {

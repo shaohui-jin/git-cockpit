@@ -429,12 +429,7 @@ export interface ConflictBlameResult {
 }
 
 export type MergeOutcome = 'clean' | 'conflicts' | 'unrelated';
-export type MergePairSituation =
-  | 'looking_at_temp'
-  | 'temp_remote'
-  | 'temp_local'
-  | 'already_merged'
-  | MergeOutcome;
+export type MergePairSituation = 'looking_at_temp' | 'temp_remote' | 'temp_local' | 'already_merged' | MergeOutcome;
 
 export interface MergePreviewResult {
   repoRoot: string;

@@ -4,9 +4,9 @@ Git Cockpit 通过 GitHub Actions 把 **core** 与 **mcp-server** 两个包发�
 
 ## 1. 发布哪些包
 
-| 包 | npm 名称 | 版本维护位置 | 发布 tag |
-| --- | --- | --- | --- |
-| core | `@shaohui_jin/git-cockpit-core` | `packages/core/package.json` | `core-v{version}` |
+| 包         | npm 名称                              | 版本维护位置                       | 发布 tag                |
+| ---------- | ------------------------------------- | ---------------------------------- | ----------------------- |
+| core       | `@shaohui_jin/git-cockpit-core`       | `packages/core/package.json`       | `core-v{version}`       |
 | mcp-server | `@shaohui_jin/git-cockpit-mcp-server` | `packages/mcp-server/package.json` | `mcp-server-v{version}` |
 
 web 前端**不单独发布**：mcp-server 的 `prepublishOnly` 会把 `web/dist` 复制进 `dist/web`，随包一起发布；`webServer.ts` 的 `resolveWebDist` 会在发布布局 `dist/web` 下命中，无需额外安装静态资源。

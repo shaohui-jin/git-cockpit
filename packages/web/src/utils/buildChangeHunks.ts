@@ -2,13 +2,7 @@ import { diffArrays } from 'diff';
 import { parseConflictContent, type ConflictSegment } from './parseConflict';
 
 /** WebStorm 风格变更分类 */
-export type HunkKind =
-  | "equal"
-  | "add-left"
-  | "add-right"
-  | "modify-left"
-  | "modify-right"
-  | "conflict";
+export type HunkKind = 'equal' | 'add-left' | 'add-right' | 'modify-left' | 'modify-right' | 'conflict';
 
 /**
  * auto: 非冲突，默认已纳入结果
@@ -17,14 +11,14 @@ export type HunkKind =
  * ignore-left / ignore-right: 忽略该侧
  */
 export type HunkAction =
-  | "auto"
-  | "pending"
-  | "accept-left"
-  | "accept-right"
-  | "ignore-left"
-  | "ignore-right"
+  | 'auto'
+  | 'pending'
+  | 'accept-left'
+  | 'accept-right'
+  | 'ignore-left'
+  | 'ignore-right'
   /** AI / 自定义合并正文 */
-  | "custom";
+  | 'custom';
 
 export interface ChangeHunk {
   id: string;
@@ -47,14 +41,14 @@ interface SideRegion {
 }
 
 function splitLines(text: string | null | undefined): string[] {
-  if (text == null || text === "") {
+  if (text == null || text === '') {
     return [];
   }
-  return text.replace(/\r\n/g, "\n").split("\n");
+  return text.replace(/\r\n/g, '\n').split('\n');
 }
 
 function join(lines: string[]): string {
-  return lines.join("\n");
+  return lines.join('\n');
 }
 
 /**
@@ -103,46 +97,42 @@ function findInsertsAt(regions: SideRegion[], at: number): SideRegion[] {
  * 说明：合并预演对照的是两个分支 tip。左 15 / 右 18 即使
  * 「相对 base 只有右侧改过」，对用户仍是两边不一致，应标红而非蓝。
  */
-function classifyBothSides(
-  leftLines: string[],
-  rightLines: string[],
-  baseLines: string[],
-): Omit<ChangeHunk, "id"> {
+function classifyBothSides(leftLines: string[], rightLines: string[], baseLines: string[]): Omit<ChangeHunk, 'id'> {
   const l = join(leftLines);
   const r = join(rightLines);
   if (l === r) {
     return {
-      kind: baseLines.length === 0 ? "add-left" : "modify-left",
+      kind: baseLines.length === 0 ? 'add-left' : 'modify-left',
       leftLines,
       rightLines,
       baseLines,
-      action: "auto",
+      action: 'auto'
     };
   }
   if (leftLines.length === 0 && rightLines.length > 0) {
     return {
-      kind: "add-right",
+      kind: 'add-right',
       leftLines,
       rightLines,
       baseLines,
-      action: "auto",
+      action: 'auto'
     };
   }
   if (rightLines.length === 0 && leftLines.length > 0) {
     return {
-      kind: "add-left",
+      kind: 'add-left',
       leftLines,
       rightLines,
       baseLines,
-      action: "auto",
+      action: 'auto'
     };
   }
   return {
-    kind: "conflict",
+    kind: 'conflict',
     leftLines,
     rightLines,
     baseLines,
-    action: "pending",
+    action: 'pending'
   };
 }
 
@@ -155,23 +145,23 @@ function classifyBothSides(
 export function buildChangeHunksFromSides(
   baseText: string | null | undefined,
   oursText: string | null | undefined,
-  theirsText: string | null | undefined,
+  theirsText: string | null | undefined
 ): ChangeHunk[] {
-  const base = splitLines(baseText ?? "");
-  const ours = splitLines(oursText ?? "");
-  const theirs = splitLines(theirsText ?? "");
+  const base = splitLines(baseText ?? '');
+  const ours = splitLines(oursText ?? '');
+  const theirs = splitLines(theirsText ?? '');
 
   if (base.length === 0) {
     if (join(ours) === join(theirs)) {
       return [
         {
-          id: "h-0",
-          kind: "equal",
+          id: 'h-0',
+          kind: 'equal',
           leftLines: ours,
           rightLines: theirs,
           baseLines: [],
-          action: "auto",
-        },
+          action: 'auto'
+        }
       ];
     }
     return buildTwoWayHunks(ours, theirs);
@@ -193,7 +183,7 @@ export function buildChangeHunksFromSides(
 
   const hunks: ChangeHunk[] = [];
   let id = 0;
-  const push = (h: Omit<ChangeHunk, "id">) => {
+  const push = (h: Omit<ChangeHunk, 'id'>) => {
     hunks.push({ ...h, id: `h-${id++}` });
   };
 
@@ -219,36 +209,36 @@ export function buildChangeHunksFromSides(
       if (l && r) {
         if (join(l.lines) === join(r.lines)) {
           push({
-            kind: "add-left",
+            kind: 'add-left',
             leftLines: l.lines,
             rightLines: r.lines,
             baseLines: [],
-            action: "auto",
+            action: 'auto'
           });
         } else {
           push({
-            kind: "conflict",
+            kind: 'conflict',
             leftLines: l.lines,
             rightLines: r.lines,
             baseLines: [],
-            action: "pending",
+            action: 'pending'
           });
         }
       } else if (l) {
         push({
-          kind: "add-left",
+          kind: 'add-left',
           leftLines: l.lines,
           rightLines: [],
           baseLines: [],
-          action: "auto",
+          action: 'auto'
         });
       } else if (r) {
         push({
-          kind: "add-right",
+          kind: 'add-right',
           leftLines: [],
           rightLines: r.lines,
           baseLines: [],
-          action: "auto",
+          action: 'auto'
         });
       }
     }
@@ -271,38 +261,27 @@ export function buildChangeHunksFromSides(
 
     // 找到覆盖本切片的完整 region（在 region 起点才输出整块）
     const lFull = leftRegions.find(
-      (r) => r.start !== r.end && r.start === start && r.end >= end && !emittedLeft.has(r),
+      (r) => r.start !== r.end && r.start === start && r.end >= end && !emittedLeft.has(r)
     );
     const rFull = rightRegions.find(
-      (r) => r.start !== r.end && r.start === start && r.end >= end && !emittedRight.has(r),
+      (r) => r.start !== r.end && r.start === start && r.end >= end && !emittedRight.has(r)
     );
 
     // 本切片落在某 region 内部（非起点）→ 跳过（已随起点整块输出）
-    const lInside = leftRegions.find(
-      (r) => r.start !== r.end && r.start < start && r.end >= end,
-    );
-    const rInside = rightRegions.find(
-      (r) => r.start !== r.end && r.start < start && r.end >= end,
-    );
+    const lInside = leftRegions.find((r) => r.start !== r.end && r.start < start && r.end >= end);
+    const rInside = rightRegions.find((r) => r.start !== r.end && r.start < start && r.end >= end);
     if ((lInside || rInside) && !lFull && !rFull) {
       continue;
     }
 
     // 扩展：若 region 比当前切片更大，一次吐完整 region
-    const l = leftRegions.find(
-      (r) => r.start !== r.end && r.start === start && !emittedLeft.has(r),
-    );
-    const r = rightRegions.find(
-      (r) => r.start !== r.end && r.start === start && !emittedRight.has(r),
-    );
+    const l = leftRegions.find((r) => r.start !== r.end && r.start === start && !emittedLeft.has(r));
+    const r = rightRegions.find((r) => r.start !== r.end && r.start === start && !emittedRight.has(r));
 
     if (l && r) {
       emittedLeft.add(l);
       emittedRight.add(r);
-      const baseSlice = base.slice(
-        Math.min(l.start, r.start),
-        Math.max(l.end, r.end),
-      );
+      const baseSlice = base.slice(Math.min(l.start, r.start), Math.max(l.end, r.end));
       push(classifyBothSides(l.lines, r.lines, baseSlice));
       const skipUntil = Math.max(l.end, r.end);
       while (pi + 1 < sorted.length - 1 && sorted[pi + 1]! < skipUntil) {
@@ -335,11 +314,11 @@ export function buildChangeHunksFromSides(
 
     // 双侧都无变更 → equal
     push({
-      kind: "equal",
+      kind: 'equal',
       leftLines: sliceBase,
       rightLines: [...sliceBase],
       baseLines: sliceBase,
-      action: "auto",
+      action: 'auto'
     });
   }
 
@@ -351,9 +330,7 @@ export function buildChangeHunksFromSides(
     if (emittedLeft.has(l) || l.start === l.end) {
       continue;
     }
-    const r = rightRegions.find(
-      (x) => !emittedRight.has(x) && x.start === l.start && x.end === l.end,
-    );
+    const r = rightRegions.find((x) => !emittedRight.has(x) && x.start === l.start && x.end === l.end);
     if (r) {
       emittedRight.add(r);
       emittedLeft.add(l);
@@ -376,13 +353,13 @@ export function buildChangeHunksFromSides(
   if (hunks.length === 0) {
     return [
       {
-        id: "h-0",
-        kind: "equal",
+        id: 'h-0',
+        kind: 'equal',
         leftLines: ours,
         rightLines: theirs,
         baseLines: base,
-        action: "auto",
-      },
+        action: 'auto'
+      }
     ];
   }
   return hunks;
@@ -399,11 +376,11 @@ function buildTwoWayHunks(ours: string[], theirs: string[]): ChangeHunk[] {
     if (!part.added && !part.removed) {
       hunks.push({
         id: `h-${id++}`,
-        kind: "equal",
+        kind: 'equal',
         leftLines: [...part.value],
         rightLines: [...part.value],
         baseLines: [...part.value],
-        action: "auto",
+        action: 'auto'
       });
       i += 1;
       continue;
@@ -422,29 +399,29 @@ function buildTwoWayHunks(ours: string[], theirs: string[]): ChangeHunk[] {
     if (left.length && right.length) {
       hunks.push({
         id: `h-${id++}`,
-        kind: "conflict",
+        kind: 'conflict',
         leftLines: left,
         rightLines: right,
         baseLines: [],
-        action: "pending",
+        action: 'pending'
       });
     } else if (left.length) {
       hunks.push({
         id: `h-${id++}`,
-        kind: "add-left",
+        kind: 'add-left',
         leftLines: left,
         rightLines: [],
         baseLines: [],
-        action: "auto",
+        action: 'auto'
       });
     } else {
       hunks.push({
         id: `h-${id++}`,
-        kind: "add-right",
+        kind: 'add-right',
         leftLines: [],
         rightLines: right,
         baseLines: [],
-        action: "auto",
+        action: 'auto'
       });
     }
   }
@@ -459,43 +436,43 @@ export function buildChangeHunksFromMarkers(
   conflictContent: string | null | undefined,
   oursText?: string | null,
   theirsText?: string | null,
-  baseText?: string | null,
+  baseText?: string | null
 ): ChangeHunk[] {
   let segs = parseConflictContent(conflictContent);
   if (segs.length === 0 && (oursText != null || theirsText != null)) {
     segs = [
       {
-        id: "c-0",
-        type: "conflict",
-        ours: oursText ?? "",
-        base: baseText ?? "",
-        theirs: theirsText ?? "",
-        choice: null,
-      },
+        id: 'c-0',
+        type: 'conflict',
+        ours: oursText ?? '',
+        base: baseText ?? '',
+        theirs: theirsText ?? '',
+        choice: null
+      }
     ];
   }
   const hunks: ChangeHunk[] = [];
   let i = 0;
   for (const seg of segs) {
-    if (seg.type === "text") {
+    if (seg.type === 'text') {
       const lines = splitLines(seg.content);
       hunks.push({
         id: `h-${i++}`,
-        kind: "equal",
+        kind: 'equal',
         leftLines: lines,
         rightLines: [...lines],
         baseLines: [...lines],
-        action: "auto",
+        action: 'auto'
       });
     } else {
       const c = seg as ConflictSegment;
       hunks.push({
         id: `h-${i++}`,
-        kind: "conflict",
+        kind: 'conflict',
         leftLines: splitLines(c.ours),
         rightLines: splitLines(c.theirs),
         baseLines: splitLines(c.base),
-        action: "pending",
+        action: 'pending'
       });
     }
   }
@@ -506,19 +483,14 @@ export function buildChangeHunksFromMarkers(
  * 用 merge-file 冲突标记给已有 hunk 打标：匹配到的块升为 conflict，
  * 但不整表替换（避免丢掉 add-right 等非冲突行）。
  */
-function applyMarkerConflictHints(
-  hunks: ChangeHunk[],
-  conflictContent: string | null | undefined,
-): ChangeHunk[] {
-  const markers = parseConflictContent(conflictContent).filter(
-    (s): s is ConflictSegment => s.type === "conflict",
-  );
+function applyMarkerConflictHints(hunks: ChangeHunk[], conflictContent: string | null | undefined): ChangeHunk[] {
+  const markers = parseConflictContent(conflictContent).filter((s): s is ConflictSegment => s.type === 'conflict');
   if (markers.length === 0) {
     return hunks;
   }
 
   return hunks.map((h) => {
-    if (h.kind === "equal" || h.kind === "conflict") {
+    if (h.kind === 'equal' || h.kind === 'conflict') {
       return h;
     }
     const hLeft = join(h.leftLines).trim();
@@ -531,19 +503,18 @@ function applyMarkerConflictHints(
       }
       const leftHit =
         (!!ours && (hLeft === ours || hLeft.includes(ours) || ours.includes(hLeft))) ||
-        (!ours && h.kind.endsWith("right") && !!theirs && (hRight === theirs || hRight.includes(theirs)));
-      const rightHit =
-        !!theirs && (hRight === theirs || hRight.includes(theirs) || theirs.includes(hRight));
+        (!ours && h.kind.endsWith('right') && !!theirs && (hRight === theirs || hRight.includes(theirs)));
+      const rightHit = !!theirs && (hRight === theirs || hRight.includes(theirs) || theirs.includes(hRight));
       if (!leftHit && !rightHit) {
         continue;
       }
       // 两侧内容不同才标红；补全空侧为 marker 文本
       return {
         ...h,
-        kind: "conflict",
+        kind: 'conflict',
         leftLines: h.leftLines.length ? h.leftLines : splitLines(m.ours),
         rightLines: h.rightLines.length ? h.rightLines : splitLines(m.theirs),
-        action: "pending",
+        action: 'pending'
       };
     }
     return h;
@@ -560,49 +531,39 @@ export function buildChangeHunks(file: {
   theirsContent?: string | null;
   baseContent?: string | null;
 }): ChangeHunk[] {
-  const hasSides =
-    file.oursContent != null || file.theirsContent != null || file.baseContent != null;
+  const hasSides = file.oursContent != null || file.theirsContent != null || file.baseContent != null;
 
   if (hasSides) {
-    const hunks = buildChangeHunksFromSides(
-      file.baseContent,
-      file.oursContent,
-      file.theirsContent,
-    );
+    const hunks = buildChangeHunksFromSides(file.baseContent, file.oursContent, file.theirsContent);
     return applyMarkerConflictHints(hunks, file.conflictContent);
   }
 
-  return buildChangeHunksFromMarkers(
-    file.conflictContent,
-    file.oursContent,
-    file.theirsContent,
-    file.baseContent,
-  );
+  return buildChangeHunksFromMarkers(file.conflictContent, file.oursContent, file.theirsContent, file.baseContent);
 }
 
 /** 根据 action 生成该 hunk 写入 Result 的行；pending 返回 null */
 export function resolveHunkLines(hunk: ChangeHunk): string[] | null {
   switch (hunk.action) {
-    case "auto":
-      if (hunk.kind === "equal") {
+    case 'auto':
+      if (hunk.kind === 'equal') {
         return hunk.leftLines.length ? hunk.leftLines : hunk.rightLines;
       }
-      if (hunk.kind === "add-left" || hunk.kind === "modify-left") {
+      if (hunk.kind === 'add-left' || hunk.kind === 'modify-left') {
         return hunk.leftLines;
       }
-      if (hunk.kind === "add-right" || hunk.kind === "modify-right") {
+      if (hunk.kind === 'add-right' || hunk.kind === 'modify-right') {
         return hunk.rightLines;
       }
       return null;
-    case "accept-left":
-    case "ignore-right":
+    case 'accept-left':
+    case 'ignore-right':
       return hunk.leftLines;
-    case "accept-right":
-    case "ignore-left":
+    case 'accept-right':
+    case 'ignore-left':
       return hunk.rightLines;
-    case "custom":
+    case 'custom':
       return hunk.customLines ?? [];
-    case "pending":
+    case 'pending':
       return null;
     default:
       return null;
@@ -614,16 +575,12 @@ export function applyHunkActions(hunks: ChangeHunk[]): string {
   for (const h of hunks) {
     const lines = resolveHunkLines(h);
     if (lines == null) {
-      parts.push(
-        ["<<<<<<< 未解决", ...h.leftLines, "=======", ...h.rightLines, ">>>>>>>"].join(
-          "\n",
-        ),
-      );
+      parts.push(['<<<<<<< 未解决', ...h.leftLines, '=======', ...h.rightLines, '>>>>>>>'].join('\n'));
     } else if (lines.length > 0) {
-      parts.push(lines.join("\n"));
+      parts.push(lines.join('\n'));
     }
   }
-  return parts.join("\n");
+  return parts.join('\n');
 }
 
 export function countHunkStats(hunks: ChangeHunk[]): {
@@ -637,13 +594,13 @@ export function countHunkStats(hunks: ChangeHunk[]): {
   let resolved = 0;
   let pending = 0;
   for (const h of hunks) {
-    if (h.kind === "equal") {
+    if (h.kind === 'equal') {
       continue;
     }
     changes += 1;
-    if (h.kind === "conflict") {
+    if (h.kind === 'conflict') {
       conflicts += 1;
-      if (h.action === "pending") {
+      if (h.action === 'pending') {
         pending += 1;
       } else {
         resolved += 1;
@@ -655,47 +612,43 @@ export function countHunkStats(hunks: ChangeHunk[]): {
 
 export function kindClass(kind: HunkKind): string {
   switch (kind) {
-    case "add-left":
-      return "hunk-add hunk-add-left";
-    case "add-right":
-      return "hunk-add hunk-add-right";
-    case "modify-left":
-      return "hunk-modify hunk-modify-left";
-    case "modify-right":
-      return "hunk-modify hunk-modify-right";
-    case "conflict":
-      return "hunk-conflict";
+    case 'add-left':
+      return 'hunk-add hunk-add-left';
+    case 'add-right':
+      return 'hunk-add hunk-add-right';
+    case 'modify-left':
+      return 'hunk-modify hunk-modify-left';
+    case 'modify-right':
+      return 'hunk-modify hunk-modify-right';
+    case 'conflict':
+      return 'hunk-conflict';
     default:
-      return "hunk-equal";
+      return 'hunk-equal';
   }
 }
 
-export function choiceToAction(
-  choice: "ours" | "theirs" | "base" | "custom" | string,
-): HunkAction {
-  if (choice === "ours") {
-    return "accept-left";
+export function choiceToAction(choice: 'ours' | 'theirs' | 'base' | 'custom' | string): HunkAction {
+  if (choice === 'ours') {
+    return 'accept-left';
   }
-  if (choice === "theirs") {
-    return "accept-right";
+  if (choice === 'theirs') {
+    return 'accept-right';
   }
-  if (choice === "custom") {
-    return "custom";
+  if (choice === 'custom') {
+    return 'custom';
   }
-  return "pending";
+  return 'pending';
 }
 
-export function actionToChoice(
-  action: HunkAction,
-): "ours" | "theirs" | "custom" | null {
-  if (action === "accept-left" || action === "ignore-right") {
-    return "ours";
+export function actionToChoice(action: HunkAction): 'ours' | 'theirs' | 'custom' | null {
+  if (action === 'accept-left' || action === 'ignore-right') {
+    return 'ours';
   }
-  if (action === "accept-right" || action === "ignore-left") {
-    return "theirs";
+  if (action === 'accept-right' || action === 'ignore-left') {
+    return 'theirs';
   }
-  if (action === "custom") {
-    return "custom";
+  if (action === 'custom') {
+    return 'custom';
   }
   return null;
 }

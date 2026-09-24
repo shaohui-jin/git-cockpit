@@ -7,9 +7,10 @@ export class JobStore {
 
   list(limit = 200): Job[] {
     const cap = Math.min(Math.max(limit, 1), 500);
-    const rows = this.db
-      .prepare('SELECT * FROM jobs ORDER BY started_at DESC LIMIT ?')
-      .all(cap) as Record<string, unknown>[];
+    const rows = this.db.prepare('SELECT * FROM jobs ORDER BY started_at DESC LIMIT ?').all(cap) as Record<
+      string,
+      unknown
+    >[];
     return rows.map((r) => this.rowToJob(r));
   }
 

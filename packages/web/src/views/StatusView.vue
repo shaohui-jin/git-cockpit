@@ -50,9 +50,7 @@ const logPanel = ref<{ refresh: () => Promise<void>; loading: boolean } | null>(
 const lineageInto = ref('');
 const lineageFrom = ref('');
 const workspaceConflicts = ref<WorkspaceConflicts | null>(null);
-const workspacePanel = ref<{ buildFiles: () => Array<{ path: string; resolvedContent: string }> } | null>(
-  null
-);
+const workspacePanel = ref<{ buildFiles: () => Array<{ path: string; resolvedContent: string }> } | null>(null);
 const backups = ref<BackupList>({ branches: [], stashes: [] });
 const reflog = ref<ReflogEntry[]>([]);
 const historyTab = ref<'stash' | 'backup' | 'reflog' | 'worktree'>('stash');
@@ -134,7 +132,12 @@ const graphDefaultRemote = computed(() =>
 const tabLists = computed(() => {
   const s = status.value;
   if (!s) {
-    return { unstaged: [] as FileStatus[], staged: [] as FileStatus[], untracked: [] as FileStatus[], all: [] as FileStatus[] };
+    return {
+      unstaged: [] as FileStatus[],
+      staged: [] as FileStatus[],
+      untracked: [] as FileStatus[],
+      all: [] as FileStatus[]
+    };
   }
   const untracked: FileStatus[] = s.untracked.map((p) => ({
     path: p,
@@ -594,8 +597,7 @@ function workspaceContinue(): void {
 function workspaceAbort(): void {
   const op = status.value?.operation;
   if (op !== 'merge' && op !== 'rebase' && op !== 'cherry-pick') return;
-  const tool =
-    op === 'merge' ? 'git_merge_abort' : op === 'rebase' ? 'git_rebase_abort' : 'git_cherry_pick_abort';
+  const tool = op === 'merge' ? 'git_merge_abort' : op === 'rebase' ? 'git_rebase_abort' : 'git_cherry_pick_abort';
   void run(tool);
 }
 
@@ -619,8 +621,8 @@ function onBranchCommand(cmd: string | number | object, n: BranchTreeNode): void
   else if (c === 'delete-force') deleteBranch(n, true);
 }
 
-const branchMenuCanDelete = computed(
-  () => Boolean(branchMenu.node?.branch && !branchMenu.node.branch.current && !branchMenu.node.remote)
+const branchMenuCanDelete = computed(() =>
+  Boolean(branchMenu.node?.branch && !branchMenu.node.branch.current && !branchMenu.node.remote)
 );
 let branchMenuOpenedAt = 0;
 
@@ -670,11 +672,11 @@ function deleteBranch(n: BranchTreeNode, force: boolean): void {
   if (!n.branch || n.branch.current || n.remote) return;
   const name = n.branch.name;
   if (force) {
-    ElMessageBox.confirm(
-      `强制删除本地分支 ${name}？（不检查是否已合并；高风险，执行前会备份）`,
-      '强制删除分支',
-      { type: 'warning', confirmButtonText: '继续', cancelButtonText: '取消' }
-    )
+    ElMessageBox.confirm(`强制删除本地分支 ${name}？（不检查是否已合并；高风险，执行前会备份）`, '强制删除分支', {
+      type: 'warning',
+      confirmButtonText: '继续',
+      cancelButtonText: '取消'
+    })
       .then(() => void run('git_branch_delete_force', { name }))
       .catch(() => undefined);
     return;
@@ -751,7 +753,7 @@ function confirmRebase(): void {
 
 function statusLetter(f: FileStatus): string {
   if (f.untracked) return '?';
-  return f.staged ? (f.indexStatus || 'M') : (f.workTreeStatus || 'M');
+  return f.staged ? f.indexStatus || 'M' : f.workTreeStatus || 'M';
 }
 function statusClass(f: FileStatus): string {
   if (f.untracked) return 'new';
@@ -824,7 +826,11 @@ onUnmounted(() => {
 
     <div v-else class="status-layout">
       <!-- 左：分支树 -->
-      <el-card v-if="contentMode === 'workspace'" shadow="never" class="branch-panel glass gc-card-fill gc-card-fill--tight">
+      <el-card
+        v-if="contentMode === 'workspace'"
+        shadow="never"
+        class="branch-panel glass gc-card-fill gc-card-fill--tight"
+      >
         <template #header>
           <div class="panel-head">
             <span class="panel-title">分支 Branch</span>
@@ -857,7 +863,12 @@ onUnmounted(() => {
                   @contextmenu="openBranchMenu($event, data)"
                 >
                   <span class="node-name">{{ data.label }}</span>
-                  <span v-if="!data.remote" class="node-sync" :class="{ clean: !syncText(data.branch) && data.branch?.upstream }">{{ syncText(data.branch) }}</span>
+                  <span
+                    v-if="!data.remote"
+                    class="node-sync"
+                    :class="{ clean: !syncText(data.branch) && data.branch?.upstream }"
+                    >{{ syncText(data.branch) }}</span
+                  >
                 </div>
               </template>
             </el-tree>
@@ -875,15 +886,22 @@ onUnmounted(() => {
             <BranchTreeSelect v-model="lineageInto" remote-first placeholder="选择线上目标" />
             <span class="field-label">我的分支</span>
             <BranchTreeSelect v-model="lineageFrom" placeholder="选择我的分支" />
-            <el-button type="primary" :disabled="!lineageInto || !lineageFrom" :loading="graphLoading" @click="compareLineage">对比</el-button>
+            <el-button
+              type="primary"
+              :disabled="!lineageInto || !lineageFrom"
+              :loading="graphLoading"
+              @click="compareLineage"
+              >对比</el-button
+            >
             <el-button :disabled="!graph?.lineage" @click="clearLineage">清除</el-button>
-            <el-button v-if="graph?.lineage?.mergeBase" text type="primary" @click="goMergePreview">去合并预演</el-button>
+            <el-button v-if="graph?.lineage?.mergeBase" text type="primary" @click="goMergePreview"
+              >去合并预演</el-button
+            >
           </div>
           <p v-if="graph?.lineage" class="lineage-meta">
             <template v-if="graph.lineage.mergeBase">
-              merge-base {{ graph.lineage.mergeBase.slice(0, 7) }}
-              · {{ graph.lineage.into }} 独有 {{ graph.lineage.intoOnlyCount }}
-              · {{ graph.lineage.from }} 独有 {{ graph.lineage.fromOnlyCount }}
+              merge-base {{ graph.lineage.mergeBase.slice(0, 7) }} · {{ graph.lineage.into }} 独有
+              {{ graph.lineage.intoOnlyCount }} · {{ graph.lineage.from }} 独有 {{ graph.lineage.fromOnlyCount }}
             </template>
             <template v-else>两条分支没有共同祖先</template>
           </p>
@@ -897,268 +915,305 @@ onUnmounted(() => {
         </div>
 
         <div v-else-if="contentMode === 'log'" class="log-pane">
-          <CommitLogPanel
-            ref="logPanel"
-            :operation="status?.operation ?? 'none'"
-            @pick="cherryPickCommit"
-          />
+          <CommitLogPanel ref="logPanel" :operation="status?.operation ?? 'none'" @pick="cherryPickCommit" />
         </div>
 
         <template v-else>
-        <!-- 工具栏 -->
-        <el-card shadow="never" class="toolbar-card glass">
-          <div class="toolbar">
-            <div class="toolbar-group gc-gap-btns">
-              <el-button type="primary" @click="commitVisible = true">提交 Commit</el-button>
-              <el-button plain @click="stageAll">暂存全部</el-button>
-              <el-button plain :disabled="(status?.staged.length ?? 0) === 0" @click="unstageAll">取消暂存全部</el-button>
-              <el-badge :value="checkedCount" :hidden="checkedCount === 0" :offset="[2, 4]">
-                <el-button type="success" plain @click="openStashDialog">暂存改动 Stash</el-button>
-              </el-badge>
-              <el-tooltip content="Shelve Silently：使用默认说明，一键暂存全部更改" placement="top">
-                <el-button plain @click="silentStash">静默 Stash</el-button>
-              </el-tooltip>
-              <el-tooltip content="把选中分支合并进当前检出分支（会改工作区）。预演请走底栏「合并」。" placement="top">
-                <el-button plain @click="mergeVisible = true">工作区合并</el-button>
-              </el-tooltip>
-              <el-tooltip content="git fetch --prune，更新远程跟踪分支，不改工作区" placement="top">
-                <el-button plain @click="fetchRemote">Fetch</el-button>
-              </el-tooltip>
-              <el-tooltip content="把当前分支的上游更新合并进来。没有上游时会失败。" placement="top">
-                <el-button plain @click="pull">拉取</el-button>
-              </el-tooltip>
-              <el-button plain @click="tagVisible = true">打标签</el-button>
-              <el-button type="danger" plain @click="resetVisible = true">硬重置</el-button>
-              <el-button type="danger" plain @click="run('git_clean')">清理未跟踪</el-button>
-              <el-tooltip content="把当前分支变基到所选目标（高风险，改历史）" placement="top">
-                <el-button type="danger" plain @click="rebaseVisible = true">变基</el-button>
-              </el-tooltip>
-              <el-tooltip content="--force-with-lease 推送当前分支（高风险）" placement="top">
-                <el-button type="danger" plain @click="run('git_push_force')">强制推送</el-button>
-              </el-tooltip>
-            </div>
-          </div>
-        </el-card>
-
-        <el-alert
-          v-if="status?.operation && status.operation !== 'none'"
-          :title="operationTitle(status.operation)"
-          :description="
-            (status.conflicted.length ? `还有 ${status.conflicted.length} 个冲突文件。` : '冲突已处理，可以继续。') +
-            ' 选边写回当前工作区后点继续；或中止这次操作。不是底栏「合并」的 merge-tree 预演。'
-          "
-          type="error"
-          :closable="false"
-          show-icon
-          class="mb"
-        >
-          <template #default>
-            <div class="ws-conflict-actions">
-              <el-button type="primary" size="small" @click="workspaceContinue">完成选边并继续</el-button>
-              <el-button type="danger" plain size="small" @click="workspaceAbort">中止</el-button>
-            </div>
-          </template>
-        </el-alert>
-        <el-alert
-          v-else-if="status?.conflicted.length"
-          title="存在合并冲突，请先解决冲突（修改文件后重新 git add 并提交）"
-          type="error"
-          :closable="false"
-          show-icon
-          class="mb"
-        />
-
-        <ConflictResolvePanel
-          v-if="workspaceConflicts && workspaceConflicts.operation !== 'none' && workspaceConflicts.files.length"
-          ref="workspacePanel"
-          :files="workspaceConflicts.files"
-          :repo-id="repoId()"
-          :into="workspaceConflicts.into"
-          :from="workspaceConflicts.from"
-          :left-label="workspaceConflicts.oursLabel"
-          :right-label="workspaceConflicts.theirsLabel"
-          class="mb"
-        />
-
-        <div class="workspace-body">
-        <!-- 更改文件 -->
-        <el-card shadow="never" class="changes-card glass gc-card-fill gc-card-fill--flush">
-          <template #header>
-            <div class="card-head">
-              <span class="card-title">更改 Changes</span>
-              <div class="card-actions gc-gap-btns">
-                <el-tag v-if="checkedCount" size="small" type="primary" effect="plain">已选 {{ checkedCount }}</el-tag>
-                <el-button size="small" text @click="checkAllCurrentTab">全选本组</el-button>
-                <el-button v-if="checkedCount" size="small" text type="danger" @click="clearChecked">清除选择</el-button>
+          <!-- 工具栏 -->
+          <el-card shadow="never" class="toolbar-card glass">
+            <div class="toolbar">
+              <div class="toolbar-group gc-gap-btns">
+                <el-button type="primary" @click="commitVisible = true">提交 Commit</el-button>
+                <el-button plain @click="stageAll">暂存全部</el-button>
+                <el-button plain :disabled="(status?.staged.length ?? 0) === 0" @click="unstageAll"
+                  >取消暂存全部</el-button
+                >
+                <el-badge :value="checkedCount" :hidden="checkedCount === 0" :offset="[2, 4]">
+                  <el-button type="success" plain @click="openStashDialog">暂存改动 Stash</el-button>
+                </el-badge>
+                <el-tooltip content="Shelve Silently：使用默认说明，一键暂存全部更改" placement="top">
+                  <el-button plain @click="silentStash">静默 Stash</el-button>
+                </el-tooltip>
+                <el-tooltip
+                  content="把选中分支合并进当前检出分支（会改工作区）。预演请走底栏「合并」。"
+                  placement="top"
+                >
+                  <el-button plain @click="mergeVisible = true">工作区合并</el-button>
+                </el-tooltip>
+                <el-tooltip content="git fetch --prune，更新远程跟踪分支，不改工作区" placement="top">
+                  <el-button plain @click="fetchRemote">Fetch</el-button>
+                </el-tooltip>
+                <el-tooltip content="把当前分支的上游更新合并进来。没有上游时会失败。" placement="top">
+                  <el-button plain @click="pull">拉取</el-button>
+                </el-tooltip>
+                <el-button plain @click="tagVisible = true">打标签</el-button>
+                <el-button type="danger" plain @click="resetVisible = true">硬重置</el-button>
+                <el-button type="danger" plain @click="run('git_clean')">清理未跟踪</el-button>
+                <el-tooltip content="把当前分支变基到所选目标（高风险，改历史）" placement="top">
+                  <el-button type="danger" plain @click="rebaseVisible = true">变基</el-button>
+                </el-tooltip>
+                <el-tooltip content="--force-with-lease 推送当前分支（高风险）" placement="top">
+                  <el-button type="danger" plain @click="run('git_push_force')">强制推送</el-button>
+                </el-tooltip>
               </div>
             </div>
-          </template>
-          <el-tabs v-model="activeTab" class="changes-tabs gc-tabs-fill">
-            <el-tab-pane v-for="t in tabs" :key="t.key" :name="t.key">
-              <template #label>
-                <span class="tab-label">
-                  {{ t.label }}
-                  <el-badge :value="t.count" :hidden="t.count === 0" type="primary" class="tab-badge" />
-                </span>
-              </template>
-              <div class="tab-hint">「{{ t.hint }}」</div>
-              <div v-if="t.count === 0" class="file-empty">没有{{ t.label }}的文件</div>
-              <el-tree
-                v-else
-                :data="tabTrees[t.key]"
-                :props="{ label: 'label', children: 'children' }"
-                node-key="key"
-                default-expand-all
-                :indent="12"
-                class="change-tree gc-tree gc-tree-files"
-              >
-                <template #default="{ data }">
-                  <div
-                    v-if="data.file"
-                    class="change-file gc-gap-btns"
-                    :class="{ on: monitor.path === data.file.path }"
-                    @click="showDiff(data.file)"
-                  >
-                    <el-checkbox :model-value="isChecked(data.file.path)" @click.stop @change="toggleChecked(data.file.path)" />
-                    <span class="file-status" :class="statusClass(data.file)">{{ statusLetter(data.file) }}</span>
-                    <span class="file-path mono" :title="data.file.path">{{ data.label }}</span>
-                    <el-button v-if="data.file.conflicted" size="small" text type="warning" @click.stop="stageFile(data.file)">标记已解决(git add)</el-button>
-                    <el-button v-else size="small" text :type="data.file.staged ? 'warning' : 'success'" @click.stop="rowAction(data.file)">
-                      {{ data.file.staged ? '取消暂存' : '暂存' }}
-                    </el-button>
+          </el-card>
+
+          <el-alert
+            v-if="status?.operation && status.operation !== 'none'"
+            :title="operationTitle(status.operation)"
+            :description="
+              (status.conflicted.length ? `还有 ${status.conflicted.length} 个冲突文件。` : '冲突已处理，可以继续。') +
+              ' 选边写回当前工作区后点继续；或中止这次操作。不是底栏「合并」的 merge-tree 预演。'
+            "
+            type="error"
+            :closable="false"
+            show-icon
+            class="mb"
+          >
+            <template #default>
+              <div class="ws-conflict-actions">
+                <el-button type="primary" size="small" @click="workspaceContinue">完成选边并继续</el-button>
+                <el-button type="danger" plain size="small" @click="workspaceAbort">中止</el-button>
+              </div>
+            </template>
+          </el-alert>
+          <el-alert
+            v-else-if="status?.conflicted.length"
+            title="存在合并冲突，请先解决冲突（修改文件后重新 git add 并提交）"
+            type="error"
+            :closable="false"
+            show-icon
+            class="mb"
+          />
+
+          <ConflictResolvePanel
+            v-if="workspaceConflicts && workspaceConflicts.operation !== 'none' && workspaceConflicts.files.length"
+            ref="workspacePanel"
+            :files="workspaceConflicts.files"
+            :repo-id="repoId()"
+            :into="workspaceConflicts.into"
+            :from="workspaceConflicts.from"
+            :left-label="workspaceConflicts.oursLabel"
+            :right-label="workspaceConflicts.theirsLabel"
+            class="mb"
+          />
+
+          <div class="workspace-body">
+            <!-- 更改文件 -->
+            <el-card shadow="never" class="changes-card glass gc-card-fill gc-card-fill--flush">
+              <template #header>
+                <div class="card-head">
+                  <span class="card-title">更改 Changes</span>
+                  <div class="card-actions gc-gap-btns">
+                    <el-tag v-if="checkedCount" size="small" type="primary" effect="plain"
+                      >已选 {{ checkedCount }}</el-tag
+                    >
+                    <el-button size="small" text @click="checkAllCurrentTab">全选本组</el-button>
+                    <el-button v-if="checkedCount" size="small" text type="danger" @click="clearChecked"
+                      >清除选择</el-button
+                    >
                   </div>
-                  <div v-else class="change-dir">
-                    <el-checkbox
-                      :model-value="folderChecked(data)"
-                      :indeterminate="folderIndeterminate(data)"
-                      @click.stop
-                      @change="toggleFolder(data)"
-                    />
-                    <span class="dir-name" :title="data.fullPath">{{ data.label }}</span>
-                    <span class="dir-count">{{ data.fileCount }}</span>
+                </div>
+              </template>
+              <el-tabs v-model="activeTab" class="changes-tabs gc-tabs-fill">
+                <el-tab-pane v-for="t in tabs" :key="t.key" :name="t.key">
+                  <template #label>
+                    <span class="tab-label">
+                      {{ t.label }}
+                      <el-badge :value="t.count" :hidden="t.count === 0" type="primary" class="tab-badge" />
+                    </span>
+                  </template>
+                  <div class="tab-hint">「{{ t.hint }}」</div>
+                  <div v-if="t.count === 0" class="file-empty">没有{{ t.label }}的文件</div>
+                  <el-tree
+                    v-else
+                    :data="tabTrees[t.key]"
+                    :props="{ label: 'label', children: 'children' }"
+                    node-key="key"
+                    default-expand-all
+                    :indent="12"
+                    class="change-tree gc-tree gc-tree-files"
+                  >
+                    <template #default="{ data }">
+                      <div
+                        v-if="data.file"
+                        class="change-file gc-gap-btns"
+                        :class="{ on: monitor.path === data.file.path }"
+                        @click="showDiff(data.file)"
+                      >
+                        <el-checkbox
+                          :model-value="isChecked(data.file.path)"
+                          @click.stop
+                          @change="toggleChecked(data.file.path)"
+                        />
+                        <span class="file-status" :class="statusClass(data.file)">{{ statusLetter(data.file) }}</span>
+                        <span class="file-path mono" :title="data.file.path">{{ data.label }}</span>
+                        <el-button
+                          v-if="data.file.conflicted"
+                          size="small"
+                          text
+                          type="warning"
+                          @click.stop="stageFile(data.file)"
+                          >标记已解决(git add)</el-button
+                        >
+                        <el-button
+                          v-else
+                          size="small"
+                          text
+                          :type="data.file.staged ? 'warning' : 'success'"
+                          @click.stop="rowAction(data.file)"
+                        >
+                          {{ data.file.staged ? '取消暂存' : '暂存' }}
+                        </el-button>
+                      </div>
+                      <div v-else class="change-dir">
+                        <el-checkbox
+                          :model-value="folderChecked(data)"
+                          :indeterminate="folderIndeterminate(data)"
+                          @click.stop
+                          @change="toggleFolder(data)"
+                        />
+                        <span class="dir-name" :title="data.fullPath">{{ data.label }}</span>
+                        <span class="dir-count">{{ data.fileCount }}</span>
+                      </div>
+                    </template>
+                  </el-tree>
+                </el-tab-pane>
+              </el-tabs>
+            </el-card>
+
+            <div class="right-stack">
+              <el-card shadow="never" class="monitor-card glass gc-card-fill gc-card-fill--flush">
+                <template #header>
+                  <div class="card-head">
+                    <span class="card-title">差异监视器</span>
+                    <span v-if="monitor.diff" class="monitor-stat">
+                      <span>{{ monitor.diff.files.length }} 个文件</span>
+                      <span class="add">+{{ monitor.diff.insertions }}</span>
+                      <span class="del">-{{ monitor.diff.deletions }}</span>
+                      <span v-if="monitor.diff.truncated" class="warn">（已截断）</span>
+                    </span>
                   </div>
                 </template>
-              </el-tree>
-            </el-tab-pane>
-          </el-tabs>
-        </el-card>
+                <div v-loading="monitor.loading" class="monitor-body">
+                  <p v-if="monitor.title" class="monitor-file mono">{{ monitor.title }}</p>
+                  <DiffViewer v-if="monitor.diff?.rawPatch" :patch="monitor.diff.rawPatch" />
+                  <DiffViewer v-else-if="monitor.patch" :patch="monitor.patch" />
+                  <p v-else-if="monitor.diff" class="file-empty">无差异</p>
+                  <p v-else class="file-empty">点文件看红绿差异。Stash 的「差异」也会显示在这里。</p>
+                </div>
+              </el-card>
 
-        <div class="right-stack">
-        <el-card shadow="never" class="monitor-card glass gc-card-fill gc-card-fill--flush">
-          <template #header>
-            <div class="card-head">
-              <span class="card-title">差异监视器</span>
-              <span v-if="monitor.diff" class="monitor-stat">
-                <span>{{ monitor.diff.files.length }} 个文件</span>
-                <span class="add">+{{ monitor.diff.insertions }}</span>
-                <span class="del">-{{ monitor.diff.deletions }}</span>
-                <span v-if="monitor.diff.truncated" class="warn">（已截断）</span>
-              </span>
+              <el-card shadow="never" class="history-card glass gc-card-fill gc-card-fill--flush">
+                <template #header>
+                  <div class="card-head">
+                    <span class="card-title">记录 Records</span>
+                    <div class="card-actions gc-gap-btns">
+                      <el-button size="small" text @click="openWorktreeDialog">添加 worktree</el-button>
+                      <el-button
+                        size="small"
+                        text
+                        @click="
+                          loadStashes();
+                          loadWorktrees();
+                          loadBackupsAndReflog();
+                        "
+                        >刷新</el-button
+                      >
+                    </div>
+                  </div>
+                </template>
+                <el-tabs v-model="historyTab" class="history-tabs gc-tabs-fill">
+                  <el-tab-pane name="stash">
+                    <template #label>Stash（{{ stashes.length }}）</template>
+                    <div v-if="stashes.length === 0" class="file-empty">没有暂存的更改</div>
+                    <div v-else class="stash-list mono">
+                      <div v-for="s in stashes" :key="s.ref" class="stash-row" :class="{ on: monitor.path === s.ref }">
+                        <div class="stash-main">
+                          <span class="stash-ref">{{ s.ref }}</span>
+                          <span class="stash-msg" :title="s.message">{{ firstLine(s.message) || '（无说明）' }}</span>
+                          <span v-if="s.date" class="stash-date">{{ formatDate(s.date) }}</span>
+                        </div>
+                        <div class="stash-actions">
+                          <el-button size="small" text type="primary" @click="showStashDiff(s)">差异</el-button>
+                          <el-button size="small" text type="success" @click="applyStash(s)">应用</el-button>
+                          <el-button size="small" text type="warning" @click="popStash(s)">恢复</el-button>
+                          <el-button size="small" text type="danger" @click="dropStash(s)">删除</el-button>
+                        </div>
+                      </div>
+                    </div>
+                  </el-tab-pane>
+                  <el-tab-pane name="backup">
+                    <template #label>备份（{{ backups.branches.length + backups.stashes.length }}）</template>
+                    <div v-if="!backups.branches.length && !backups.stashes.length" class="file-empty">
+                      高危操作前会自动建 backup/pre-op-* 分支；工作区不干净时还会 stash
+                    </div>
+                    <div v-else class="stash-list mono">
+                      <div v-for="b in backups.branches" :key="'b-' + b" class="stash-row">
+                        <div class="stash-main">
+                          <span class="stash-ref">{{ b }}</span>
+                          <span class="stash-msg">检出不会把工作区自动恢复成操作前，也不会执行 reset --hard</span>
+                        </div>
+                        <div class="stash-actions">
+                          <el-button size="small" text type="primary" @click="checkoutBackup(b)">检出</el-button>
+                        </div>
+                      </div>
+                      <div v-for="s in backups.stashes" :key="'s-' + s" class="stash-row">
+                        <div class="stash-main">
+                          <span class="stash-ref">{{ s }}</span>
+                          <span class="stash-msg">应用不会重置当前分支</span>
+                        </div>
+                        <div class="stash-actions">
+                          <el-button size="small" text type="success" @click="applyBackupStash(s)">应用</el-button>
+                        </div>
+                      </div>
+                    </div>
+                  </el-tab-pane>
+                  <el-tab-pane name="worktree">
+                    <template #label>Worktree（{{ worktrees.length }}）</template>
+                    <div v-if="worktrees.length === 0" class="file-empty">
+                      没有 worktree。可点记录卡片上的「添加 worktree」。
+                    </div>
+                    <div v-else class="stash-list mono">
+                      <div v-for="w in worktrees" :key="w.path" class="stash-row">
+                        <div class="stash-main">
+                          <span class="stash-ref">{{
+                            w.isMain ? '主区' : w.detached ? 'detached' : w.branch || 'worktree'
+                          }}</span>
+                          <span class="stash-msg" :title="w.path">{{ w.path }}</span>
+                          <span v-if="w.head" class="stash-date">{{ w.head.slice(0, 7) }}</span>
+                        </div>
+                        <div class="stash-actions">
+                          <el-button v-if="!w.isMain" size="small" text type="danger" @click="removeWorktree(w)">
+                            移除
+                          </el-button>
+                        </div>
+                      </div>
+                    </div>
+                  </el-tab-pane>
+                  <el-tab-pane name="reflog">
+                    <template #label>Reflog（{{ reflog.length }}）</template>
+                    <div v-if="reflog.length === 0" class="file-empty">没有 reflog 记录</div>
+                    <div v-else class="stash-list mono">
+                      <div v-for="e in reflog" :key="e.selector + e.hash" class="stash-row">
+                        <div class="stash-main">
+                          <span class="stash-ref">{{ e.hash.slice(0, 7) }}</span>
+                          <span class="stash-msg" :title="e.message"
+                            >{{ e.selector }} · {{ firstLine(e.message) }}</span
+                          >
+                          <span v-if="e.date" class="stash-date">{{ formatDate(e.date) }}</span>
+                        </div>
+                        <div class="stash-actions">
+                          <el-button size="small" text type="primary" @click="checkoutReflog(e.hash)">检出</el-button>
+                        </div>
+                      </div>
+                    </div>
+                  </el-tab-pane>
+                </el-tabs>
+              </el-card>
             </div>
-          </template>
-          <div v-loading="monitor.loading" class="monitor-body">
-            <p v-if="monitor.title" class="monitor-file mono">{{ monitor.title }}</p>
-            <DiffViewer v-if="monitor.diff?.rawPatch" :patch="monitor.diff.rawPatch" />
-            <DiffViewer v-else-if="monitor.patch" :patch="monitor.patch" />
-            <p v-else-if="monitor.diff" class="file-empty">无差异</p>
-            <p v-else class="file-empty">点文件看红绿差异。Stash 的「差异」也会显示在这里。</p>
           </div>
-        </el-card>
-
-        <el-card shadow="never" class="history-card glass gc-card-fill gc-card-fill--flush">
-          <template #header>
-            <div class="card-head">
-              <span class="card-title">记录 Records</span>
-              <div class="card-actions gc-gap-btns">
-                <el-button size="small" text @click="openWorktreeDialog">添加 worktree</el-button>
-                <el-button size="small" text @click="loadStashes(); loadWorktrees(); loadBackupsAndReflog()">刷新</el-button>
-              </div>
-            </div>
-          </template>
-          <el-tabs v-model="historyTab" class="history-tabs gc-tabs-fill">
-            <el-tab-pane name="stash">
-              <template #label>Stash（{{ stashes.length }}）</template>
-              <div v-if="stashes.length === 0" class="file-empty">没有暂存的更改</div>
-              <div v-else class="stash-list mono">
-                <div v-for="s in stashes" :key="s.ref" class="stash-row" :class="{ on: monitor.path === s.ref }">
-                  <div class="stash-main">
-                    <span class="stash-ref">{{ s.ref }}</span>
-                    <span class="stash-msg" :title="s.message">{{ firstLine(s.message) || '（无说明）' }}</span>
-                    <span v-if="s.date" class="stash-date">{{ formatDate(s.date) }}</span>
-                  </div>
-                  <div class="stash-actions">
-                    <el-button size="small" text type="primary" @click="showStashDiff(s)">差异</el-button>
-                    <el-button size="small" text type="success" @click="applyStash(s)">应用</el-button>
-                    <el-button size="small" text type="warning" @click="popStash(s)">恢复</el-button>
-                    <el-button size="small" text type="danger" @click="dropStash(s)">删除</el-button>
-                  </div>
-                </div>
-              </div>
-            </el-tab-pane>
-            <el-tab-pane name="backup">
-              <template #label>备份（{{ backups.branches.length + backups.stashes.length }}）</template>
-              <div v-if="!backups.branches.length && !backups.stashes.length" class="file-empty">
-                高危操作前会自动建 backup/pre-op-* 分支；工作区不干净时还会 stash
-              </div>
-              <div v-else class="stash-list mono">
-                <div v-for="b in backups.branches" :key="'b-' + b" class="stash-row">
-                  <div class="stash-main">
-                    <span class="stash-ref">{{ b }}</span>
-                    <span class="stash-msg">检出不会把工作区自动恢复成操作前，也不会执行 reset --hard</span>
-                  </div>
-                  <div class="stash-actions">
-                    <el-button size="small" text type="primary" @click="checkoutBackup(b)">检出</el-button>
-                  </div>
-                </div>
-                <div v-for="s in backups.stashes" :key="'s-' + s" class="stash-row">
-                  <div class="stash-main">
-                    <span class="stash-ref">{{ s }}</span>
-                    <span class="stash-msg">应用不会重置当前分支</span>
-                  </div>
-                  <div class="stash-actions">
-                    <el-button size="small" text type="success" @click="applyBackupStash(s)">应用</el-button>
-                  </div>
-                </div>
-              </div>
-            </el-tab-pane>
-            <el-tab-pane name="worktree">
-              <template #label>Worktree（{{ worktrees.length }}）</template>
-              <div v-if="worktrees.length === 0" class="file-empty">没有 worktree。可点记录卡片上的「添加 worktree」。</div>
-              <div v-else class="stash-list mono">
-                <div v-for="w in worktrees" :key="w.path" class="stash-row">
-                  <div class="stash-main">
-                    <span class="stash-ref">{{ w.isMain ? '主区' : w.detached ? 'detached' : w.branch || 'worktree' }}</span>
-                    <span class="stash-msg" :title="w.path">{{ w.path }}</span>
-                    <span v-if="w.head" class="stash-date">{{ w.head.slice(0, 7) }}</span>
-                  </div>
-                  <div class="stash-actions">
-                    <el-button v-if="!w.isMain" size="small" text type="danger" @click="removeWorktree(w)">
-                      移除
-                    </el-button>
-                  </div>
-                </div>
-              </div>
-            </el-tab-pane>
-            <el-tab-pane name="reflog">
-              <template #label>Reflog（{{ reflog.length }}）</template>
-              <div v-if="reflog.length === 0" class="file-empty">没有 reflog 记录</div>
-              <div v-else class="stash-list mono">
-                <div v-for="e in reflog" :key="e.selector + e.hash" class="stash-row">
-                  <div class="stash-main">
-                    <span class="stash-ref">{{ e.hash.slice(0, 7) }}</span>
-                    <span class="stash-msg" :title="e.message">{{ e.selector }} · {{ firstLine(e.message) }}</span>
-                    <span v-if="e.date" class="stash-date">{{ formatDate(e.date) }}</span>
-                  </div>
-                  <div class="stash-actions">
-                    <el-button size="small" text type="primary" @click="checkoutReflog(e.hash)">检出</el-button>
-                  </div>
-                </div>
-              </div>
-            </el-tab-pane>
-          </el-tabs>
-        </el-card>
-        </div>
-        </div>
         </template>
       </div>
     </div>
@@ -1175,7 +1230,9 @@ onUnmounted(() => {
           <li class="el-dropdown-menu__item" @click="runBranchMenu('push')">推送</li>
         </template>
         <template v-else>
-          <li v-if="branchMenu.node.remote" class="el-dropdown-menu__item" @click="runBranchMenu('checkout-as')">检出为本地分支</li>
+          <li v-if="branchMenu.node.remote" class="el-dropdown-menu__item" @click="runBranchMenu('checkout-as')">
+            检出为本地分支
+          </li>
           <li v-else class="el-dropdown-menu__item" @click="runBranchMenu('checkout')">切换</li>
           <li class="el-dropdown-menu__item" @click="runBranchMenu('merge')">合并到当前分支</li>
         </template>
@@ -1187,7 +1244,13 @@ onUnmounted(() => {
     </Teleport>
 
     <!-- 写操作确认对话框 -->
-    <ConfirmDialog v-model:visible="confirmVisible" :tool="pending?.tool ?? ''" :preview="pending?.preview ?? null" @confirm="onConfirmed" @cancel="cancel" />
+    <ConfirmDialog
+      v-model:visible="confirmVisible"
+      :tool="pending?.tool ?? ''"
+      :preview="pending?.preview ?? null"
+      @confirm="onConfirmed"
+      @cancel="cancel"
+    />
 
     <!-- 提交 -->
     <el-dialog v-model="commitVisible" title="提交 Commit" width="520px" @closed="commitMessage = ''">
@@ -1205,7 +1268,15 @@ onUnmounted(() => {
     </el-dialog>
 
     <!-- 新建分支 -->
-    <el-dialog v-model="branchVisible" title="新建分支" width="480px" @closed="branchName = ''; branchStart = ''">
+    <el-dialog
+      v-model="branchVisible"
+      title="新建分支"
+      width="480px"
+      @closed="
+        branchName = '';
+        branchStart = '';
+      "
+    >
       <el-form label-width="100px">
         <el-form-item label="分支名">
           <el-input v-model="branchName" placeholder="feature/xxx" />
@@ -1259,7 +1330,9 @@ onUnmounted(() => {
           <el-input v-model="stashMessage" placeholder="留空则使用默认说明（WIP on 分支: 提交）" />
         </el-form-item>
         <el-form-item label="包含未跟踪">
-          <el-checkbox v-model="stashIncludeUntracked">包含未跟踪文件（-u）。勾选文件后会自动包含其中的未跟踪文件</el-checkbox>
+          <el-checkbox v-model="stashIncludeUntracked"
+            >包含未跟踪文件（-u）。勾选文件后会自动包含其中的未跟踪文件</el-checkbox
+          >
         </el-form-item>
       </el-form>
       <div v-if="stashCandidates.length" class="stash-files">
@@ -1288,7 +1361,13 @@ onUnmounted(() => {
 
     <!-- 硬重置 -->
     <el-dialog v-model="resetVisible" title="硬重置（高风险）" width="480px" @closed="resetTarget = ''">
-      <el-alert title="将丢弃索引与工作区所有更改（不可逆），执行前会自动创建备份" type="error" :closable="false" show-icon class="mb" />
+      <el-alert
+        title="将丢弃索引与工作区所有更改（不可逆），执行前会自动创建备份"
+        type="error"
+        :closable="false"
+        show-icon
+        class="mb"
+      />
       <el-input v-model="resetTarget" placeholder="重置目标，默认 HEAD，如 HEAD~1 / commit hash / main" />
       <template #footer>
         <el-button @click="resetVisible = false">取消</el-button>
@@ -1346,7 +1425,13 @@ onUnmounted(() => {
     </el-dialog>
 
     <el-dialog v-model="rebaseVisible" title="变基（高风险）" width="480px" @closed="rebaseOnto = ''">
-      <el-alert title="将把当前分支变基到所选目标，可能改写历史；执行前会自动备份" type="error" :closable="false" show-icon class="mb" />
+      <el-alert
+        title="将把当前分支变基到所选目标，可能改写历史；执行前会自动备份"
+        type="error"
+        :closable="false"
+        show-icon
+        class="mb"
+      />
       <el-form label-width="100px">
         <el-form-item label="变基到">
           <BranchTreeSelect v-model="rebaseOnto" placeholder="选择目标分支" />

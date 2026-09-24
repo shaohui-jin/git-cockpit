@@ -36,8 +36,7 @@ export class ChatSessions {
 }
 
 export type ChatRepoResolve =
-  | { ok: true; repoPath: string }
-  | { ok: false; status: number; error: string; code: string };
+  { ok: true; repoPath: string } | { ok: false; status: number; error: string; code: string };
 
 /**
  * 会话钉死已打开的仓。模型参数里的 repoPath 另由 sanitizeChatArgs 丢掉。

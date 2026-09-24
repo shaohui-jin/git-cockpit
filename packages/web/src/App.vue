@@ -6,6 +6,7 @@ import { useSettingsStore } from '@/stores/settings';
 import { useBranchesStore } from '@/stores/branches';
 import { useMergeSessionStore } from '@/stores/mergeSession';
 import { useJobsStore } from '@/stores/jobs';
+import { useOverviewStore } from '@/stores/overview';
 import { subscribeEvents } from '@/api/client';
 import { useRevision } from '@/composables/revision';
 import { jobLine, notifyJobEnded } from '@/utils/jobNotify';
@@ -18,6 +19,7 @@ const settings = useSettingsStore();
 const branches = useBranchesStore();
 const mergeSession = useMergeSessionStore();
 const jobs = useJobsStore();
+const overview = useOverviewStore();
 const route = useRoute();
 const router = useRouter();
 const { bump, revision } = useRevision();
@@ -105,7 +107,11 @@ onMounted(async () => {
       notifyJobEnded(payload, router);
       if (payload.status === 'ok') {
         bump();
-        void repos.load();
+        void repos.load().then(() => {
+          const ids = repos.repos.map((r) => r.id);
+          overview.prune(ids);
+          void overview.refresh(ids, { force: true, background: true });
+        });
       }
     },
     onError: () => {
@@ -138,7 +144,13 @@ watch(
     void settings.load(repos.currentId).catch(() => undefined);
   }
 );
-watch(revision, () => void branches.load());
+watch(revision, () => {
+  void branches.load();
+  const ids = repos.repos.map((r) => r.id);
+  if (ids.length) {
+    void overview.refresh(ids, { force: true, background: true });
+  }
+});
 
 function onKeydown(ev: KeyboardEvent): void {
   if (ev.key === 'Escape' && chatOpen.value) chatOpen.value = false;
@@ -158,13 +170,7 @@ onUnmounted(() => {
         <span class="brand-name">Git Cockpit</span>
       </div>
       <div class="top-end">
-        <button
-          v-if="liveJob"
-          type="button"
-          class="pulse"
-          :title="liveJobTitle"
-          @click="goMenu('/jobs')"
-        >
+        <button v-if="liveJob" type="button" class="pulse" :title="liveJobTitle" @click="goMenu('/jobs')">
           <i /><span>{{ liveJobTitle }}</span>
           <em v-if="jobs.runningCount > 1">{{ jobs.runningCount }}</em>
         </button>
@@ -184,13 +190,7 @@ onUnmounted(() => {
     </main>
 
     <Transition name="chat-rise">
-      <aside
-        v-show="chatOpen"
-        class="chat-sheet-anchor"
-        role="dialog"
-        aria-label="聊天"
-        :aria-hidden="!chatOpen"
-      >
+      <aside v-show="chatOpen" class="chat-sheet-anchor" role="dialog" aria-label="聊天" :aria-hidden="!chatOpen">
         <div class="chat-sheet">
           <header class="sheet-bar">
             <span>助手 · {{ chatRepoLabel }}</span>
@@ -211,9 +211,7 @@ onUnmounted(() => {
         @click="goMenu(m.path)"
       >
         {{ m.label }}
-        <span v-if="m.path === '/jobs' && jobs.runningCount" class="dock-count">{{
-          jobs.runningCount
-        }}</span>
+        <span v-if="m.path === '/jobs' && jobs.runningCount" class="dock-count">{{ jobs.runningCount }}</span>
       </button>
     </nav>
   </div>
@@ -338,7 +336,9 @@ onUnmounted(() => {
 }
 .chat-rise-enter-active,
 .chat-rise-leave-active {
-  transition: opacity 0.22s ease, transform 0.22s ease;
+  transition:
+    opacity 0.22s ease,
+    transform 0.22s ease;
 }
 .chat-rise-leave-active {
   pointer-events: none;

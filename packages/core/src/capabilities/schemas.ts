@@ -11,10 +11,7 @@ const repoId = z
   .optional()
   .describe('已打开仓库的稳定 id；不提供时使用 MCP session 绑定仓库或当前打开的仓库。');
 
-const repoPath = z
-  .string()
-  .optional()
-  .describe('仓库绝对路径；不提供时使用 MCP session 绑定仓库或当前打开的仓库。');
+const repoPath = z.string().optional().describe('仓库绝对路径；不提供时使用 MCP session 绑定仓库或当前打开的仓库。');
 
 const dryRun = z
   .boolean()
@@ -26,13 +23,7 @@ const detail = z
   .optional()
   .describe('为 true 时 MCP 返回完整正文；默认只回摘要（路径/统计）。网页 GET 不受影响。');
 
-const maxCount = z
-  .number()
-  .int()
-  .min(1)
-  .max(10000)
-  .optional()
-  .describe('最多返回的提交数量。');
+const maxCount = z.number().int().min(1).max(10000).optional().describe('最多返回的提交数量。');
 
 /** 全部只读工具共享的仓库选择字段。 */
 const readonlyBase = { repoId, repoPath };
@@ -146,10 +137,7 @@ export const GitMergeSurveySchema = z.object({
   froms: z.array(z.string().min(1)).min(1).describe('我的分支（theirs）列表'),
   fetch: z.boolean().optional().describe('是否先非交互 fetch。缺省 true；整批只 fetch 一次'),
   remote: z.string().optional().describe('fetch 使用的远程名，缺省 origin'),
-  async: z
-    .boolean()
-    .optional()
-    .describe('为 true 或格子数>20 时后台跑，立即返回 jobId，用 git_job_get 查结果')
+  async: z.boolean().optional().describe('为 true 或格子数>20 时后台跑，立即返回 jobId，用 git_job_get 查结果')
 });
 export type GitMergeSurveyArgs = z.infer<typeof GitMergeSurveySchema>;
 
@@ -183,10 +171,7 @@ export type GitCommitArgs = z.infer<typeof GitCommitSchema>;
 export const GitCheckoutSchema = z.object({
   ...writeBase,
   branch: z.string().describe('要切换到的分支；给出 newBranch 时这是检出起点'),
-  newBranch: z
-    .string()
-    .optional()
-    .describe('从 branch 新建并检出的本地分支名。起点是远程跟踪枝时带 --track')
+  newBranch: z.string().optional().describe('从 branch 新建并检出的本地分支名。起点是远程跟踪枝时带 --track')
 });
 export type GitCheckoutArgs = z.infer<typeof GitCheckoutSchema>;
 
@@ -358,10 +343,7 @@ export const GitMrCreateSchema = z.object({
   ...mrIntoFrom,
   title: z.string().optional().describe('PR 标题；缺省 Merge <source> into <target>'),
   body: z.string().optional().describe('PR 正文。启用正文规范时忽略，改走 fields'),
-  fields: z
-    .record(z.unknown())
-    .optional()
-    .describe('正文规范字段（id → 值）。设置里启用规范时必填，由服务端渲染 body'),
+  fields: z.record(z.unknown()).optional().describe('正文规范字段（id → 值）。设置里启用规范时必填，由服务端渲染 body'),
   reviewers: z.array(z.string()).optional().describe('审核人/指派人用户名；GitLab 会解析成数字 id。Token 不在此传入')
 });
 export type GitMrCreateArgs = z.infer<typeof GitMrCreateSchema>;

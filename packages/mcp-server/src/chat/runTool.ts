@@ -96,11 +96,15 @@ export async function confirmChatWrite(
     return { ok: false, error: '仓库已变化，请重新预览后再确认', tool: ticket.tool, preview: fresh };
   }
 
-  const exec = await executeTool(def, { ...ticket.args, dryRun: false, repoPath: ticket.repoPath }, {
-    runtime,
-    source: 'chat',
-    repoPath: ticket.repoPath
-  });
+  const exec = await executeTool(
+    def,
+    { ...ticket.args, dryRun: false, repoPath: ticket.repoPath },
+    {
+      runtime,
+      source: 'chat',
+      repoPath: ticket.repoPath
+    }
+  );
   if (!exec.success) {
     return { ok: false, error: exec.error?.message ?? '执行失败', tool: ticket.tool };
   }

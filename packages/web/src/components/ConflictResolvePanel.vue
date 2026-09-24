@@ -40,8 +40,7 @@ function initFromFiles(files: ConflictFile[]): void {
     next[f.path] = buildChangeHunks(f);
   }
   hunksByPath.value = next;
-  const first =
-    files.find((f) => countHunkStats(next[f.path] ?? []).conflicts > 0)?.path ?? files[0]?.path ?? '';
+  const first = files.find((f) => countHunkStats(next[f.path] ?? []).conflicts > 0)?.path ?? files[0]?.path ?? '';
   activePath.value = first;
   const list = next[first] ?? [];
   activeHunkId.value = list.find((h) => h.kind === 'conflict')?.id ?? list[0]?.id ?? null;
@@ -93,7 +92,10 @@ function fileLabel(path: string): string {
 function selectFile(path: string): void {
   activePath.value = path;
   const list = hunksByPath.value[path] ?? [];
-  const first = list.find((h) => h.kind === 'conflict' && h.action === 'pending') ?? list.find((h) => h.kind === 'conflict') ?? list[0];
+  const first =
+    list.find((h) => h.kind === 'conflict' && h.action === 'pending') ??
+    list.find((h) => h.kind === 'conflict') ??
+    list[0];
   activeHunkId.value = first?.id ?? null;
 }
 
@@ -270,7 +272,9 @@ defineExpose({ buildFiles });
           <span>冲突文件 {{ conflictFiles.length }}</span>
           <span class="file-nav">
             <el-button size="small" :disabled="conflictFiles.length < 2" @click="goConflictFile(-1)">‹</el-button>
-            <span class="nav-pos">{{ conflictFileIndex >= 0 ? conflictFileIndex + 1 : 0 }}/{{ conflictFiles.length }}</span>
+            <span class="nav-pos"
+              >{{ conflictFileIndex >= 0 ? conflictFileIndex + 1 : 0 }}/{{ conflictFiles.length }}</span
+            >
             <el-button size="small" :disabled="conflictFiles.length < 2" @click="goConflictFile(1)">›</el-button>
           </span>
         </div>
@@ -325,10 +329,16 @@ defineExpose({ buildFiles });
           <span class="muted">{{ fileStats.resolved }}/{{ fileStats.conflicts }}</span>
           <span class="merge-bar-actions">
             <el-button size="small" :disabled="!conflictHunks.length" @click="goConflict(-1)">上一处</el-button>
-            <span class="nav-pos">{{ activeConflictIndex >= 0 ? activeConflictIndex + 1 : 0 }}/{{ conflictHunks.length }}</span>
+            <span class="nav-pos"
+              >{{ activeConflictIndex >= 0 ? activeConflictIndex + 1 : 0 }}/{{ conflictHunks.length }}</span
+            >
             <el-button size="small" :disabled="!conflictHunks.length" @click="goConflict(1)">下一处</el-button>
-            <el-button size="small" :disabled="!canPickHunk" @click="acceptActive('left')">采用{{ leftLabel }}</el-button>
-            <el-button size="small" :disabled="!canPickHunk" @click="acceptActive('right')">采用{{ rightLabel }}</el-button>
+            <el-button size="small" :disabled="!canPickHunk" @click="acceptActive('left')"
+              >采用{{ leftLabel }}</el-button
+            >
+            <el-button size="small" :disabled="!canPickHunk" @click="acceptActive('right')"
+              >采用{{ rightLabel }}</el-button
+            >
             <el-button size="small" :disabled="!activePath" @click="resetCurrentFile">重置本文件</el-button>
           </span>
         </div>
@@ -366,7 +376,9 @@ defineExpose({ buildFiles });
             @click="activeHunkId = h.id"
           >
             <div class="pane pane-ours">
-              <pre class="code"><span v-for="(line, i) in (h.leftLines.length ? h.leftLines : [''])" :key="'L'+i" class="code-line">{{ line || ' ' }}</span></pre>
+              <pre
+                class="code"
+              ><span v-for="(line, i) in (h.leftLines.length ? h.leftLines : [''])" :key="'L'+i" class="code-line">{{ line || ' ' }}</span></pre>
             </div>
             <div class="gutter">
               <el-button
@@ -381,7 +393,9 @@ defineExpose({ buildFiles });
               </el-button>
             </div>
             <div class="pane pane-result">
-              <pre class="code"><span v-for="(line, i) in resultLines(h)" :key="'R'+i" class="code-line" :class="{ pending: h.kind === 'conflict' && h.action === 'pending' }">{{ line || ' ' }}</span></pre>
+              <pre
+                class="code"
+              ><span v-for="(line, i) in resultLines(h)" :key="'R'+i" class="code-line" :class="{ pending: h.kind === 'conflict' && h.action === 'pending' }">{{ line || ' ' }}</span></pre>
             </div>
             <div class="gutter">
               <el-button
@@ -396,7 +410,9 @@ defineExpose({ buildFiles });
               </el-button>
             </div>
             <div class="pane pane-theirs">
-              <pre class="code"><span v-for="(line, i) in (h.rightLines.length ? h.rightLines : [''])" :key="'T'+i" class="code-line">{{ line || ' ' }}</span></pre>
+              <pre
+                class="code"
+              ><span v-for="(line, i) in (h.rightLines.length ? h.rightLines : [''])" :key="'T'+i" class="code-line">{{ line || ' ' }}</span></pre>
             </div>
           </div>
         </div>

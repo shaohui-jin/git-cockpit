@@ -53,10 +53,9 @@ export async function waitPairBranches(page: Page, into: string, from: string): 
 }
 
 export async function runPairPreview(page: Page): Promise<void> {
-  const pending = page.waitForResponse(
-    (r) => r.url().includes('/merge/rehearse') && r.request().method() === 'GET',
-    { timeout: 30_000 }
-  );
+  const pending = page.waitForResponse((r) => r.url().includes('/merge/rehearse') && r.request().method() === 'GET', {
+    timeout: 30_000
+  });
   await page.getByRole('button', { name: '预演', exact: true }).click();
   const res = await pending;
   if (!res.ok()) {

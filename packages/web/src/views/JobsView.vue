@@ -42,9 +42,7 @@ const visibleJobs = computed(() => {
 });
 
 const activeJob = computed(() => jobs.jobs.find((j) => j.id === activeJobId.value) ?? null);
-const jobLogText = computed(() =>
-  (activeJob.value?.logs ?? []).join('\n').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
-);
+const jobLogText = computed(() => (activeJob.value?.logs ?? []).join('\n').replace(/\r\n/g, '\n').replace(/\r/g, '\n'));
 
 function tailOf(j: CloneJobSummary): string {
   if (j.error) return j.error;
@@ -174,14 +172,18 @@ onMounted(async () => {
     <div v-else class="split" v-loading="jobs.loading && !jobs.jobs.length">
       <aside class="gc-glass list">
         <div class="chips">
-          <button type="button" class="chip" :class="{ on: filter === 'all' }" @click="setFilter('all')">全部 {{ counts.all }}</button>
+          <button type="button" class="chip" :class="{ on: filter === 'all' }" @click="setFilter('all')">
+            全部 {{ counts.all }}
+          </button>
           <button type="button" class="chip" :class="{ on: filter === 'running' }" @click="setFilter('running')">
             进行中 {{ counts.running }}
           </button>
           <button type="button" class="chip" :class="{ on: filter === 'error' }" @click="setFilter('error')">
             失败 {{ counts.error }}
           </button>
-          <button type="button" class="chip" :class="{ on: filter === 'ok' }" @click="setFilter('ok')">成功 {{ counts.ok }}</button>
+          <button type="button" class="chip" :class="{ on: filter === 'ok' }" @click="setFilter('ok')">
+            成功 {{ counts.ok }}
+          </button>
           <el-button text type="primary" :loading="jobs.loading" @click="jobs.load()">刷新</el-button>
         </div>
         <p v-if="!visibleJobs.length" class="miss">没有这类任务</p>
@@ -215,13 +217,15 @@ onMounted(async () => {
               plain
               :loading="cancellingId === activeJob.id"
               @click="cancelJob(activeJob.id)"
-            >取消</el-button>
+              >取消</el-button
+            >
             <el-button
               v-if="activeJob.status === 'error' && activeJob.kind === 'clone'"
               type="primary"
               plain
               @click="retryClone(activeJob)"
-            >修改并重试</el-button>
+              >修改并重试</el-button
+            >
           </header>
           <p class="meta mono">{{ jobLine(activeJob) }}</p>
           <p v-if="activeJob.error" class="banner-err">{{ activeJob.error }}</p>

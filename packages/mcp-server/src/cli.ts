@@ -11,7 +11,7 @@ import { startMcpStdio } from './mcpServer.ts';
 import { startMcpBridge } from './mcpBridge.ts';
 import { ConfigStore } from './config.ts';
 import { resolveDaemonEndpoint } from './daemonEndpoint.ts';
-import { version } from '../package.json'
+import { version } from '../package.json';
 
 async function probeDaemon(url: string, timeoutMs = 1_000): Promise<boolean> {
   try {
@@ -74,9 +74,7 @@ export async function main(argv: string[]): Promise<number> {
 
     // 显式逃生舱：确实需要每个客户端一份后端时才用（会失去全局队列与仓库锁）。
     if (args.includes('--standalone')) {
-      process.stderr.write(
-        '[git-cockpit] --standalone：本进程自建后端，多个客户端将各自持有一份队列与仓库锁。\n'
-      );
+      process.stderr.write('[git-cockpit] --standalone：本进程自建后端，多个客户端将各自持有一份队列与仓库锁。\n');
       await startMcpStdio(createRuntime({ dataDir }));
       return 0;
     }

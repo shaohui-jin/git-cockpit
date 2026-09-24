@@ -29,7 +29,8 @@ export const inspectCapabilities: Capability[] = [
   },
   {
     name: 'git_diff',
-    description: '获取工作区/暂存区/提交范围的差异。支持指定文件、staged、大 diff 截断。返回文件级统计与完整 unified diff 文本。',
+    description:
+      '获取工作区/暂存区/提交范围的差异。支持指定文件、staged、大 diff 截断。返回文件级统计与完整 unified diff 文本。',
     risk: 'readonly',
     schema: S.GitDiffSchema,
     handler: async (args: Args, ctx) =>

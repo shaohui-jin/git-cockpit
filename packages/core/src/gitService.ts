@@ -350,13 +350,7 @@ export class GitService extends EventEmitter {
     activityTotal: number;
   }> {
     const since = emptyActivity().activityStart;
-    const log = await this.runAllowFail([
-      'log',
-      '--all',
-      '--pretty=format:%cd',
-      '--date=short',
-      `--since=${since}`
-    ]);
+    const log = await this.runAllowFail(['log', '--all', '--pretty=format:%cd', '--date=short', `--since=${since}`]);
     if (log.code !== 0 || !log.stdout.trim()) return emptyActivity();
     return bucketActivityDays(log.stdout.split('\n'));
   }
@@ -425,7 +419,18 @@ export class GitService extends EventEmitter {
     for (const record of output.split(GIT_RECORD_SEP)) {
       if (!record.trim()) continue;
       const fields = record.split(GIT_FIELD_SEP);
-      const [hash, parents, authorName, authorEmail, authorDate, committerName, committerEmail, committerDate, refs, subject] = fields;
+      const [
+        hash,
+        parents,
+        authorName,
+        authorEmail,
+        authorDate,
+        committerName,
+        committerEmail,
+        committerDate,
+        refs,
+        subject
+      ] = fields;
       if (!hash) continue;
       const body = fields.slice(10).join(GIT_FIELD_SEP) || null;
       commits.push({
@@ -448,7 +453,10 @@ export class GitService extends EventEmitter {
   }
 
   /** 展示提交详细信息（元信息 + diff） */
-  async getShow(commit: string, options: Pick<DiffOptions, 'path' | 'maxPatchBytes'> = {}): Promise<{
+  async getShow(
+    commit: string,
+    options: Pick<DiffOptions, 'path' | 'maxPatchBytes'> = {}
+  ): Promise<{
     commit: CommitInfo;
     diff: DiffResult;
   }> {
@@ -456,7 +464,12 @@ export class GitService extends EventEmitter {
     if (meta.length === 0) {
       throw new GitOperationError(`提交不存在: ${commit}`, 'COMMIT_NOT_FOUND');
     }
-    const diff = await this.getDiff({ from: `${commit}^`, to: commit, path: options.path, maxPatchBytes: options.maxPatchBytes });
+    const diff = await this.getDiff({
+      from: `${commit}^`,
+      to: commit,
+      path: options.path,
+      maxPatchBytes: options.maxPatchBytes
+    });
     return { commit: meta[0]!, diff };
   }
 
@@ -647,7 +660,15 @@ export class GitService extends EventEmitter {
 
   /** 提交列表（MCP `git_graph` / 历史旁路）。状态页分支图请用 `getBranchGraph`。 */
   async getGraph(maxCount = 500): Promise<GraphData> {
-    const args = ['log', '--no-color', '--date=iso-strict', '--all', '-n', String(Math.max(1, maxCount)), `--pretty=format:${GIT_LOG_FORMAT}`];
+    const args = [
+      'log',
+      '--no-color',
+      '--date=iso-strict',
+      '--all',
+      '-n',
+      String(Math.max(1, maxCount)),
+      `--pretty=format:${GIT_LOG_FORMAT}`
+    ];
     const output = await this.safeLogOutput(args);
     const commits = this.parseLogOutput(output).map((c) => ({
       hash: c.hash,
@@ -882,7 +903,10 @@ export class GitService extends EventEmitter {
     await this.assertNoLock();
   }
 
-  private async runWrite(command: string[], options: { dryRun?: boolean; risk: WritePreview['risk']; affectedFiles?: string[]; note?: string }): Promise<WritePreview | string> {
+  private async runWrite(
+    command: string[],
+    options: { dryRun?: boolean; risk: WritePreview['risk']; affectedFiles?: string[]; note?: string }
+  ): Promise<WritePreview | string> {
     if (options.dryRun) {
       return GitService.preview(command, options.risk, options.affectedFiles, options.note);
     }
@@ -934,7 +958,10 @@ export class GitService extends EventEmitter {
   }
 
   /** git commit */
-  async commit(message: string, options: { dryRun?: boolean; allowEmpty?: boolean; paths?: string[] } = {}): Promise<WritePreview | string> {
+  async commit(
+    message: string,
+    options: { dryRun?: boolean; allowEmpty?: boolean; paths?: string[] } = {}
+  ): Promise<WritePreview | string> {
     if (!message?.trim()) throw new GitOperationError('提交信息不能为空', 'INVALID_COMMIT_MESSAGE');
     const cmd = ['commit'];
     if (options.allowEmpty) cmd.push('--allow-empty');
@@ -992,19 +1019,30 @@ export class GitService extends EventEmitter {
         throw new GitOperationError('本地更改会被覆盖，请先提交或暂存（git stash）', 'CHECKOUT_CONFLICT');
       }
       if (/already exists|a branch named/.test(msg)) {
-        throw new GitOperationError(`本地已有分支 ${fresh ?? branchName}，请换一个名字，或直接切换到它`, 'BRANCH_EXISTS');
+        throw new GitOperationError(
+          `本地已有分支 ${fresh ?? branchName}，请换一个名字，或直接切换到它`,
+          'BRANCH_EXISTS'
+        );
       }
       throw new GitOperationError(this.extractGitMessage(msg), 'GIT_CHECKOUT_FAILED');
     }
   }
 
   /** 创建分支（默认从当前 HEAD） */
-  async createBranch(branchName: string, options: { dryRun?: boolean; startPoint?: string } = {}): Promise<WritePreview | string> {
+  async createBranch(
+    branchName: string,
+    options: { dryRun?: boolean; startPoint?: string } = {}
+  ): Promise<WritePreview | string> {
     this.validateRefName(branchName);
     const cmd = ['branch', branchName];
     if (options.startPoint) cmd.push(options.startPoint);
     if (options.dryRun) {
-      return GitService.preview(cmd, 'low', undefined, `将创建分支 ${branchName}${options.startPoint ? `（起点 ${options.startPoint}）` : ''}`);
+      return GitService.preview(
+        cmd,
+        'low',
+        undefined,
+        `将创建分支 ${branchName}${options.startPoint ? `（起点 ${options.startPoint}）` : ''}`
+      );
     }
     await this.prepareWrite();
     try {
@@ -1022,7 +1060,8 @@ export class GitService extends EventEmitter {
   async deleteBranch(branchName: string, options: { dryRun?: boolean } = {}): Promise<WritePreview | string> {
     this.validateRefName(branchName);
     const cmd = ['branch', '-d', branchName];
-    if (options.dryRun) return GitService.preview(cmd, 'medium', undefined, `将删除分支 ${branchName}（未合并分支会被拒绝）`);
+    if (options.dryRun)
+      return GitService.preview(cmd, 'medium', undefined, `将删除分支 ${branchName}（未合并分支会被拒绝）`);
     await this.prepareWrite();
     try {
       const out = await this.run(cmd);
@@ -1031,7 +1070,10 @@ export class GitService extends EventEmitter {
     } catch (err) {
       const msg = String((err as Error).message ?? '');
       if (/not fully merged/.test(msg)) {
-        throw new GitOperationError(`分支 ${branchName} 尚未完全合并，已拒绝删除（如需强制执行请开启高风险工具）`, 'BRANCH_NOT_MERGED');
+        throw new GitOperationError(
+          `分支 ${branchName} 尚未完全合并，已拒绝删除（如需强制执行请开启高风险工具）`,
+          'BRANCH_NOT_MERGED'
+        );
       }
       throw new GitOperationError(this.extractGitMessage(msg), 'GIT_BRANCH_DELETE_FAILED');
     }
@@ -1041,7 +1083,8 @@ export class GitService extends EventEmitter {
   async merge(branchName: string, options: { dryRun?: boolean } = {}): Promise<WritePreview | string> {
     this.validateRefName(branchName);
     const cmd = ['merge', branchName];
-    if (options.dryRun) return GitService.preview(cmd, 'high', undefined, `将合并分支 ${branchName} 到当前分支（可能产生冲突）`);
+    if (options.dryRun)
+      return GitService.preview(cmd, 'high', undefined, `将合并分支 ${branchName} 到当前分支（可能产生冲突）`);
     await this.prepareWrite();
     try {
       const out = await this.run(cmd);
@@ -1133,11 +1176,14 @@ export class GitService extends EventEmitter {
   }
 
   /** 强制推送（高风险） */
-  async pushForce(options: { dryRun?: boolean; remote?: string; branch?: string } = {}): Promise<WritePreview | string> {
+  async pushForce(
+    options: { dryRun?: boolean; remote?: string; branch?: string } = {}
+  ): Promise<WritePreview | string> {
     const cmd = ['push', '--force-with-lease'];
     if (options.remote) cmd.push(options.remote);
     if (options.branch) cmd.push(options.branch);
-    if (options.dryRun) return GitService.preview(cmd, 'high', undefined, '将以 --force-with-lease 强制推送（请先创建备份）');
+    if (options.dryRun)
+      return GitService.preview(cmd, 'high', undefined, '将以 --force-with-lease 强制推送（请先创建备份）');
     await this.prepareWrite();
     try {
       const out = await this.run(cmd);
@@ -1150,7 +1196,10 @@ export class GitService extends EventEmitter {
   }
 
   /** 创建标签 */
-  async createTag(tagName: string, options: { dryRun?: boolean; message?: string; commit?: string } = {}): Promise<WritePreview | string> {
+  async createTag(
+    tagName: string,
+    options: { dryRun?: boolean; message?: string; commit?: string } = {}
+  ): Promise<WritePreview | string> {
     this.validateRefName(tagName);
     const cmd = ['tag'];
     if (options.message) cmd.push('-a');
@@ -1271,7 +1320,8 @@ export class GitService extends EventEmitter {
   async stashDrop(options: { dryRun?: boolean; index?: number } = {}): Promise<WritePreview | string> {
     const cmd = ['stash', 'drop'];
     if (typeof options.index === 'number' && options.index >= 0) cmd.push(`stash@{${options.index}}`);
-    if (options.dryRun) return GitService.preview(cmd, 'medium', undefined, '将删除该 stash 记录（删除后不可直接恢复）');
+    if (options.dryRun)
+      return GitService.preview(cmd, 'medium', undefined, '将删除该 stash 记录（删除后不可直接恢复）');
     await this.prepareWrite();
     try {
       const out = await this.run(cmd);
@@ -1305,7 +1355,8 @@ export class GitService extends EventEmitter {
   /** 硬重置到指定提交（高风险，需先备份） */
   async resetHard(target: string, options: { dryRun?: boolean } = {}): Promise<WritePreview | string> {
     const cmd = ['reset', '--hard', target];
-    if (options.dryRun) return GitService.preview(cmd, 'high', undefined, `将硬重置到 ${target}（工作区与索引将被丢弃）`);
+    if (options.dryRun)
+      return GitService.preview(cmd, 'high', undefined, `将硬重置到 ${target}（工作区与索引将被丢弃）`);
     await this.prepareWrite();
     try {
       const out = await this.run(cmd);
@@ -1369,7 +1420,12 @@ export class GitService extends EventEmitter {
     const cmd = ['-c', 'core.editor=true', 'merge', '--continue'];
     const paths = (options.files ?? []).map((f) => f.path);
     if (options.dryRun) {
-      return GitService.preview(cmd, 'medium', paths.length ? paths : undefined, '将提交当前 merge（需已解决全部冲突）');
+      return GitService.preview(
+        cmd,
+        'medium',
+        paths.length ? paths : undefined,
+        '将提交当前 merge（需已解决全部冲突）'
+      );
     }
     const op = await this.detectWorkspaceOperation();
     if (op !== 'merge') {
@@ -1398,7 +1454,12 @@ export class GitService extends EventEmitter {
     const cmd = ['-c', 'core.editor=true', 'rebase', '--continue'];
     const paths = (options.files ?? []).map((f) => f.path);
     if (options.dryRun) {
-      return GitService.preview(cmd, 'medium', paths.length ? paths : undefined, '将继续变基（需已解决当前提交的冲突）');
+      return GitService.preview(
+        cmd,
+        'medium',
+        paths.length ? paths : undefined,
+        '将继续变基（需已解决当前提交的冲突）'
+      );
     }
     const op = await this.detectWorkspaceOperation();
     if (op !== 'rebase') {
@@ -1510,11 +1571,9 @@ export class GitService extends EventEmitter {
       };
     }
     const into = 'HEAD';
-    const from =
-      operation === 'merge' ? 'MERGE_HEAD' : operation === 'rebase' ? 'REBASE_HEAD' : 'CHERRY_PICK_HEAD';
+    const from = operation === 'merge' ? 'MERGE_HEAD' : operation === 'rebase' ? 'REBASE_HEAD' : 'CHERRY_PICK_HEAD';
     const oursLabel = operation === 'rebase' ? '变基目标' : '当前分支';
-    const theirsLabel =
-      operation === 'merge' ? '合入的' : operation === 'rebase' ? '正在重放的提交' : '拣进来的提交';
+    const theirsLabel = operation === 'merge' ? '合入的' : operation === 'rebase' ? '正在重放的提交' : '拣进来的提交';
     const listed = await this.runAllowFail(['ls-files', '-u']);
     const stages = new Map<string, { s1?: string; s2?: string; s3?: string }>();
     for (const line of listed.stdout.split('\n')) {
@@ -1565,7 +1624,8 @@ export class GitService extends EventEmitter {
   async deleteBranchForce(branchName: string, options: { dryRun?: boolean } = {}): Promise<WritePreview | string> {
     this.validateRefName(branchName);
     const cmd = ['branch', '-D', branchName];
-    if (options.dryRun) return GitService.preview(cmd, 'high', undefined, `将强制删除分支 ${branchName}（不检查合并状态）`);
+    if (options.dryRun)
+      return GitService.preview(cmd, 'high', undefined, `将强制删除分支 ${branchName}（不检查合并状态）`);
     await this.prepareWrite();
     try {
       const out = await this.run(cmd);
@@ -1708,10 +1768,7 @@ export class GitService extends EventEmitter {
         return { sha: r.stdout.trim(), gitRef: c };
       }
     }
-    throw new GitOperationError(
-      `无法解析引用「${trimmed}」（已试：${tried.join('、')}）`,
-      'REV_NOT_FOUND'
-    );
+    throw new GitOperationError(`无法解析引用「${trimmed}」（已试：${tried.join('、')}）`, 'REV_NOT_FOUND');
   }
 
   /** 两条提交的共同祖先；无关历史时返回 null（不抛） */
@@ -1847,7 +1904,11 @@ export class GitService extends EventEmitter {
   }
 
   /** 先走现代 merge-tree --write-tree；无结果时回落旧式三参 merge-tree */
-  private async runMergeTree(intoSha: string, fromSha: string, mergeBaseSha: string | null): Promise<ReturnType<typeof parseModernMergeTree>> {
+  private async runMergeTree(
+    intoSha: string,
+    fromSha: string,
+    mergeBaseSha: string | null
+  ): Promise<ReturnType<typeof parseModernMergeTree>> {
     await this.assertMergeTreeSupported();
     const args = ['merge-tree', '--write-tree', '-z', '--messages', '--name-only'];
     if (!mergeBaseSha) args.push('--allow-unrelated-histories');
@@ -1861,10 +1922,7 @@ export class GitService extends EventEmitter {
       return {
         clean: false,
         conflictFiles: [],
-        messages: [
-          ...parsed.messages,
-          '无法计算 merge-base，且 merge-tree 未能给出冲突文件列表（可能为无关历史）。'
-        ]
+        messages: [...parsed.messages, '无法计算 merge-base，且 merge-tree 未能给出冲突文件列表（可能为无关历史）。']
       };
     }
     const classic = await this.runAllowFail(['merge-tree', mergeBaseSha, intoSha, fromSha]);
@@ -2120,12 +2178,7 @@ export class GitService extends EventEmitter {
   }
 
   private async loadTempBranches(remoteNames: string[]) {
-    const r = await this.runAllowFail([
-      'for-each-ref',
-      '--format=%(refname)',
-      'refs/heads/merge/',
-      'refs/remotes/'
-    ]);
+    const r = await this.runAllowFail(['for-each-ref', '--format=%(refname)', 'refs/heads/merge/', 'refs/remotes/']);
     return parseTempBranches(r.code === 0 ? r.stdout : '', remoteNames);
   }
 
@@ -2215,10 +2268,7 @@ export class GitService extends EventEmitter {
         if (!cell.tempBranch?.name || !cell.intoSha || !cell.fromSha) continue;
         const ref = cell.tempBranch.local ? cell.tempBranch.name : `${remotes[0]}/${cell.tempBranch.name}`;
         const tip = await this.ensureRev(ref).catch(() => '');
-        const holds =
-          !!tip &&
-          (await this.isAncestor(cell.fromSha, tip)) &&
-          (await this.isAncestor(cell.intoSha, tip));
+        const holds = !!tip && (await this.isAncestor(cell.fromSha, tip)) && (await this.isAncestor(cell.intoSha, tip));
         if (!holds) delete cell.tempBranch;
       }
       return result;
@@ -2347,8 +2397,7 @@ export class GitService extends EventEmitter {
     }
     const doPush = options.push !== false;
     const tempBranch =
-      options.tempBranch?.trim() ||
-      defaultTempBranchName(into, from, remoteNames, { intoSha, fromSha });
+      options.tempBranch?.trim() || defaultTempBranchName(into, from, remoteNames, { intoSha, fromSha });
     this.validateRefName(tempBranch);
 
     const cmd = ['worktree', 'add', '-B', tempBranch, '<tmp>', into, '&&', 'merge', '--no-ff', '--no-commit', from];
@@ -2445,7 +2494,10 @@ export class GitService extends EventEmitter {
         const detail = (commitRun.stderr || commitRun.stdout).trim();
         const mergeText = `${mergeRun.stdout}\n${mergeRun.stderr}`;
         if (/nothing to commit|no changes added/i.test(detail) || /Already up to date/i.test(mergeText)) {
-          throw new GitOperationError(`没有可合并的新提交（${from} → ${into}），无需落盘。${rollbackNote}`, 'NOTHING_TO_MERGE');
+          throw new GitOperationError(
+            `没有可合并的新提交（${from} → ${into}），无需落盘。${rollbackNote}`,
+            'NOTHING_TO_MERGE'
+          );
         }
         throw new GitOperationError(`提交失败（主工作区未改动）：${detail} ${rollbackNote}`, 'COMMIT_FAILED');
       }
@@ -2521,10 +2573,7 @@ export class GitService extends EventEmitter {
     const remotes = remoteList.map((r) => r.name);
     const remoteNames = remotes.length ? remotes : ['origin'];
     if (isSameBranchForMr(into, from, remoteNames) && !options.sourceBranch?.trim()) {
-      throw new GitOperationError(
-        `「${from}」与「${into}」是同一分支，请自行 push/pull，不创建 PR。`,
-        'SAME_BRANCH'
-      );
+      throw new GitOperationError(`「${from}」与「${into}」是同一分支，请自行 push/pull，不创建 PR。`, 'SAME_BRANCH');
     }
 
     const remote = pickRemoteName(into, remotes, options.remote);
@@ -2615,11 +2664,7 @@ export class GitService extends EventEmitter {
     const remote = pickRemoteName(into, remotes, options.remote);
     const explicit = options.sourceBranch?.trim() || '';
     const fromMr = branchNameForMr(from, remoteNames);
-    const diy =
-      Boolean(explicit) &&
-      explicit !== fromMr &&
-      explicit !== from &&
-      !isMergeTempRef(explicit, remoteNames);
+    const diy = Boolean(explicit) && explicit !== fromMr && explicit !== from && !isMergeTempRef(explicit, remoteNames);
 
     const preview = await this.previewMerge({
       into,
@@ -2634,10 +2679,7 @@ export class GitService extends EventEmitter {
       pairTempBranch: preview.pairTempBranch
     });
     const fail = (code: string, message: string) => {
-      throw new GitOperationError(
-        gate.webUrl ? `${message}\n选边：${gate.webUrl}` : message,
-        code
-      );
+      throw new GitOperationError(gate.webUrl ? `${message}\n选边：${gate.webUrl}` : message, code);
     };
     if (diy) {
       if (preview.situation === 'conflicts' || preview.situation === 'unrelated') {
@@ -2650,7 +2692,10 @@ export class GitService extends EventEmitter {
 
   /** 提取 git 报错中用户可读的部分 */
   private extractGitMessage(msg: string): string {
-    const lines = msg.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
+    const lines = msg
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
     // 常见格式: "fatal: xxx" / "error: xxx" / "error: pathspec ..."
     const fatal = lines.find((l) => /^fatal:/i.test(l));
     const error = lines.find((l) => /^error:/i.test(l));
@@ -2734,4 +2779,18 @@ async function writeResolvedFiles(
   }
 }
 
-export type { DiffResult, FileStatus, DiffFileSummary, BranchInfo, TagInfo, RemoteInfo, RepoStatus, CommitInfo, GraphData, BranchGraph, BranchTip, GraphCommitNode, ReflogEntry };
+export type {
+  DiffResult,
+  FileStatus,
+  DiffFileSummary,
+  BranchInfo,
+  TagInfo,
+  RemoteInfo,
+  RepoStatus,
+  CommitInfo,
+  GraphData,
+  BranchGraph,
+  BranchTip,
+  GraphCommitNode,
+  ReflogEntry
+};

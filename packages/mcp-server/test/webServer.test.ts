@@ -5,7 +5,14 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createTestRuntime, disposeTestRuntime, createSampleRepo, cleanupTmp, initRepo, commitFile } from './helpers.ts';
+import {
+  createTestRuntime,
+  disposeTestRuntime,
+  createSampleRepo,
+  cleanupTmp,
+  initRepo,
+  commitFile
+} from './helpers.ts';
 import { createWebServer } from '../src/webServer.ts';
 import type { Runtime } from '../src/index.ts';
 import type { WebServerHandle } from '../src/index.ts';
@@ -107,6 +114,18 @@ describe('Web API', () => {
     expect(res.statusCode).toBe(200);
     const body = res.json() as { repos: Array<{ path: string; available: boolean; dirtyCount: number }> };
     expect(body.repos.some((r) => r.path === repoDir && r.available)).toBe(true);
+  });
+
+  it('GET /api/repos/:id/overview 返回单仓脉搏', async () => {
+    const repos = (await server.app.inject({ method: 'GET', url: '/api/repos' })).json();
+    const id = repos.repos[0].id;
+    const res = await server.app.inject({ method: 'GET', url: `/api/repos/${id}/overview` });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { overview: { id: number; path: string; available: boolean; current: string } };
+    expect(body.overview.id).toBe(id);
+    expect(body.overview.path).toBe(repoDir);
+    expect(body.overview.available).toBe(true);
+    expect(body.overview.current).toBe('main');
   });
 
   it('打开不存在目录返回 400', async () => {
@@ -287,7 +306,7 @@ describe('Web API', () => {
     });
     expect(denied.statusCode).toBe(400);
     const deniedBody = denied.json() as { error?: { message?: string } | string };
-    const deniedMsg = typeof deniedBody.error === 'string' ? deniedBody.error : deniedBody.error?.message ?? '';
+    const deniedMsg = typeof deniedBody.error === 'string' ? deniedBody.error : (deniedBody.error?.message ?? '');
     expect(deniedMsg).toMatch(/allowedRepos|白名单/);
 
     await server.app.inject({
@@ -499,7 +518,10 @@ describe('Web API', () => {
       payload: { markdown, filename: 'Default.md' }
     });
     expect(parsed.statusCode).toBe(200);
-    const body = parsed.json() as { template: { fields: Array<{ id: string; type: string }>; enabled: boolean }; preview: string };
+    const body = parsed.json() as {
+      template: { fields: Array<{ id: string; type: string }>; enabled: boolean };
+      preview: string;
+    };
     expect(body.template.enabled).toBe(true);
     expect(body.template.fields.map((f) => f.id)).toContain('purpose');
     expect(body.preview).toContain('## 变更目的');
@@ -547,8 +569,7 @@ describe('Web API', () => {
     const repos = (await server.app.inject({ method: 'GET', url: '/api/repos' })).json() as {
       repos: Array<{ id: number; path: string }>;
     };
-    const samePath = (a: string, b: string) =>
-      path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
+    const samePath = (a: string, b: string) => path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
     const id = repos.repos.find((r) => samePath(r.path, repoDir))?.id ?? repos.repos[0]?.id;
     expect(id).toBeDefined();
     const events: unknown[] = [];
@@ -579,8 +600,7 @@ describe('Web API', () => {
     const repos = (await server.app.inject({ method: 'GET', url: '/api/repos' })).json() as {
       repos: Array<{ id: number; path: string }>;
     };
-    const samePath = (a: string, b: string) =>
-      path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
+    const samePath = (a: string, b: string) => path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
     const id = repos.repos.find((r) => samePath(r.path, repoDir))?.id ?? repos.repos[0]?.id;
     expect(id).toBeDefined();
     const res = await server.app.inject({ method: 'DELETE', url: `/api/repos/${id}` });
@@ -606,6 +626,52 @@ describe('Web API - 无仓库场景', () => {
     try {
       const res = await server.app.inject({ method: 'GET', url: '/api/repos/999/status' });
       expect(res.statusCode).toBe(404);
+    } finally {
+      await server.close();
+      disposeTestRuntime(runtime);
+    }
+  });
+});
+
+describe('POST /api/shutdown', () => {
+  it('有 running 任务时返回 409', async () => {
+    const runtime = createTestRuntime();
+    const server = await createWebServer(runtime, { staticDir: null, noListen: true });
+    vi.spyOn(runtime.jobs, 'list').mockReturnValue([
+      {
+        id: 'job-run',
+        kind: 'clone',
+        status: 'running',
+        title: 'clone',
+        logs: [],
+        startedAt: '2026-01-01T00:00:00.000Z',
+        payload: {}
+      }
+    ]);
+    try {
+      const res = await server.app.inject({
+        method: 'POST',
+        url: '/api/shutdown',
+        headers: { 'x-git-cockpit-secret': runtime.config.auth.localSecret }
+      });
+      expect(res.statusCode).toBe(409);
+      expect(res.json().error).toMatch(/任务进行中/);
+    } finally {
+      await server.close();
+      disposeTestRuntime(runtime);
+    }
+  });
+
+  it('无 running 任务时返回 204', async () => {
+    const runtime = createTestRuntime();
+    const server = await createWebServer(runtime, { staticDir: null, noListen: true });
+    try {
+      const res = await server.app.inject({
+        method: 'POST',
+        url: '/api/shutdown',
+        headers: { 'x-git-cockpit-secret': runtime.config.auth.localSecret }
+      });
+      expect(res.statusCode).toBe(204);
     } finally {
       await server.close();
       disposeTestRuntime(runtime);

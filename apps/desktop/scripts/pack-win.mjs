@@ -15,7 +15,7 @@ const desktopRoot = path.resolve(here, '..');
 function runningDesktopElectron() {
   try {
     const out = execSync(
-      'wmic process where "name=\'electron.exe\' or name=\'Git Cockpit.exe\'" get CommandLine,Name /FORMAT:LIST',
+      "wmic process where \"name='electron.exe' or name='Git Cockpit.exe'\" get CommandLine,Name /FORMAT:LIST",
       { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
     );
     return /git-cockpit[\\/]apps[\\/]desktop|git-cockpit-desktop|Git Cockpit\.exe/i.test(out);
@@ -39,10 +39,11 @@ mkdirSync(stage, { recursive: true });
 const env = { ...process.env };
 delete env.GH_TOKEN;
 delete env.GITHUB_TOKEN;
-execSync(
-  `pnpm exec electron-builder --win zip nsis --x64 --publish never --config.directories.output="${stage}"`,
-  { cwd: desktopRoot, stdio: 'inherit', env }
-);
+execSync(`pnpm exec electron-builder --win zip nsis --x64 --publish never --config.directories.output="${stage}"`, {
+  cwd: desktopRoot,
+  stdio: 'inherit',
+  env
+});
 
 const release = path.join(desktopRoot, 'release');
 mkdirSync(release, { recursive: true });

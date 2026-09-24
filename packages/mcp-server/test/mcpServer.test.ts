@@ -16,7 +16,9 @@ import type { Runtime } from '../src/index.ts';
 type ServerLike = ReturnType<typeof createMcpServer>;
 
 type PromptReg = {
-  callback: (extra: unknown) => Promise<{ messages: { content: { text: string } }[] }> | { messages: { content: { text: string } }[] };
+  callback: (
+    extra: unknown
+  ) => Promise<{ messages: { content: { text: string } }[] }> | { messages: { content: { text: string } }[] };
 };
 type ResourceReg = {
   readCallback: (uri: URL) => Promise<{ contents: { text: string }[] }>;

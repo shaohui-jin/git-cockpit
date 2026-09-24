@@ -55,13 +55,7 @@ const cells = computed(() => {
 <template>
   <div class="heat" :title="`近 12 周 ${total} 次提交`">
     <div v-for="(col, wi) in cells" :key="wi" class="heat-col">
-      <span
-        v-for="(c, di) in col"
-        :key="di"
-        class="heat-cell"
-        :class="'lv' + c.lv"
-        :title="c.title"
-      />
+      <span v-for="(c, di) in col" :key="di" class="heat-cell" :class="'lv' + c.lv" :title="c.title" />
     </div>
   </div>
 </template>
@@ -83,8 +77,16 @@ const cells = computed(() => {
   border-radius: 2px;
   background: var(--gc-heat-0);
 }
-.heat-cell.lv1 { background: var(--gc-heat-1); }
-.heat-cell.lv2 { background: var(--gc-heat-2); }
-.heat-cell.lv3 { background: var(--gc-heat-3); }
-.heat-cell.lv4 { background: var(--gc-heat-4); }
+.heat-cell.lv1 {
+  background: var(--gc-heat-1);
+}
+.heat-cell.lv2 {
+  background: var(--gc-heat-2);
+}
+.heat-cell.lv3 {
+  background: var(--gc-heat-3);
+}
+.heat-cell.lv4 {
+  background: var(--gc-heat-4);
+}
 </style>

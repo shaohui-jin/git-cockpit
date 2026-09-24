@@ -2,13 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { EventEmitter } from 'node:events';
 import { assertCloneDest, assertSafeCloneUrl, removeIncompleteCloneDest, spawnClone } from './clone.ts';
 import type { GitService } from './gitService.ts';
-import {
-  appendPendingChunk,
-  clonePayload,
-  takePendingChunk,
-  type Job,
-  type JobProgressPayload
-} from './jobTypes.ts';
+import { appendPendingChunk, clonePayload, takePendingChunk, type Job, type JobProgressPayload } from './jobTypes.ts';
 import type { JobStore } from './jobStore.ts';
 
 export { appendPendingChunk, takePendingChunk };

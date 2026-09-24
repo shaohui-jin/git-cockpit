@@ -61,9 +61,7 @@ describe('远程平台解析', () => {
   });
 
   it('github.com 走 api.github.com；apiBaseUrl 可覆盖', () => {
-    expect(githubPullsApiUrl('git@github.com:acme/app.git')).toBe(
-      'https://api.github.com/repos/acme/app/pulls'
-    );
+    expect(githubPullsApiUrl('git@github.com:acme/app.git')).toBe('https://api.github.com/repos/acme/app/pulls');
     expect(githubPullsApiUrl('git@github.com:acme/app.git', 'https://git.example.com/api/v3')).toBe(
       'https://git.example.com/api/v3/repos/acme/app/pulls'
     );

@@ -238,18 +238,18 @@ describe('MCP Streamable HTTP /mcp', () => {
   });
 
   it('不带密钥返回 401', async () => {
-    const res = await rawPost(
-      `${base}/mcp`,
-      { 'Content-Type': 'application/json', Accept: ACCEPT },
-      initializeBody()
-    );
+    const res = await rawPost(`${base}/mcp`, { 'Content-Type': 'application/json', Accept: ACCEPT }, initializeBody());
     expect(res.status).toBe(401);
   });
 
   it('缺少 text/event-stream 的 Accept 返回 406（SDK 约定，文档需照抄）', async () => {
     const res = await rawPost(
       `${base}/mcp`,
-      { 'Content-Type': 'application/json', Accept: 'application/json', [SECRET_HEADER]: runtime.config.auth.localSecret },
+      {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        [SECRET_HEADER]: runtime.config.auth.localSecret
+      },
       initializeBody()
     );
     expect(res.status).toBe(406);
@@ -285,9 +285,7 @@ describe('MCP Streamable HTTP /mcp', () => {
     expect(forwarder.sessionId()).toBeTruthy();
 
     // initialized 通知：daemon 回 202 无正文，桥不应回写任何东西
-    const notify = await forwarder.forward(
-      JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })
-    );
+    const notify = await forwarder.forward(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }));
     expect(notify).toBeNull();
 
     // 复用同一会话：tools/list 必须成功，且工具数与 TOOL_DEFS 一致

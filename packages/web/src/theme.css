@@ -24,9 +24,7 @@
   --gc-gap: 8px;
   --gc-radius: 6px;
   --gc-ctx-menu: 168px;
-  --gc-shadow-menu:
-    0 8px 24px color-mix(in srgb, #102028 14%, transparent),
-    0 0 0 1px var(--el-border-color-lighter);
+  --gc-shadow-menu: 0 8px 24px color-mix(in srgb, #102028 14%, transparent), 0 0 0 1px var(--el-border-color-lighter);
 
   /* Element 浮层默认吃 --el-box-shadow-light，与 --gc-shadow-menu 对齐 */
   --el-box-shadow-light: var(--gc-shadow-menu);
@@ -90,9 +88,7 @@ html.dark {
   --el-text-color-secondary: #8b94a6;
   --el-text-color-placeholder: #5d6676;
   --el-text-color-disabled: #4a5261;
-  --gc-shadow-menu:
-    0 10px 28px color-mix(in srgb, #000 58%, transparent),
-    0 0 0 1px var(--el-border-color);
+  --gc-shadow-menu: 0 10px 28px color-mix(in srgb, #000 58%, transparent), 0 0 0 1px var(--el-border-color);
   --el-box-shadow-light: var(--gc-shadow-menu);
 }
 

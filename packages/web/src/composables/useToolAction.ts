@@ -62,7 +62,9 @@ export function useToolAction(repoId: () => number | null) {
         return exec;
       }
       if (exec.backupCreated) {
-        ElMessage.success(`${action.tool} 执行成功（已自动备份：${exec.backupCreated.branch ?? '分支'}${exec.backupCreated.stashRef ? ` / ${exec.backupCreated.stashRef}` : ''}）`);
+        ElMessage.success(
+          `${action.tool} 执行成功（已自动备份：${exec.backupCreated.branch ?? '分支'}${exec.backupCreated.stashRef ? ` / ${exec.backupCreated.stashRef}` : ''}）`
+        );
       } else {
         ElMessage.success(`${action.tool} 执行成功`);
       }
@@ -97,11 +99,11 @@ export function useToolAction(repoId: () => number | null) {
       return;
     }
     if (exec.error?.code === 'NO_TOKEN') {
-      ElMessageBox.confirm(
-        exec.error.message || '当前域名尚未配置 Token。',
-        '未配置 Token',
-        { confirmButtonText: '去 MR 配置', cancelButtonText: '取消', type: 'warning' }
-      )
+      ElMessageBox.confirm(exec.error.message || '当前域名尚未配置 Token。', '未配置 Token', {
+        confirmButtonText: '去 MR 配置',
+        cancelButtonText: '取消',
+        type: 'warning'
+      })
         .then(() => router.push({ path: '/settings' }))
         .catch(() => undefined);
       return;

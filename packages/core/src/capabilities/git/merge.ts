@@ -107,7 +107,8 @@ export const mergeCapabilities: Capability[] = [
   },
   {
     name: 'git_merge',
-    description: '把指定分支合并到当前分支（普通合并）。产生冲突时停止，不要选边、不要用本工具冒充预演。支持 dry_run 预览。',
+    description:
+      '把指定分支合并到当前分支（普通合并）。产生冲突时停止，不要选边、不要用本工具冒充预演。支持 dry_run 预览。',
     risk: 'write',
     schema: S.GitMergeSchema,
     handler: async (args: Args, ctx) =>

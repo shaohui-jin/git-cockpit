@@ -238,8 +238,7 @@ function classifySection(title: string, body: string, index: number, used: Set<s
     .join('\n')
     .trim();
   const trailingText = trailing.join('\n').trim();
-  const onlyStatic =
-    checkboxes.length === 0 && enums.length === 0 && !hasPlaceholder && !prose && !help;
+  const onlyStatic = checkboxes.length === 0 && enums.length === 0 && !hasPlaceholder && !prose && !help;
 
   const out: MrTemplateField[] = [];
   const itemRequired = title !== '本次提交的验证方式';
@@ -257,7 +256,11 @@ function classifySection(title: string, body: string, index: number, used: Set<s
     return out;
   }
 
-  if (hasPlaceholder || (prose && checkboxes.length === 0 && enums.length === 0) || (!prose && !checkboxes.length && !enums.length)) {
+  if (
+    hasPlaceholder ||
+    (prose && checkboxes.length === 0 && enums.length === 0) ||
+    (!prose && !checkboxes.length && !enums.length)
+  ) {
     out.push({
       id: uniqueId(base, `section_${index}`, used),
       type: 'textarea',
@@ -396,9 +399,7 @@ function renderFieldValue(field: MrTemplateField, raw: unknown): string {
   }
   if (field.type === 'checkboxes') {
     const checked = checkedSet(raw);
-    return (field.items ?? [])
-      .map((item) => `- [${checked.has(item.id) ? 'x' : ' '}] ${item.label}`)
-      .join('\n');
+    return (field.items ?? []).map((item) => `- [${checked.has(item.id) ? 'x' : ' '}] ${item.label}`).join('\n');
   }
   const text = typeof raw === 'string' ? raw.trim() : '';
   return text || field.placeholder || '';
@@ -467,17 +468,10 @@ export function publicMrTemplate(template: MrTemplate | null | undefined): Publi
 }
 
 /** 启用规范时必须交 fields；成功则渲染 body，忽略传入的裸 body */
-export function resolveMrCreateBody(
-  template: MrTemplate | null | undefined,
-  fields: unknown,
-  body?: string
-): string {
+export function resolveMrCreateBody(template: MrTemplate | null | undefined, fields: unknown, body?: string): string {
   if (!template?.enabled) return typeof body === 'string' ? body : '';
   if (fields == null || typeof fields !== 'object' || Array.isArray(fields)) {
-    throw new GitOperationError(
-      '已启用正文规范，请按 fields 填写，不要只传 body',
-      'TEMPLATE_INCOMPLETE'
-    );
+    throw new GitOperationError('已启用正文规范，请按 fields 填写，不要只传 body', 'TEMPLATE_INCOMPLETE');
   }
   const values = fields as MrTemplateValues;
   const check = validateMrTemplateFields(template, values);

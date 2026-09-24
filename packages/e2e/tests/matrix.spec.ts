@@ -25,10 +25,9 @@ test('矩阵一格去预演 → 选边落盘 → 回矩阵显示冲突 · 本地
   await expect(page.locator('.chips').filter({ hasText: 'FROM' })).toContainText('feat-c');
   await turnOffFetch(page);
 
-  const pending = page.waitForResponse(
-    (r) => r.url().includes('/merge/survey') && r.request().method() === 'GET',
-    { timeout: 30_000 }
-  );
+  const pending = page.waitForResponse((r) => r.url().includes('/merge/survey') && r.request().method() === 'GET', {
+    timeout: 30_000
+  });
   await page.getByRole('button', { name: '跑矩阵' }).click();
   expect((await pending).ok()).toBeTruthy();
 

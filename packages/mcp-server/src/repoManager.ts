@@ -7,12 +7,7 @@
  */
 import { EventEmitter } from 'node:events';
 import * as path from 'node:path';
-import {
-  assertRepoAllowed,
-  GitService,
-  RepoNotFoundError,
-  RepoStore
-} from '@shaohui_jin/git-cockpit-core';
+import { assertRepoAllowed, GitService, RepoNotFoundError, RepoStore } from '@shaohui_jin/git-cockpit-core';
 import type { GitCockpitConfig, OpenedRepo } from '@shaohui_jin/git-cockpit-core';
 
 export interface RepoHandle {

@@ -5,7 +5,13 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { DEFAULT_CONFIG, expandHome, normalizeLlmConfig, normalizeMrConfig, normalizePermissions } from '@shaohui_jin/git-cockpit-core';
+import {
+  DEFAULT_CONFIG,
+  expandHome,
+  normalizeLlmConfig,
+  normalizeMrConfig,
+  normalizePermissions
+} from '@shaohui_jin/git-cockpit-core';
 import type { GitCockpitConfig, MrConfigRaw } from '@shaohui_jin/git-cockpit-core';
 
 export type DeepPartial<T> = {
@@ -16,7 +22,7 @@ export type DeepPartial<T> = {
 function deepMerge<T>(target: T, source: unknown): T {
   if (source === null || source === undefined) return target;
   if (Array.isArray(source)) {
-    return (source as unknown[]) as T;
+    return source as unknown[] as T;
   }
   if (typeof source === 'object' && typeof target === 'object' && target !== null) {
     const out = { ...(target as Record<string, unknown>) } as Record<string, unknown>;

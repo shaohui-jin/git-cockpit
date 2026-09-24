@@ -362,13 +362,7 @@ watch(searchQuery, () => {
     <div v-if="error" class="graph-msg">{{ error }}</div>
     <div v-else-if="loading && !data" class="graph-msg">加载分支图…</div>
     <div v-else-if="!data?.tips.length" class="graph-msg">没有分支 tip</div>
-    <div
-      v-else
-      ref="stageRef"
-      class="graph-stage"
-      tabindex="0"
-      title="Ctrl+F 搜索分支节点"
-    >
+    <div v-else ref="stageRef" class="graph-stage" tabindex="0" title="Ctrl+F 搜索分支节点">
       <div ref="containerRef" class="graph-g6" />
 
       <button v-if="!searchOpen" type="button" class="graph-search-toggle" title="Ctrl+F" @click="openSearch">

@@ -20,14 +20,14 @@ npm install @shaohui_jin/git-cockpit-core
 
 ## 核心能力
 
-| 模块 | 说明 |
-| --- | --- |
-| `GitService` | 基于 simple-git 的 Git 操作封装：串行执行队列、`.git/index.lock` 写前检查、数组参数防注入、高/中/低风险分级与 `dry-run` 写预览 |
-| `PermissionManager` | 工具级风险等级（readonly / write / dangerous）与审批规则决策 |
-| `BackupManager` | 高危操作前的备份与恢复 |
-| `AuditLogger` | 操作审计日志落库 |
-| `RepoStore` | 已打开仓库列表管理 |
-| `openDatabase` | 统一的 `node:sqlite` 数据库入口（数据目录由你传入） |
+| 模块                | 说明                                                                                                                           |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `GitService`        | 基于 simple-git 的 Git 操作封装：串行执行队列、`.git/index.lock` 写前检查、数组参数防注入、高/中/低风险分级与 `dry-run` 写预览 |
+| `PermissionManager` | 工具级风险等级（readonly / write / dangerous）与审批规则决策                                                                   |
+| `BackupManager`     | 高危操作前的备份与恢复                                                                                                         |
+| `AuditLogger`       | 操作审计日志落库                                                                                                               |
+| `RepoStore`         | 已打开仓库列表管理                                                                                                             |
+| `openDatabase`      | 统一的 `node:sqlite` 数据库入口（数据目录由你传入）                                                                            |
 
 ## 快速使用
 
@@ -37,7 +37,7 @@ import { GitService, PermissionManager, BackupManager, AuditLogger } from '@shao
 // 打开仓库（校验路径合法且是 Git 仓库），返回真实仓库根目录
 const git = await GitService.open('/path/to/repo');
 
-const status = await git.getStatus();             // RepoStatus 工作区状态
+const status = await git.getStatus(); // RepoStatus 工作区状态
 const preview = await git.commit('feat: x', { dryRun: true }); // 提交预览
 console.log(preview.command, preview.affectedFiles);
 

@@ -32,7 +32,10 @@ const command = computed(() => {
 
 const risk = computed(() => {
   const p = props.preview;
-  const raw = p && 'risk' in p && typeof (p as { risk?: unknown }).risk === 'string' ? String((p as { risk: string }).risk) : 'write';
+  const raw =
+    p && 'risk' in p && typeof (p as { risk?: unknown }).risk === 'string'
+      ? String((p as { risk: string }).risk)
+      : 'write';
   if (raw === 'dangerous' || raw === 'high') return 'dangerous';
   if (raw === 'readonly') return 'readonly';
   return 'write';
@@ -47,7 +50,11 @@ const affectedFiles = computed(() => {
 });
 
 const riskText = computed(() =>
-  risk.value === 'dangerous' ? { type: 'danger', label: '高风险' } : risk.value === 'write' ? { type: 'warning', label: '写操作' } : { type: 'info', label: '只读' }
+  risk.value === 'dangerous'
+    ? { type: 'danger', label: '高风险' }
+    : risk.value === 'write'
+      ? { type: 'warning', label: '写操作' }
+      : { type: 'info', label: '只读' }
 );
 
 const previewNote = computed(() => {

@@ -45,7 +45,7 @@ import {
   shouldProbeLlm
 } from '@shaohui_jin/git-cockpit-core';
 import type { MrTemplate } from '@shaohui_jin/git-cockpit-core';
-import { collectRepoOverviews } from './overview.ts';
+import { collectRepoOverviewForId, collectRepoOverviews } from './overview.ts';
 import type { MrCliStatus, MrTokenStatus, OpenedRepo } from '@shaohui_jin/git-cockpit-core';
 import { disposeRuntime } from './runtime.ts';
 import type { Runtime } from './runtime.ts';
@@ -168,6 +168,21 @@ export async function createWebServer(
     return { secret: runtime.config.auth.localSecret };
   });
 
+  app.post('/api/shutdown', async (_req, reply) => {
+    if (jobs.list().some((j) => j.status === 'running')) {
+      return reply.code(409).send({ error: '有任务进行中，请先等待结束' });
+    }
+    await reply.code(204).send();
+    setImmediate(() => {
+      void (async () => {
+        mcpHttp.dispose();
+        await app.close();
+        disposeRuntime(runtime);
+        if (!process.env.VITEST) process.exit(0);
+      })();
+    });
+  });
+
   app.get('/api/jobs', async () => ({
     jobs: jobs.list().map((j) => jobs.summary(j))
   }));
@@ -287,6 +302,18 @@ export async function createWebServer(
     repos: await collectRepoOverviews(runtime)
   }));
 
+  app.get<{ Params: { id: string } }>('/api/repos/:id/overview', async (req, reply) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      return reply.code(400).send({ error: '非法仓库 id' } as never);
+    }
+    const overview = await collectRepoOverviewForId(runtime, id);
+    if (!overview) {
+      return reply.code(404).send({ error: '仓库不存在或已失效' } as never);
+    }
+    return { overview };
+  });
+
   app.get('/api/repos', async () => ({
     repos: runtime.repoManager.list()
   }));
@@ -377,31 +404,35 @@ export async function createWebServer(
     withRepo(req, reply, async ({ service }) => service.getStatus())
   );
 
-  app.get<{ Params: { id: string }; Querystring: Record<string, string | undefined> }>('/api/repos/:id/log', async (req, reply) =>
-    withRepo(req, reply, async ({ service }) => {
-      const q = req.query;
-      return service.getLog({
-        maxCount: q.maxCount ? Math.min(Number(q.maxCount) || 100, 10000) : undefined,
-        from: q.from,
-        to: q.to,
-        author: q.author,
-        path: q.path,
-        all: q.all === 'true'
-      });
-    })
+  app.get<{ Params: { id: string }; Querystring: Record<string, string | undefined> }>(
+    '/api/repos/:id/log',
+    async (req, reply) =>
+      withRepo(req, reply, async ({ service }) => {
+        const q = req.query;
+        return service.getLog({
+          maxCount: q.maxCount ? Math.min(Number(q.maxCount) || 100, 10000) : undefined,
+          from: q.from,
+          to: q.to,
+          author: q.author,
+          path: q.path,
+          all: q.all === 'true'
+        });
+      })
   );
 
-  app.get<{ Params: { id: string }; Querystring: Record<string, string | undefined> }>('/api/repos/:id/diff', async (req, reply) =>
-    withRepo(req, reply, async ({ service }) => {
-      const q = req.query;
-      return service.getDiff({
-        from: q.from,
-        to: q.to,
-        path: q.path,
-        staged: q.staged === 'true',
-        maxPatchBytes: q.maxPatchBytes ? Number(q.maxPatchBytes) : undefined
-      });
-    })
+  app.get<{ Params: { id: string }; Querystring: Record<string, string | undefined> }>(
+    '/api/repos/:id/diff',
+    async (req, reply) =>
+      withRepo(req, reply, async ({ service }) => {
+        const q = req.query;
+        return service.getDiff({
+          from: q.from,
+          to: q.to,
+          path: q.path,
+          staged: q.staged === 'true',
+          maxPatchBytes: q.maxPatchBytes ? Number(q.maxPatchBytes) : undefined
+        });
+      })
   );
 
   app.get<{ Params: { id: string; commit: string }; Querystring: Record<string, string | undefined> }>(
@@ -427,35 +458,47 @@ export async function createWebServer(
     withRepo(req, reply, async ({ service }) => service.listRemotes())
   );
 
-  app.get<{ Params: { id: string }; Querystring: Record<string, string | undefined> }>('/api/repos/:id/graph', async (req, reply) =>
-    withRepo(req, reply, async ({ service }) => service.getGraph(req.query.maxCount ? Number(req.query.maxCount) : 500))
+  app.get<{ Params: { id: string }; Querystring: Record<string, string | undefined> }>(
+    '/api/repos/:id/graph',
+    async (req, reply) =>
+      withRepo(req, reply, async ({ service }) =>
+        service.getGraph(req.query.maxCount ? Number(req.query.maxCount) : 500)
+      )
   );
 
-  app.get<{ Params: { id: string }; Querystring: Record<string, string | undefined> }>('/api/repos/:id/branch-graph', async (req, reply) =>
-    withRepo(req, reply, async ({ service }) =>
-      service.getBranchGraph({
-        maxNodes: req.query.maxNodes ? Number(req.query.maxNodes) : 200,
-        into: req.query.into,
-        from: req.query.from
-      })
-    )
+  app.get<{ Params: { id: string }; Querystring: Record<string, string | undefined> }>(
+    '/api/repos/:id/branch-graph',
+    async (req, reply) =>
+      withRepo(req, reply, async ({ service }) =>
+        service.getBranchGraph({
+          maxNodes: req.query.maxNodes ? Number(req.query.maxNodes) : 200,
+          into: req.query.into,
+          from: req.query.from
+        })
+      )
   );
 
-  app.get<{ Params: { id: string }; Querystring: Record<string, string | undefined> }>('/api/repos/:id/reflog', async (req, reply) =>
-    withRepo(req, reply, async ({ service }) => service.getReflog(req.query.maxCount ? Number(req.query.maxCount) : 50))
+  app.get<{ Params: { id: string }; Querystring: Record<string, string | undefined> }>(
+    '/api/repos/:id/reflog',
+    async (req, reply) =>
+      withRepo(req, reply, async ({ service }) =>
+        service.getReflog(req.query.maxCount ? Number(req.query.maxCount) : 50)
+      )
   );
 
   app.get<{ Params: { id: string } }>('/api/repos/:id/backups', async (req, reply) =>
     withRepo(req, reply, async ({ service }) => new BackupManager(service).listBackups())
   );
 
-  app.get<{ Params: { id: string }; Querystring: { commit?: string; path?: string } }>('/api/repos/:id/file', async (req, reply) =>
-    withRepo(req, reply, async ({ service }) => {
-      if (!req.query.commit || !req.query.path) {
-        return { error: '需要 commit 与 path 参数' };
-      }
-      return service.getFileContent(req.query.commit, req.query.path);
-    })
+  app.get<{ Params: { id: string }; Querystring: { commit?: string; path?: string } }>(
+    '/api/repos/:id/file',
+    async (req, reply) =>
+      withRepo(req, reply, async ({ service }) => {
+        if (!req.query.commit || !req.query.path) {
+          return { error: '需要 commit 与 path 参数' };
+        }
+        return service.getFileContent(req.query.commit, req.query.path);
+      })
   );
 
   app.get<{ Params: { id: string } }>('/api/repos/:id/stashes', async (req, reply) =>
@@ -617,17 +660,20 @@ export async function createWebServer(
   // ---------------------------------------------------------------------------
   // 配置 / 权限
   // ---------------------------------------------------------------------------
-  app.post<{ Body: { markdown?: string; filename?: string } }>('/api/settings/mr-template/parse', async (req, reply) => {
-    const markdown = typeof req.body?.markdown === 'string' ? req.body.markdown : '';
-    if (!markdown.trim()) return reply.code(400).send({ error: '请提供 Markdown 文本' });
-    try {
-      const template = parseMrTemplateMarkdown(markdown, req.body?.filename ?? '');
-      return { template, preview: renderMrTemplate(template) };
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return reply.code(400).send({ error: message });
+  app.post<{ Body: { markdown?: string; filename?: string } }>(
+    '/api/settings/mr-template/parse',
+    async (req, reply) => {
+      const markdown = typeof req.body?.markdown === 'string' ? req.body.markdown : '';
+      if (!markdown.trim()) return reply.code(400).send({ error: '请提供 Markdown 文本' });
+      try {
+        const template = parseMrTemplateMarkdown(markdown, req.body?.filename ?? '');
+        return { template, preview: renderMrTemplate(template) };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return reply.code(400).send({ error: message });
+      }
     }
-  });
+  );
 
   app.post<{ Body: { template?: unknown; values?: Record<string, unknown> } }>(
     '/api/settings/mr-template/preview',
@@ -707,16 +753,10 @@ export async function createWebServer(
     }
     if (patch.mr !== undefined) {
       const next = normalizeMrConfig(runtime.config.mr);
-      if (
-        patch.mr.method === 'cli' ||
-        patch.mr.method === 'token' ||
-        patch.mr.method === 'browser'
-      ) {
+      if (patch.mr.method === 'cli' || patch.mr.method === 'token' || patch.mr.method === 'browser') {
         next.method = patch.mr.method;
         const handle =
-          repoIdForMr != null
-            ? await runtime.repoManager.getById(repoIdForMr)
-            : await runtime.repoManager.getCurrent();
+          repoIdForMr != null ? await runtime.repoManager.getById(repoIdForMr) : await runtime.repoManager.getCurrent();
         if (handle) {
           next.repoMethods = {
             ...next.repoMethods,
@@ -936,10 +976,7 @@ async function withCliTokenStatus(
   return cli;
 }
 
-function remoteUrlForValidation(
-  host: string,
-  ctx: { remoteUrl: string; host: string | null } | null
-): string {
+function remoteUrlForValidation(host: string, ctx: { remoteUrl: string; host: string | null } | null): string {
   const name = normalizeHostName(host);
   if (ctx?.remoteUrl && ctx.host === name) return ctx.remoteUrl;
   return `https://${name}/verify/token.git`;
@@ -1015,12 +1052,7 @@ async function mrClientView(
       const platform = profile?.platform ?? detected;
       const token = profile?.token?.trim() ?? '';
       let tokenStatus: MrTokenStatus | null = null;
-      if (
-        opts?.tokenStatus &&
-        host &&
-        opts.tokenStatusHost &&
-        normalizeHostName(opts.tokenStatusHost) === host
-      ) {
+      if (opts?.tokenStatus && host && opts.tokenStatusHost && normalizeHostName(opts.tokenStatusHost) === host) {
         tokenStatus = opts.tokenStatus;
       }
       if (!tokenStatus && opts?.validateToken && token && (platform === 'github' || platform === 'gitlab')) {
@@ -1055,9 +1087,7 @@ async function mrClientView(
   }));
   const currentHost = current?.host ?? null;
   const showHosts =
-    Boolean(currentHost) && current?.platform !== 'unknown'
-      ? hostsPublic.filter((h) => h.host === currentHost)
-      : [];
+    Boolean(currentHost) && current?.platform !== 'unknown' ? hostsPublic.filter((h) => h.host === currentHost) : [];
   return {
     method: methodForRepo(mr, repoPath),
     defaultRemote: mr.defaultRemote,

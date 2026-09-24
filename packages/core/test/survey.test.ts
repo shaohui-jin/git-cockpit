@@ -1,12 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
-import {
-  GitOperationError,
-  GitService,
-  clearMergeSurveyCache,
-  parseTempBranches
-} from '../src/index.ts';
+import { GitOperationError, GitService, clearMergeSurveyCache, parseTempBranches } from '../src/index.ts';
 import { cleanupTmp, createSurveyRepo } from './helpers.ts';
 
 describe('parseTempBranches', () => {

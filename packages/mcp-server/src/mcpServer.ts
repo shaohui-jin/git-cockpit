@@ -64,22 +64,27 @@ export function createMcpServer(runtime: Runtime, session = new McpSessionContex
 /** 将 daemon 的业务事件映射为 MCP 主动通知；监听器随 server 关闭而移除。 */
 function bindMcpNotifications(server: McpServer, runtime: Runtime, session: McpSessionContext): void {
   const onRepoChanged = (payload: unknown) => {
-    const repoPath = typeof payload === 'object' && payload !== null && 'repoPath' in payload
-      ? String((payload as { repoPath?: unknown }).repoPath ?? '')
-      : '';
+    const repoPath =
+      typeof payload === 'object' && payload !== null && 'repoPath' in payload
+        ? String((payload as { repoPath?: unknown }).repoPath ?? '')
+        : '';
     const binding = session.getBinding();
     if (binding && repoPath && binding.repoPath !== repoPath) return;
     void server.server.sendResourceUpdated({ uri: 'git-cockpit://repo/current' }).catch(() => undefined);
-    void server.server.sendLoggingMessage({
-      level: 'info',
-      data: { event: 'repo-changed', repoPath, payload }
-    }).catch(() => undefined);
+    void server.server
+      .sendLoggingMessage({
+        level: 'info',
+        data: { event: 'repo-changed', repoPath, payload }
+      })
+      .catch(() => undefined);
   };
   const onJobProgress = (payload: unknown) => {
-    void server.server.sendLoggingMessage({
-      level: 'info',
-      data: { event: 'job-progress', payload }
-    }).catch(() => undefined);
+    void server.server
+      .sendLoggingMessage({
+        level: 'info',
+        data: { event: 'job-progress', payload }
+      })
+      .catch(() => undefined);
   };
   runtime.eventBus.on('repo-changed', onRepoChanged);
   runtime.eventBus.on('job-progress', onJobProgress);

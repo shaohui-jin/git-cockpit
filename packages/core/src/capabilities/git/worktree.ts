@@ -31,8 +31,7 @@ export const worktreeCapabilities: Capability[] = [
   },
   {
     name: 'git_worktree_remove',
-    description:
-      '移除 linked worktree（git worktree remove）。不能移除主工作区。force 可在工作区不干净时强制。',
+    description: '移除 linked worktree（git worktree remove）。不能移除主工作区。force 可在工作区不干净时强制。',
     risk: 'write',
     schema: S.GitWorktreeRemoveSchema,
     handler: async (args: Args, ctx) =>

@@ -21,7 +21,9 @@ function stableJson(value: unknown): string {
 }
 
 function previewKey(tool: string, repoPath: string, args: Record<string, unknown>): string {
-  return createHash('sha256').update(`${tool}\0${repoPath}\0${stableJson(args)}`).digest('hex');
+  return createHash('sha256')
+    .update(`${tool}\0${repoPath}\0${stableJson(args)}`)
+    .digest('hex');
 }
 
 function gcPreviews(): void {

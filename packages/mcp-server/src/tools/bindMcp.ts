@@ -59,7 +59,9 @@ function bindRepoSelect(server: McpServer, runtime: Runtime, session: McpSession
           at: new Date().toISOString()
         });
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify(binding ? { bound: true, ...binding } : { bound: false }) }]
+          content: [
+            { type: 'text' as const, text: JSON.stringify(binding ? { bound: true, ...binding } : { bound: false }) }
+          ]
         };
       } catch (err) {
         return {

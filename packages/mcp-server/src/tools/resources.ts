@@ -46,7 +46,11 @@ export function registerMcpResources(
   register(
     'repo-current',
     'git-cockpit://repo/current',
-    { title: '当前 session 仓', description: '当前 MCP session 绑定仓库的工作区摘要；未绑定时兼容最近打开仓库', mimeType: MIME },
+    {
+      title: '当前 session 仓',
+      description: '当前 MCP session 绑定仓库的工作区摘要；未绑定时兼容最近打开仓库',
+      mimeType: MIME
+    },
     async (uri) => {
       const binding = session.getBinding();
       const handle = binding

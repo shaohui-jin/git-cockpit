@@ -133,7 +133,10 @@ describe('executeTool 安全链路', () => {
     await runtime.repoManager.getCurrent().then((h) => h!.service.resetHard(headBefore));
     // 还原默认配置
     runtime.configStore.update({
-      permissions: { disabledTools: ['git_reset_hard', 'git_clean', 'git_push_force', 'git_branch_delete_force', 'git_rebase'], requireApprovalFor: ['git_reset_hard', 'git_clean', 'git_push_force', 'git_branch_delete_force', 'git_rebase'] }
+      permissions: {
+        disabledTools: ['git_reset_hard', 'git_clean', 'git_push_force', 'git_branch_delete_force', 'git_rebase'],
+        requireApprovalFor: ['git_reset_hard', 'git_clean', 'git_push_force', 'git_branch_delete_force', 'git_rebase']
+      }
     });
     runtime.config = runtime.configStore.get();
     runtime.permissions = new PermissionManager(runtime.config);
@@ -276,11 +279,7 @@ async function landTempRemote(
 ): Promise<string> {
   await divergeFeature(sample);
   const applyDef = TOOL_DEF_MAP.get('git_apply_resolve')!;
-  const applied = await mcpWrite(
-    applyDef,
-    { into, from, push: false, dryRun: false },
-    { runtime, source: 'mcp' }
-  );
+  const applied = await mcpWrite(applyDef, { into, from, push: false, dryRun: false }, { runtime, source: 'mcp' });
   if (!applied.success) {
     throw new Error(applied.error?.message ?? 'git_apply_resolve 失败');
   }
@@ -299,11 +298,7 @@ describe('git_mr_prepare / git_mr_create', () => {
       const sample = await createSampleRepo();
       await runtime.repoManager.open(sample.dir);
       const def = TOOL_DEF_MAP.get('git_mr_prepare')!;
-      const exec = await mcpWrite(
-        def,
-        { into: 'main', from: 'feature/x', dryRun: false },
-        { runtime, source: 'mcp' }
-      );
+      const exec = await mcpWrite(def, { into: 'main', from: 'feature/x', dryRun: false }, { runtime, source: 'mcp' });
       expect(exec.success).toBe(true);
       expect((exec.result as { platform: string; sourceBranch: string }).platform).toBe('unknown');
       expect((exec.result as { sourceBranch: string }).sourceBranch).toBe('feature/x');
@@ -334,11 +329,7 @@ describe('git_mr_prepare / git_mr_create', () => {
       expect(blocked.error?.code).toBe('NOT_LANDED');
 
       await landTempRemote(runtime, sample);
-      const exec = await mcpWrite(
-        def,
-        { into: 'main', from: 'feature/x', dryRun: true },
-        { runtime, source: 'mcp' }
-      );
+      const exec = await mcpWrite(def, { into: 'main', from: 'feature/x', dryRun: true }, { runtime, source: 'mcp' });
       expect(exec.success).toBe(false);
       expect(exec.error?.code).toBe('NO_TOKEN');
     } finally {
@@ -382,11 +373,7 @@ describe('git_mr_prepare / git_mr_create', () => {
       expect(String((ok.result as { note?: string }).note ?? '')).toContain('建议改用 Token 或本机 CLI');
 
       const prepDef = TOOL_DEF_MAP.get('git_mr_prepare')!;
-      const prep = await executeTool(
-        prepDef,
-        { into: 'main', from: 'feature/x' },
-        { runtime, source: 'mcp' }
-      );
+      const prep = await executeTool(prepDef, { into: 'main', from: 'feature/x' }, { runtime, source: 'mcp' });
       expect(prep.success).toBe(true);
       expect((prep.result as { template?: { enabled: boolean } }).template?.enabled).toBe(true);
       expect((prep.result as { method?: string }).method).toBe('browser');
@@ -403,11 +390,7 @@ describe('git_mr_prepare / git_mr_create', () => {
       await runtime.repoManager.open(sample.dir);
       await landTempRemote(runtime, sample);
       const def = TOOL_DEF_MAP.get('git_mr_create')!;
-      const exec = await mcpWrite(
-        def,
-        { into: 'main', from: 'feature/x', dryRun: true },
-        { runtime, source: 'mcp' }
-      );
+      const exec = await mcpWrite(def, { into: 'main', from: 'feature/x', dryRun: true }, { runtime, source: 'mcp' });
       expect(exec.success).toBe(true);
     } finally {
       disposeTestRuntime(runtime);
@@ -422,11 +405,7 @@ describe('git_mr_prepare / git_mr_create', () => {
       await runtime.repoManager.open(sample.dir);
       await landTempRemote(runtime, sample);
       const def = TOOL_DEF_MAP.get('git_mr_create')!;
-      const exec = await mcpWrite(
-        def,
-        { into: 'main', from: 'feature/x', dryRun: true },
-        { runtime, source: 'mcp' }
-      );
+      const exec = await mcpWrite(def, { into: 'main', from: 'feature/x', dryRun: true }, { runtime, source: 'mcp' });
       expect(exec.success).toBe(true);
     } finally {
       disposeTestRuntime(runtime);
@@ -454,11 +433,7 @@ describe('git_mr_prepare / git_mr_create', () => {
       bindRepoMrMethod(runtime, sample.dir, 'token');
       await landTempRemote(runtime, sample);
       const def = TOOL_DEF_MAP.get('git_mr_create')!;
-      const exec = await mcpWrite(
-        def,
-        { into: 'main', from: 'feature/x', dryRun: false },
-        { runtime, source: 'mcp' }
-      );
+      const exec = await mcpWrite(def, { into: 'main', from: 'feature/x', dryRun: false }, { runtime, source: 'mcp' });
       expect(exec.success).toBe(true);
       expect(exec.result).toMatchObject({ via: 'token', number: 3 });
     } finally {
@@ -488,11 +463,7 @@ describe('git_mr_prepare / git_mr_create', () => {
       bindRepoMrMethod(runtime, sample.dir, 'token');
       await landTempRemote(runtime, sample);
       const def = TOOL_DEF_MAP.get('git_mr_create')!;
-      const exec = await mcpWrite(
-        def,
-        { into: 'main', from: 'feature/x', dryRun: false },
-        { runtime, source: 'mcp' }
-      );
+      const exec = await mcpWrite(def, { into: 'main', from: 'feature/x', dryRun: false }, { runtime, source: 'mcp' });
       expect(exec.success).toBe(true);
       expect(exec.result).toMatchObject({ via: 'token' });
       expect((exec.result as { url: string }).url).toContain('merge_requests/2');

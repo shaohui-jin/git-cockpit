@@ -29,15 +29,21 @@ describe('merge 临时枝档位', () => {
   });
 
   it('新名字带两侧短 SHA，斜杠和连字符不再撞名', () => {
-    const tips = { fromSha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', intoSha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' };
+    const tips = {
+      fromSha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      intoSha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+    };
     expect(legacyTempBranchName('main', 'feature/foo')).toBe('merge/feature-foo-into-main');
     expect(legacyTempBranchName('main', 'feature-foo')).toBe('merge/feature-foo-into-main');
     expect(defaultTempBranchName('main', 'feature/foo', ['origin'], tips)).toBe(
       'merge/feature-foo-into-main--aaaaaaaa-bbbbbbbb'
     );
-    expect(defaultTempBranchName('main', 'feature-foo', ['origin'], { ...tips, fromSha: 'cccccccccccccccccccccccccccccccccccccccc' })).toBe(
-      'merge/feature-foo-into-main--cccccccc-bbbbbbbb'
-    );
+    expect(
+      defaultTempBranchName('main', 'feature-foo', ['origin'], {
+        ...tips,
+        fromSha: 'cccccccccccccccccccccccccccccccccccccccc'
+      })
+    ).toBe('merge/feature-foo-into-main--cccccccc-bbbbbbbb');
   });
 
   it('解析落盘提交说明', () => {
@@ -47,9 +53,7 @@ describe('merge 临时枝档位', () => {
       tempBranch: 'merge/feature-x-into-main'
     });
     expect(
-      parseLandedMergeMessage(
-        'resolve: merge origin/a into origin/b via merge/a-into-b\n\nApplied stash'
-      )
+      parseLandedMergeMessage('resolve: merge origin/a into origin/b via merge/a-into-b\n\nApplied stash')
     ).toEqual({ from: 'origin/a', into: 'origin/b', tempBranch: 'merge/a-into-b' });
   });
 
@@ -90,12 +94,14 @@ describe('merge 临时枝档位', () => {
   });
 
   it('开单闸：临时枝已推才 ok', () => {
-    expect(
-      evaluateMrMergeGate({ situation: 'temp_remote', into: 'main', from: 'feat' })
-    ).toMatchObject({ ok: true, code: 'OK' });
-    expect(
-      evaluateMrMergeGate({ situation: 'temp_local', into: 'main', from: 'feat' })
-    ).toMatchObject({ ok: false, code: 'TEMP_NOT_PUSHED' });
+    expect(evaluateMrMergeGate({ situation: 'temp_remote', into: 'main', from: 'feat' })).toMatchObject({
+      ok: true,
+      code: 'OK'
+    });
+    expect(evaluateMrMergeGate({ situation: 'temp_local', into: 'main', from: 'feat' })).toMatchObject({
+      ok: false,
+      code: 'TEMP_NOT_PUSHED'
+    });
     expect(
       evaluateMrMergeGate({
         situation: 'looking_at_temp',
@@ -263,9 +269,9 @@ describe('worktree 落盘', () => {
   it('有冲突且无 files 时拒绝，主区不变、不留 worktree', async () => {
     const { dir } = await createConflictRepo();
     const svc = await GitService.open(dir);
-    await expect(
-      svc.applyResolve({ into: 'main', from: 'feature', push: false, files: [] })
-    ).rejects.toMatchObject({ code: 'HAS_CONFLICTS' });
+    await expect(svc.applyResolve({ into: 'main', from: 'feature', push: false, files: [] })).rejects.toMatchObject({
+      code: 'HAS_CONFLICTS'
+    });
 
     const status = await svc.getStatus();
     expect(status.current).toBe('main');
@@ -301,9 +307,9 @@ describe('worktree 落盘', () => {
     });
     if ('dryRun' in first) throw new Error('不应返回 dry-run');
     const old = (await git.revparse([first.tempBranch])).trim();
-    await expect(
-      svc.applyResolve({ into: 'main', from: 'feature', push: false, files: [] })
-    ).rejects.toMatchObject({ code: 'HAS_CONFLICTS' });
+    await expect(svc.applyResolve({ into: 'main', from: 'feature', push: false, files: [] })).rejects.toMatchObject({
+      code: 'HAS_CONFLICTS'
+    });
     expect((await git.revparse([first.tempBranch])).trim()).toBe(old);
   });
 });

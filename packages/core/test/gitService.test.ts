@@ -1,12 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import {
-  ensureNonInteractiveGitEnv,
-  GitOperationError,
-  GitService,
-  nonInteractiveGitEnv
-} from '../src/index.ts';
+import { ensureNonInteractiveGitEnv, GitOperationError, GitService, nonInteractiveGitEnv } from '../src/index.ts';
 import { simpleGit } from 'simple-git';
 import { cleanupTmp, commitFile, createSampleRepo, initRepo, makeTmpDir } from './helpers.ts';
 

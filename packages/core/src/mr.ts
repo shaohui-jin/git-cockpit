@@ -18,14 +18,16 @@ import type {
 import { toHttpsRemoteUrl } from './merge.ts';
 import { normalizeMrTemplate, publicMrTemplate } from './mrTemplate.ts';
 import * as path from 'node:path';
-import {
-  cliInstallUrl,
-  cliMissingHint,
-  probeMrCli,
-  runMrCli
-} from './mrCli.ts';
+import { cliInstallUrl, cliMissingHint, probeMrCli, runMrCli } from './mrCli.ts';
 
-export { GH_INSTALL_URL, GLAB_INSTALL_URL, probeAllMrCli, probeMrCli, readCliAuthToken, resolveCliBin } from './mrCli.ts';
+export {
+  GH_INSTALL_URL,
+  GLAB_INSTALL_URL,
+  probeAllMrCli,
+  probeMrCli,
+  readCliAuthToken,
+  resolveCliBin
+} from './mrCli.ts';
 
 export interface GithubRepoRef {
   owner: string;
@@ -95,8 +97,7 @@ export function upsertMrHost(
   const host = normalizeHostName(patch.host);
   if (!host) return hosts;
   const i = hosts.findIndex((h) => normalizeHostName(h.host) === host);
-  const cur: MrHostProfile =
-    i >= 0 ? { ...hosts[i]! } : { host, platform: 'gitlab', token: '', apiBaseUrl: '' };
+  const cur: MrHostProfile = i >= 0 ? { ...hosts[i]! } : { host, platform: 'gitlab', token: '', apiBaseUrl: '' };
   cur.host = host;
   if (patch.platform === 'github' || patch.platform === 'gitlab') cur.platform = patch.platform;
   if (patch.clearToken) cur.token = '';
@@ -198,7 +199,10 @@ export function parseGithubRepo(remoteUrl: string): GithubRepoRef | null {
   if (!https || !isGithubRemote(remoteUrl)) return null;
   try {
     const u = new URL(https);
-    const parts = u.pathname.replace(/^\/+|\/+$/g, '').split('/').filter(Boolean);
+    const parts = u.pathname
+      .replace(/^\/+|\/+$/g, '')
+      .split('/')
+      .filter(Boolean);
     if (parts.length < 2) return null;
     return { owner: parts[parts.length - 2]!, repo: parts[parts.length - 1]!, origin: u.origin };
   } catch {
@@ -211,7 +215,10 @@ export function parseGitlabProject(remoteUrl: string): GitlabProjectRef | null {
   if (!https) return null;
   try {
     const u = new URL(https);
-    const parts = u.pathname.replace(/^\/+|\/+$/g, '').split('/').filter(Boolean);
+    const parts = u.pathname
+      .replace(/^\/+|\/+$/g, '')
+      .split('/')
+      .filter(Boolean);
     if (parts.length < 2) return null;
     return {
       owner: parts[0]!,
@@ -241,9 +248,7 @@ export function githubPullsApiUrl(remoteUrl: string, apiBaseUrl = ''): string | 
     return null;
   }
   const apiBase =
-    host === 'github.com' || host === 'www.github.com'
-      ? 'https://api.github.com'
-      : `${parsed.origin}/api/v3`;
+    host === 'github.com' || host === 'www.github.com' ? 'https://api.github.com' : `${parsed.origin}/api/v3`;
   return `${apiBase}/repos/${parsed.owner}/${parsed.repo}/pulls`;
 }
 
@@ -310,7 +315,10 @@ export async function createGithubPullRequest(options: {
     });
     json = (await res.json()) as typeof json;
     if (!res.ok) {
-      const detail = (json.errors ?? []).map((e) => e.message).filter(Boolean).join('; ');
+      const detail = (json.errors ?? [])
+        .map((e) => e.message)
+        .filter(Boolean)
+        .join('; ');
       throw new GitOperationError(
         `GitHub 创建 PR 失败：${detail || json.message || String(res.status)}`,
         'CREATE_MR_FAILED'
@@ -318,10 +326,7 @@ export async function createGithubPullRequest(options: {
     }
   } catch (err) {
     if (err instanceof GitOperationError) throw err;
-    throw new GitOperationError(
-      `GitHub 创建 PR 请求失败：${describeFetchError(err)}`,
-      'CREATE_MR_FAILED'
-    );
+    throw new GitOperationError(`GitHub 创建 PR 请求失败：${describeFetchError(err)}`, 'CREATE_MR_FAILED');
   }
   if (!json.html_url || json.number == null) {
     throw new GitOperationError('GitHub 创建 PR 成功但未返回链接', 'CREATE_MR_FAILED');
@@ -363,8 +368,7 @@ async function resolveGitlabUserIds(
         continue;
       }
       const arr = (await res.json()) as Array<{ id?: number; username?: string }>;
-      const hit =
-        arr.find((u) => u.username?.toLowerCase() === username.toLowerCase()) ?? arr[0];
+      const hit = arr.find((u) => u.username?.toLowerCase() === username.toLowerCase()) ?? arr[0];
       if (hit?.id != null) ids.push(hit.id);
       else missing.push(username);
     } catch {
@@ -426,10 +430,7 @@ export async function createGitlabMergeRequest(options: {
     }
   } catch (err) {
     if (err instanceof GitOperationError) throw err;
-    throw new GitOperationError(
-      `GitLab 创建 MR 请求失败：${describeFetchError(err)}`,
-      'CREATE_MR_FAILED'
-    );
+    throw new GitOperationError(`GitLab 创建 MR 请求失败：${describeFetchError(err)}`, 'CREATE_MR_FAILED');
   }
   if (!json.web_url) {
     throw new GitOperationError('GitLab 创建 MR 成功但未返回链接', 'CREATE_MR_FAILED');
@@ -525,8 +526,7 @@ export async function enrichPrepareMr(options: EnrichMrOptions): Promise<Prepare
   let cli: 'gh' | 'glab' | null = null;
   let cliError: string | undefined;
   let installUrl: string | null = null;
-  const which: 'gh' | 'glab' | null =
-    platform === 'github' ? 'gh' : platform === 'gitlab' ? 'glab' : null;
+  const which: 'gh' | 'glab' | null = platform === 'github' ? 'gh' : platform === 'gitlab' ? 'glab' : null;
   let probe: MrCliStatus | undefined;
   if (which) {
     probe = await probeMrCli(which, { cwd: options.cwd });
@@ -582,8 +582,7 @@ export async function createPullOrMergeRequest(options: {
   const token = tokenForRemote(options.mr, options.prep.remoteUrl);
   const apiBaseUrl = apiBaseForRemote(options.mr, options.prep.remoteUrl);
   const host = hostnameOf(options.prep.remoteUrl);
-  const which: 'gh' | 'glab' | null =
-    platform === 'github' ? 'gh' : platform === 'gitlab' ? 'glab' : null;
+  const which: 'gh' | 'glab' | null = platform === 'github' ? 'gh' : platform === 'gitlab' ? 'glab' : null;
   const probe = which ? await probeMrCli(which, { cwd: options.cwd }) : null;
 
   let via: CreateMrResult['via'] = 'browser';
@@ -650,9 +649,7 @@ export async function createPullOrMergeRequest(options: {
       messages.push(probe.error ?? cliMissingHint(which!));
     }
     if (templateEnabled) {
-      messages.push(
-        '已启用正文规范。浏览器创建页不会写入这段正文，建议在设置 → MR 配置改用 Token 或本机 CLI。'
-      );
+      messages.push('已启用正文规范。浏览器创建页不会写入这段正文，建议在设置 → MR 配置改用 Token 或本机 CLI。');
     }
     messages.push('未调用 Token / CLI，请用浏览器打开创建页。');
     if (body.trim()) {

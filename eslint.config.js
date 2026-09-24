@@ -1,5 +1,6 @@
 // @ts-check
 import js from '@eslint/js';
+import eslintConfigPrettier from 'eslint-config-prettier';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
@@ -61,5 +62,6 @@ export default tseslint.config(
     rules: {
       '@typescript-eslint/no-require-imports': 'off'
     }
-  }
+  },
+  eslintConfigPrettier
 );

@@ -2,13 +2,7 @@ import type { z } from 'zod';
 import type { BackupResult } from '../backup.ts';
 import type { GitService } from '../gitService.ts';
 import type { JobEngine } from '../jobEngine.ts';
-import type {
-  GitCockpitConfig,
-  OperationLogEntry,
-  OperationSource,
-  RepoOverview,
-  RiskLevel
-} from '../types.ts';
+import type { GitCockpitConfig, OperationLogEntry, OperationSource, RepoOverview, RiskLevel } from '../types.ts';
 
 /** Agent 下一步：只给工具名和已填好的参数，不写自然语言。 */
 export interface NextStep {

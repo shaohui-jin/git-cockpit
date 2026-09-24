@@ -157,9 +157,12 @@ export async function validateMrToken(options: {
       }
       if (!res.ok) return fail('无效', `GitHub API 异常：HTTP ${res.status}`);
       const user = (await res.json()) as { login?: string };
-      const expired =
-        expiresAt != null && !Number.isNaN(Date.parse(expiresAt)) && Date.parse(expiresAt) < Date.now();
-      if (expired) return fail('已过期', 'Token 已过期', { login: user.login, expiresMessage: expiryMessage(expiresAt, 'github') });
+      const expired = expiresAt != null && !Number.isNaN(Date.parse(expiresAt)) && Date.parse(expiresAt) < Date.now();
+      if (expired)
+        return fail('已过期', 'Token 已过期', {
+          login: user.login,
+          expiresMessage: expiryMessage(expiresAt, 'github')
+        });
       return okStatus({ login: user.login, expiresMessage: expiryMessage(expiresAt, 'github') });
     } catch (err) {
       return fail('无效', `无法连接 GitHub API：${describeFetchError(err)}`);
@@ -198,7 +201,10 @@ export async function validateMrToken(options: {
         if (expiresAt) {
           const end = Date.parse(/^\d{4}-\d{2}-\d{2}$/.test(expiresAt) ? `${expiresAt}T23:59:59+08:00` : expiresAt);
           if (!Number.isNaN(end) && end < Date.now()) {
-            return fail('已过期', 'Token 已过期', { login: user.username, expiresMessage: expiryMessage(expiresAt, 'gitlab') });
+            return fail('已过期', 'Token 已过期', {
+              login: user.username,
+              expiresMessage: expiryMessage(expiresAt, 'gitlab')
+            });
           }
         }
       }

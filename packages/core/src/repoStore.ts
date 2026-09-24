@@ -32,13 +32,13 @@ export class RepoStore {
 
   getByPath(path: string): OpenedRepo | null {
     const row = this.db.prepare('SELECT * FROM opened_repos WHERE path = ?').get(path) as
-      | Record<string, unknown>
-      | undefined;
+      Record<string, unknown> | undefined;
     return row ? this.rowToRepo(row) : null;
   }
 
   getById(id: number): OpenedRepo | null {
-    const row = this.db.prepare('SELECT * FROM opened_repos WHERE id = ?').get(id) as Record<string, unknown> | undefined;
+    const row = this.db.prepare('SELECT * FROM opened_repos WHERE id = ?').get(id) as
+      Record<string, unknown> | undefined;
     return row ? this.rowToRepo(row) : null;
   }
 

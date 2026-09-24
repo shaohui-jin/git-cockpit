@@ -35,9 +35,10 @@ export class McpSessionContext {
       throw new Error('repoId 与 repoPath 只能传一个');
     }
 
-    const handle = input.repoId !== undefined
-      ? await this.runtime.repoManager.getById(input.repoId)
-      : await this.runtime.repoManager.open(input.repoPath!);
+    const handle =
+      input.repoId !== undefined
+        ? await this.runtime.repoManager.getById(input.repoId)
+        : await this.runtime.repoManager.open(input.repoPath!);
     if (!handle) {
       throw new Error(`仓库不存在: id=${input.repoId}`);
     }

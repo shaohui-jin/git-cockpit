@@ -227,7 +227,9 @@ export function createMcpForwarder(options: McpForwarderOptions): McpForwarder {
       } catch (err) {
         const detail = err instanceof Error ? err.message : String(err);
         process.stderr.write(`[git-cockpit] 转发到 daemon 失败：${detail}\n`);
-        return message.id === undefined || message.id === null ? null : errorResponse(message.id, `无法连接 daemon：${detail}`);
+        return message.id === undefined || message.id === null
+          ? null
+          : errorResponse(message.id, `无法连接 daemon：${detail}`);
       }
 
       const sid = res.headers.get('mcp-session-id');
@@ -287,8 +289,8 @@ export async function startMcpBridge(options: McpForwarderOptions): Promise<void
       return;
     }
     pending += 1;
-    tail = tail
-      .then(async () => {
+    tail = tail.then(
+      async () => {
         try {
           const out = await forwarder.forward(line);
           if (out) process.stdout.write(`${out}\n`);
@@ -300,9 +302,11 @@ export async function startMcpBridge(options: McpForwarderOptions): Promise<void
         } finally {
           pending -= 1;
         }
-      }, async () => {
+      },
+      async () => {
         pending -= 1;
-      });
+      }
+    );
   };
 
   process.stdin.setEncoding('utf8');

@@ -1,6 +1,14 @@
 import { defineStore } from 'pinia';
 import * as api from '@/api/client';
-import type { MrCurrentHost, MrSettings, MrTemplate, PermissionsPayload, PublicLlmConfig, RemoteInfo, ToolSummary } from '@/api/types';
+import type {
+  MrCurrentHost,
+  MrSettings,
+  MrTemplate,
+  PermissionsPayload,
+  PublicLlmConfig,
+  RemoteInfo,
+  ToolSummary
+} from '@/api/types';
 
 interface State {
   permissions: PermissionsPayload | null;
@@ -98,8 +106,7 @@ function deriveCurrent(mr: MrSettings): MrCurrentHost | null {
     remote: hit.name,
     remoteUrl,
     tokenSet: Boolean(profile?.tokenSet),
-    tokenPreview:
-      (mr.current?.host === host ? (mr.current.tokenPreview ?? '') : '') || profile?.tokenPreview || '',
+    tokenPreview: (mr.current?.host === host ? (mr.current.tokenPreview ?? '') : '') || profile?.tokenPreview || '',
     tokenStatus: mr.current?.host === host ? (mr.current.tokenStatus ?? null) : null,
     apiBaseUrl: profile?.apiBaseUrl ?? ''
   };

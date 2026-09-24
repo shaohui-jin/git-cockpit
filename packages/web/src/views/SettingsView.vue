@@ -596,34 +596,30 @@ async function clearLlmKey(): Promise<void> {
                 <div class="mr-kv">
                   <span class="mono">gh</span>
                   <span>{{ cliStatusText(settings.mr?.cli.gh) }}</span>
-                  <el-link
-                    v-if="!settings.mr?.cli.gh.found"
-                    type="primary"
-                    :href="ghInstallUrl"
-                    target="_blank"
-                  >去下载</el-link>
+                  <el-link v-if="!settings.mr?.cli.gh.found" type="primary" :href="ghInstallUrl" target="_blank"
+                    >去下载</el-link
+                  >
                   <span
                     v-else-if="settings.mr?.cli.gh.loggedIn && settings.mr?.cli.gh.tokenStatus"
                     class="token-title-status"
                     :class="cliTokenStatusClass(settings.mr?.cli.gh)"
-                  >{{ settings.mr?.cli.gh.tokenStatus.titleStatus }}</span>
+                    >{{ settings.mr?.cli.gh.tokenStatus.titleStatus }}</span
+                  >
                 </div>
               </template>
               <template v-if="showGlabCli">
                 <div class="mr-kv">
                   <span class="mono">glab</span>
                   <span>{{ cliStatusText(settings.mr?.cli.glab) }}</span>
-                  <el-link
-                    v-if="!settings.mr?.cli.glab.found"
-                    type="primary"
-                    :href="glabInstallUrl"
-                    target="_blank"
-                  >去下载</el-link>
+                  <el-link v-if="!settings.mr?.cli.glab.found" type="primary" :href="glabInstallUrl" target="_blank"
+                    >去下载</el-link
+                  >
                   <span
                     v-else-if="settings.mr?.cli.glab.loggedIn && settings.mr?.cli.glab.tokenStatus"
                     class="token-title-status"
                     :class="cliTokenStatusClass(settings.mr?.cli.glab)"
-                  >{{ settings.mr?.cli.glab.tokenStatus.titleStatus }}</span>
+                    >{{ settings.mr?.cli.glab.tokenStatus.titleStatus }}</span
+                  >
                 </div>
               </template>
               <el-button @click="redetectCli">重新检测</el-button>
@@ -631,15 +627,21 @@ async function clearLlmKey(): Promise<void> {
 
             <div v-if="opt.id === 'token'" class="mr-stack">
               <template v-if="!current?.host">
-                <p class="mr-hint">{{
-                  repos.currentId ? '当前仓库没有可识别的远程地址，无法绑定 Token。' : '请先在工作台打开并选择仓库。Token 始终绑定当前远程的域名。'
-                }}</p>
+                <p class="mr-hint">
+                  {{
+                    repos.currentId
+                      ? '当前仓库没有可识别的远程地址，无法绑定 Token。'
+                      : '请先在工作台打开并选择仓库。Token 始终绑定当前远程的域名。'
+                  }}
+                </p>
               </template>
               <template v-else>
                 <el-form class="mr-form gc-form-narrow" label-width="100px" label-position="left" @submit.prevent>
                   <el-form-item label="Token">
                     <div class="mr-field">
-                      <p v-if="tokenStatusText" class="token-title-status" :class="tokenStatusClass">{{ tokenStatusText }}</p>
+                      <p v-if="tokenStatusText" class="token-title-status" :class="tokenStatusClass">
+                        {{ tokenStatusText }}
+                      </p>
                       <el-input
                         v-model="tokenInput"
                         type="password"
@@ -668,10 +670,7 @@ async function clearLlmKey(): Promise<void> {
                     </div>
                   </el-form-item>
                   <el-form-item v-if="showAdvanced" label="API Base URL">
-                    <el-input
-                      v-model="apiBaseUrl"
-                      placeholder="空则按域名惯例推断，如 https://git.a.com/api/v4"
-                    />
+                    <el-input v-model="apiBaseUrl" placeholder="空则按域名惯例推断，如 https://git.a.com/api/v4" />
                   </el-form-item>
                   <el-form-item>
                     <el-button
@@ -714,11 +713,7 @@ async function clearLlmKey(): Promise<void> {
                 currentHostProfile.platform === 'github' ? 'GitHub' : 'GitLab'
               }}</el-tag>
               <el-tag size="small" :type="currentHostProfile.tokenSet ? 'success' : 'info'" effect="plain">
-                {{
-                  currentHostProfile.tokenSet
-                    ? currentHostProfile.tokenPreview || '已配置 Token'
-                    : '无 Token'
-                }}
+                {{ currentHostProfile.tokenSet ? currentHostProfile.tokenPreview || '已配置 Token' : '无 Token' }}
               </el-tag>
               <el-button link type="danger" @click="removeHost(currentHostProfile.host)">清除</el-button>
             </li>
@@ -756,9 +751,7 @@ async function clearLlmKey(): Promise<void> {
               v-model="llmKeyInput"
               type="password"
               show-password
-              :placeholder="
-                settings.llm?.tokenSet ? `已保存 ${settings.llm.tokenPreview}，输入新 Key 覆盖` : 'sk-…'
-              "
+              :placeholder="settings.llm?.tokenSet ? `已保存 ${settings.llm.tokenPreview}，输入新 Key 覆盖` : 'sk-…'"
             />
           </label>
           <div class="row">
@@ -783,20 +776,29 @@ async function clearLlmKey(): Promise<void> {
             :rows="6"
             placeholder="一行一个本地路径。留空 = 不限制"
           />
-          <p class="hint">非空时，打开路径必须等于其中一条或位于其下。空名单不限制路径，MCP 带的 repoPath 同样不限制。</p>
+          <p class="hint">
+            非空时，打开路径必须等于其中一条或位于其下。空名单不限制路径，MCP 带的 repoPath 同样不限制。
+          </p>
           <div class="row">
             <el-button @click="copyAccessSecret">复制本机访问密钥</el-button>
           </div>
-          <p class="hint">HTTP 的 /api 与 /mcp 要带请求头 X-Git-Cockpit-Secret。探活不校验。能读到 config.json 的本机进程不受这道头限制。</p>
+          <p class="hint">
+            HTTP 的 /api 与 /mcp 要带请求头 X-Git-Cockpit-Secret。探活不校验。能读到 config.json
+            的本机进程不受这道头限制。
+          </p>
           <div v-if="loaded" class="row">
             <el-button type="primary" :loading="settings.saving" :disabled="!gitDirty" @click="saveGit">保存</el-button>
             <el-button :disabled="!gitDirty" @click="syncGitDraft">放弃</el-button>
           </div>
         </aside>
         <div class="gc-glass pad git-main" v-loading="settings.loading">
-          <p class="hint git-main-hint">点芯片启用或禁用。高危左边红条，默认关。打开后执行前仍会自动备份。没有审批队列。</p>
+          <p class="hint git-main-hint">
+            点芯片启用或禁用。高危左边红条，默认关。打开后执行前仍会自动备份。没有审批队列。
+          </p>
           <div v-for="g in gitToolGroups" :key="g.name" class="git-pack">
-            <p class="git-pack-h">{{ g.name }} <span>{{ g.items.length }}</span></p>
+            <p class="git-pack-h">
+              {{ g.name }} <span>{{ g.items.length }}</span>
+            </p>
             <div class="git-wall">
               <button
                 v-for="t in g.items"

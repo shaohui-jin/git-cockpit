@@ -3,8 +3,8 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { useReposStore } from '@/stores/repos';
+import { useOverviewStore } from '@/stores/overview';
 import { useJobsStore } from '@/stores/jobs';
-import { useRevision } from '@/composables/revision';
 import * as api from '@/api/client';
 import CloneDialog from '@/components/CloneDialog.vue';
 import RepoCard from '@/components/RepoCard.vue';
@@ -19,9 +19,8 @@ import {
   type RepoFilter
 } from '@/utils/repoAttention';
 import { moveAmong } from '@/utils/repoOrder';
-import type { RepoOverview } from '@/api/types';
-
 const repos = useReposStore();
+const overview = useOverviewStore();
 const jobs = useJobsStore();
 const router = useRouter();
 
@@ -32,17 +31,12 @@ const cloneRetrying = ref(false);
 const cloneUrl = ref('');
 const cloneDest = ref('');
 const cloning = ref(false);
-const overviews = ref<RepoOverview[]>([]);
-const overviewLoading = ref(false);
 const filter = ref<RepoFilter>('all');
 const dragId = ref<number | null>(null);
 const overId = ref<number | null>(null);
 const fetching = ref(false);
-const { revision } = useRevision();
 
-function overviewOf(path: string): RepoOverview | undefined {
-  return overviews.value.find((o) => o.path === path);
-}
+const overviewOf = overview.overviewOf;
 
 const filterCounts = computed(() => {
   let stuck = 0;
@@ -64,20 +58,40 @@ const weatherTabs = computed(() => {
   const c = filterCounts.value;
   return [
     { key: 'all' as const, weather: '全部', count: n, hint: '所有已打开的仓库', aria: filterAriaName('all', n) },
-    { key: 'stuck' as const, weather: '雷雨', count: c.stuck, hint: weatherHint('stuck'), aria: filterAriaName('stuck', c.stuck) },
-    { key: 'dirty' as const, weather: '薄雾', count: c.dirty, hint: weatherHint('dirty'), aria: filterAriaName('dirty', c.dirty) },
-    { key: 'sync' as const, weather: '刮风', count: c.sync, hint: weatherHint('sync'), aria: filterAriaName('sync', c.sync) },
-    { key: 'quiet' as const, weather: '晴天', count: c.quiet, hint: weatherHint('quiet'), aria: filterAriaName('quiet', c.quiet) }
+    {
+      key: 'stuck' as const,
+      weather: '雷雨',
+      count: c.stuck,
+      hint: weatherHint('stuck'),
+      aria: filterAriaName('stuck', c.stuck)
+    },
+    {
+      key: 'dirty' as const,
+      weather: '薄雾',
+      count: c.dirty,
+      hint: weatherHint('dirty'),
+      aria: filterAriaName('dirty', c.dirty)
+    },
+    {
+      key: 'sync' as const,
+      weather: '刮风',
+      count: c.sync,
+      hint: weatherHint('sync'),
+      aria: filterAriaName('sync', c.sync)
+    },
+    {
+      key: 'quiet' as const,
+      weather: '晴天',
+      count: c.quiet,
+      hint: weatherHint('quiet'),
+      aria: filterAriaName('quiet', c.quiet)
+    }
   ];
 });
 
-const cardRepos = computed(() =>
-  repos.repos.filter((r) => matchesFilter(overviewOf(r.path), filter.value))
-);
+const cardRepos = computed(() => repos.repos.filter((r) => matchesFilter(overviewOf(r.path), filter.value)));
 
-const current = computed(
-  () => repos.repos.find((r) => r.id === repos.currentId) ?? repos.repos[0] ?? null
-);
+const current = computed(() => repos.repos.find((r) => r.id === repos.currentId) ?? repos.repos[0] ?? null);
 const currentOv = computed(() => (current.value ? overviewOf(current.value.path) : undefined));
 const currentAttention = computed(() => attentionOf(currentOv.value));
 const currentMissing = computed(() => currentOv.value?.available === false);
@@ -94,9 +108,7 @@ function setFilter(next: RepoFilter): void {
 }
 
 async function fetchAll(): Promise<void> {
-  const ids = repos.repos
-    .filter((r) => overviewOf(r.path)?.available !== false)
-    .map((r) => r.id);
+  const ids = repos.repos.filter((r) => overviewOf(r.path)?.available !== false).map((r) => r.id);
   if (!ids.length) {
     ElMessage.warning('没有可抓取的仓库');
     return;
@@ -168,18 +180,6 @@ function onCardDragEnd(): void {
   overId.value = null;
 }
 
-async function loadOverview(): Promise<void> {
-  overviewLoading.value = true;
-  try {
-    const { repos: rows } = await api.listOverview();
-    overviews.value = rows;
-  } catch {
-    overviews.value = [];
-  } finally {
-    overviewLoading.value = false;
-  }
-}
-
 async function openRepo(): Promise<void> {
   const p = newPath.value.trim();
   if (!p) {
@@ -192,7 +192,8 @@ async function openRepo(): Promise<void> {
     ElMessage.success(`已打开 ${repo.path}`);
     repos.switchTo(repo.id);
     newPath.value = '';
-    await loadOverview();
+    overview.prune(repos.repos.map((r) => r.id));
+    await overview.ensure([repo.id], repos.repos);
   } catch (err) {
     ElMessage.error(err instanceof Error ? err.message : String(err));
   } finally {
@@ -212,8 +213,8 @@ async function removeRepo(id: number, path: string): Promise<void> {
   }
   try {
     await repos.remove(id);
+    overview.remove([id]);
     ElMessage.success('已移除');
-    await loadOverview();
   } catch (err) {
     ElMessage.error(err instanceof Error ? err.message : String(err));
   }
@@ -285,17 +286,18 @@ async function startClone(): Promise<void> {
   }
 }
 
-watch(revision, () => void loadOverview());
-
-onMounted(() => {
-  void repos.load();
-  void loadOverview();
+onMounted(async () => {
+  await repos.load();
+  await overview.sync(repos.repos);
 });
 </script>
 
 <template>
   <div class="page board">
-    <h2 class="page-title">工作台</h2>
+    <div class="page-title-row">
+      <h2 class="page-title">工作台</h2>
+      <span v-if="overview.refreshing" class="overview-refreshing" aria-live="polite">更新中…</span>
+    </div>
 
     <el-alert
       v-if="repos.healthOk === false"
@@ -335,14 +337,15 @@ onMounted(() => {
             <template v-if="currentOv && !currentMissing">
               <span class="ab"
                 ><b :class="{ on: currentOv.ahead > 0 }">{{ currentOv.ahead }}</b
-                >↑
-                <b :class="{ on: currentOv.behind > 0 }">{{ currentOv.behind }}</b
+                >↑ <b :class="{ on: currentOv.behind > 0 }">{{ currentOv.behind }}</b
                 >↓</span
               >
               <span v-if="currentOv.dirtyCount" class="chip">{{ currentOv.dirtyCount }} 更改</span>
               <span v-if="currentOv.conflictCount" class="chip danger">{{ currentOv.conflictCount }} 冲突</span>
               <span v-if="currentOv.operation !== 'none'" class="chip danger">{{ currentOv.operation }}</span>
-              <span v-if="currentOv.tempMergeBranchCount" class="chip">{{ currentOv.tempMergeBranchCount }} 合并草稿</span>
+              <span v-if="currentOv.tempMergeBranchCount" class="chip"
+                >{{ currentOv.tempMergeBranchCount }} 合并草稿</span
+              >
             </template>
           </div>
           <p class="hero-hint">
@@ -448,6 +451,26 @@ onMounted(() => {
   flex-direction: column;
   gap: var(--gc-pad);
   overflow: auto;
+}
+.page-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--gc-gap);
+  flex: none;
+}
+.overview-refreshing {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  animation: overview-pulse 1.2s ease-in-out infinite;
+}
+@keyframes overview-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 .offline {
   flex: none;

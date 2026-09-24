@@ -137,6 +137,10 @@ export function listOverview(): Promise<{ repos: RepoOverview[] }> {
   return request('GET', '/api/repos/overview');
 }
 
+export function fetchRepoOverview(id: number): Promise<{ overview: RepoOverview }> {
+  return request('GET', `/api/repos/${id}/overview`);
+}
+
 /** 打开一个本地仓库 */
 export function openRepo(path: string): Promise<{ repo: OpenedRepo }> {
   return request('POST', '/api/repos/open', { path });
@@ -346,16 +350,16 @@ export function cancelClone(id: string): Promise<{ job: CloneJobSummary }> {
   return request('POST', `/api/jobs/${encodeURIComponent(id)}/cancel`);
 }
 
-export function getFileContent(id: number, commit: string, path: string): Promise<{ content: string; truncated: boolean }> {
+export function getFileContent(
+  id: number,
+  commit: string,
+  path: string
+): Promise<{ content: string; truncated: boolean }> {
   return request('GET', `/api/repos/${id}/file?commit=${encodeURIComponent(commit)}&path=${encodeURIComponent(path)}`);
 }
 
 /** 通用写操作入口（复用后端安全链路：权限/dry-run/备份/审计） */
-export function runTool(
-  id: number,
-  tool: string,
-  params: Record<string, unknown> = {}
-): Promise<ToolExecResult> {
+export function runTool(id: number, tool: string, params: Record<string, unknown> = {}): Promise<ToolExecResult> {
   return request('POST', `/api/repos/${id}/tools/${tool}`, { params });
 }
 
@@ -429,7 +433,11 @@ export function getHealth(): Promise<HealthInfo> {
 
 export interface ChatSseHandlers {
   onDelta?: (text: string) => void;
-  onConfirm?: (payload: { token: string; tool: string; preview: { command: string; affectedFiles: string[]; args?: string[]; note?: string } }) => void;
+  onConfirm?: (payload: {
+    token: string;
+    tool: string;
+    preview: { command: string; affectedFiles: string[]; args?: string[]; note?: string };
+  }) => void;
   onTool?: (payload: { tool: string; success: boolean }) => void;
   onError?: (message: string) => void;
   onDone?: () => void;
@@ -490,7 +498,9 @@ export async function streamChat(
         if (event === 'delta' && data && typeof data === 'object' && 'text' in data) {
           handlers.onDelta?.(String((data as { text: string }).text));
         } else if (event === 'confirm' && data && typeof data === 'object') {
-          handlers.onConfirm?.(data as { token: string; tool: string; preview: { command: string; affectedFiles: string[] } });
+          handlers.onConfirm?.(
+            data as { token: string; tool: string; preview: { command: string; affectedFiles: string[] } }
+          );
         } else if (event === 'tool' && data && typeof data === 'object') {
           handlers.onTool?.(data as { tool: string; success: boolean });
         } else if (event === 'error' && data && typeof data === 'object' && 'error' in data) {
@@ -525,7 +535,8 @@ export function subscribeEvents(handlers: {
   onError?: (err: Event) => void;
 }): () => void {
   const es = new EventSource('/api/events');
-  if (handlers.onRepoChanged) es.addEventListener('repo-changed', (e) => handlers.onRepoChanged?.(JSON.parse((e as MessageEvent).data)));
+  if (handlers.onRepoChanged)
+    es.addEventListener('repo-changed', (e) => handlers.onRepoChanged?.(JSON.parse((e as MessageEvent).data)));
   if (handlers.onLog) es.addEventListener('log', () => handlers.onLog?.());
   if (handlers.onJobProgress) {
     es.addEventListener('job-progress', (e) => handlers.onJobProgress?.(JSON.parse((e as MessageEvent).data)));

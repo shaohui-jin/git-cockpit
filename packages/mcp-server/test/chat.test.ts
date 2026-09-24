@@ -56,11 +56,17 @@ describe('chat confirmGate', () => {
     expect(gate.take(t.token)?.token).toBe(t.token);
     expect(gate.take(t.token)).toBeNull();
     expect(
-      gate.previewsMatch(preview, previewFromExecResult({ command: 'git add -- a.txt', args: ['add', '--', 'a.txt'], affectedFiles: ['a.txt'] }))
+      gate.previewsMatch(
+        preview,
+        previewFromExecResult({ command: 'git add -- a.txt', args: ['add', '--', 'a.txt'], affectedFiles: ['a.txt'] })
+      )
     ).toBe(true);
-    expect(gate.previewsMatch(preview, previewFromExecResult({ command: 'git add -- b.txt', args: ['add', '--', 'b.txt'], affectedFiles: ['b.txt'] }))).toBe(
-      false
-    );
+    expect(
+      gate.previewsMatch(
+        preview,
+        previewFromExecResult({ command: 'git add -- b.txt', args: ['add', '--', 'b.txt'], affectedFiles: ['b.txt'] })
+      )
+    ).toBe(false);
   });
 });
 

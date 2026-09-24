@@ -16,9 +16,7 @@ const PROBE_TIMEOUT_MS = 15 * 1000;
 
 const PORT = Number(process.env.GIT_COCKPIT_PORT) || 3000;
 const DEV_UI_PORT = Number(process.env.GIT_COCKPIT_DEV_UI_PORT) || 5173;
-const HOSTS = Array.from(
-  new Set([process.env.GIT_COCKPIT_HOST || '127.0.0.1', '127.0.0.1', 'localhost'])
-);
+const HOSTS = Array.from(new Set([process.env.GIT_COCKPIT_HOST || '127.0.0.1', '127.0.0.1', 'localhost']));
 
 let child = null;
 let spawnedByUs = false;
@@ -54,6 +52,88 @@ async function probeDaemon() {
   return false;
 }
 
+function daemonOrigin(host) {
+  return `http://${host}:${PORT}`;
+}
+
+function requestJson(method, url, options = {}) {
+  const { secret, body, timeout = 15000 } = options;
+  return new Promise((resolve) => {
+    let parsed;
+    try {
+      parsed = new URL(url);
+    } catch {
+      resolve({ ok: false, status: 0, data: null });
+      return;
+    }
+    const payload = body != null ? JSON.stringify(body) : null;
+    const headers = { Accept: 'application/json' };
+    if (secret) headers['X-Git-Cockpit-Secret'] = secret;
+    if (payload) {
+      headers['Content-Type'] = 'application/json';
+      headers['Content-Length'] = Buffer.byteLength(payload);
+    }
+    const req = http.request(
+      {
+        hostname: parsed.hostname,
+        port: parsed.port,
+        path: `${parsed.pathname}${parsed.search}`,
+        method,
+        headers,
+        timeout
+      },
+      (res) => {
+        let raw = '';
+        res.on('data', (chunk) => {
+          raw += chunk;
+          if (raw.length > 200000) raw = raw.slice(-200000);
+        });
+        res.on('end', () => {
+          let data = null;
+          if (raw) {
+            try {
+              data = JSON.parse(raw);
+            } catch {
+              data = null;
+            }
+          }
+          resolve({
+            ok: res.statusCode != null && res.statusCode >= 200 && res.statusCode < 300,
+            status: res.statusCode ?? 0,
+            data
+          });
+        });
+      }
+    );
+    req.on('error', () => resolve({ ok: false, status: 0, data: null }));
+    req.on('timeout', () => {
+      req.destroy();
+      resolve({ ok: false, status: 0, data: null });
+    });
+    if (payload) req.write(payload);
+    req.end();
+  });
+}
+
+async function fetchDaemonHealth() {
+  for (const h of HOSTS) {
+    const res = await requestJson('GET', `${daemonOrigin(h)}/api/health`);
+    if (res.ok && res.data?.version) {
+      return { ok: true, version: String(res.data.version), host: h };
+    }
+  }
+  return { ok: false, version: '', host: HOSTS[0] };
+}
+
+async function waitDaemonDown(ms) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < ms) {
+    if (!(await probeDaemon())) return true;
+    await new Promise((r) => setTimeout(r, 400));
+  }
+  return false;
+}
+
 async function waitHealth(ms) {
   const t0 = Date.now();
   while (Date.now() - t0 < ms) {
@@ -64,7 +144,9 @@ async function waitHealth(ms) {
 }
 
 function parseVersion(raw) {
-  const m = String(raw).trim().match(/(\d+)\.(\d+)\.(\d+)/);
+  const m = String(raw)
+    .trim()
+    .match(/(\d+)\.(\d+)\.(\d+)/);
   if (!m) return null;
   return [Number(m[1]), Number(m[2]), Number(m[3])];
 }
@@ -84,7 +166,10 @@ function whereCommand(name) {
   const cmd = process.platform === 'win32' ? 'where.exe' : 'which';
   const found = spawnSync(cmd, [name], { encoding: 'utf8', windowsHide: true });
   if (found.status !== 0) return [];
-  return found.stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  return found.stdout
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
 }
 
 function nodeCandidates() {
@@ -250,6 +335,18 @@ function writeInstallLog(text) {
   }
 }
 
+function writeUpdateLog(text) {
+  try {
+    const dir = logDir();
+    fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, `daemon-update-${new Date().toISOString().replace(/[:.]/g, '-')}.log`);
+    fs.writeFileSync(file, String(text || ''), 'utf8');
+    return file;
+  } catch {
+    return null;
+  }
+}
+
 function attachSpawnLog(proc) {
   const onChunk = (buf) => {
     spawnLog += buf.toString();
@@ -301,9 +398,7 @@ function flushInstallLog() {
   if (!installReady || !installWindow || installWindow.isDestroyed() || !pendingLog) return;
   const chunk = pendingLog;
   pendingLog = '';
-  void installWindow.webContents
-    .executeJavaScript(`window.appendLog(${JSON.stringify(chunk)})`)
-    .catch(() => undefined);
+  void installWindow.webContents.executeJavaScript(`window.appendLog(${JSON.stringify(chunk)})`).catch(() => undefined);
 }
 
 function appendInstallLog(text) {
@@ -373,13 +468,15 @@ function needsPrefixFallback(output) {
   return /EACCES|EPERM|permission denied|Operation not permitted/i.test(output || '');
 }
 
-async function installDaemon(nodePath) {
-  const base = ['install', '-g', DAEMON_SPEC, '--no-audit', '--no-fund'];
+async function installDaemonPackage(nodePath, spec, { preferCustom = false } = {}) {
+  const base = ['install', '-g', spec, '--no-audit', '--no-fund'];
   const fallback = customPrefix();
-  const attempts = [
-    { args: base, prefix: null },
-    { args: [...base, '--prefix', fallback], prefix: fallback }
-  ];
+  const attempts = preferCustom
+    ? [{ args: [...base, '--prefix', fallback], prefix: fallback }]
+    : [
+        { args: base, prefix: null },
+        { args: [...base, '--prefix', fallback], prefix: fallback }
+      ];
   let last = '';
   for (const attempt of attempts) {
     appendInstallLog(`\n$ npm ${attempt.args.join(' ')}\n`);
@@ -389,10 +486,14 @@ async function installDaemon(nodePath) {
       return { ok: true, output: res.output };
     }
     last = res.output;
-    if (!needsPrefixFallback(last)) break;
+    if (preferCustom || !needsPrefixFallback(last)) break;
     appendInstallLog(`\n[git-cockpit] 全局目录不可写，改安装到 ${fallback}\n`);
   }
   return { ok: false, output: last, logFile: writeInstallLog(last) };
+}
+
+async function installDaemon(nodePath) {
+  return installDaemonPackage(nodePath, DAEMON_SPEC);
 }
 
 async function promptInstall(failed) {
@@ -458,7 +559,9 @@ async function ensureDaemon() {
   }
   systemNode = findSystemNode();
   if (!systemNode) {
-    await promptNode('没有在 PATH 里找到 node。请安装 Node.js 22 或更高版本后再打开。使用 nvm 时，需要让 node 出现在系统 PATH 中。');
+    await promptNode(
+      '没有在 PATH 里找到 node。请安装 Node.js 22 或更高版本后再打开。使用 nvm 时，需要让 node 出现在系统 PATH 中。'
+    );
     throw new Error('__node_prompted__');
   }
   if (!versionAtLeast(systemNode.version, MIN_NODE)) {
@@ -564,6 +667,7 @@ app.whenReady().then(async () => {
     createWindow(origin);
     starting = false;
     offerUpdate();
+    offerDaemonUpdate();
   } catch (err) {
     const silent =
       err instanceof Error && (err.message === '__node_prompted__' || err.message === '__install_declined__');
@@ -633,9 +737,7 @@ function offerUpdate() {
         .catch(() => undefined);
     });
     autoUpdater.on('update-downloaded', () => {
-      const extra = spawnedByUs
-        ? ''
-        : '\n\n本窗口没有拉起 :3000。若外部 git-cockpit start 占着端口，请先自己关掉它。';
+      const extra = spawnedByUs ? '' : '\n\n本窗口没有拉起 :3000。若外部 git-cockpit start 占着端口，请先自己关掉它。';
       dialog
         .showMessageBox({
           type: 'info',
@@ -651,4 +753,202 @@ function offerUpdate() {
     });
   }
   autoUpdater.checkForUpdates().catch(() => undefined);
+}
+
+function fetchRegistryVersion(nodePath) {
+  const env = pathWithNode(nodePath);
+  const npmCli = resolveNpmCli(nodePath);
+  let res;
+  if (npmCli) {
+    res = spawnSync(nodePath, [npmCli, 'view', DAEMON_PKG, 'version', '--json'], {
+      encoding: 'utf8',
+      windowsHide: true,
+      timeout: PROBE_TIMEOUT_MS,
+      env
+    });
+  } else {
+    const npmBin = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+    res = spawnSync(npmBin, ['view', DAEMON_PKG, 'version', '--json'], {
+      encoding: 'utf8',
+      windowsHide: true,
+      timeout: PROBE_TIMEOUT_MS,
+      shell: process.platform === 'win32',
+      env
+    });
+  }
+  const raw = `${res.stdout || ''}${res.stderr || ''}`.trim();
+  if (res.status !== 0) return { ok: false, version: '', output: raw };
+  const quoted = raw.match(/"(\d+\.\d+\.\d+)"/);
+  const plain = parseVersion(raw);
+  const version = quoted ? quoted[1] : plain ? formatVersion(plain) : '';
+  return version ? { ok: true, version, output: raw } : { ok: false, version: '', output: raw };
+}
+
+async function fetchBootstrapSecret(host) {
+  const res = await requestJson('GET', `${daemonOrigin(host)}/api/bootstrap`);
+  const secret = res.data?.secret;
+  return typeof secret === 'string' && secret ? secret : null;
+}
+
+async function daemonHasRunningJobs(host, secret) {
+  const res = await requestJson('GET', `${daemonOrigin(host)}/api/jobs`, { secret });
+  if (!res.ok || !Array.isArray(res.data?.jobs)) return false;
+  return res.data.jobs.some((job) => job.status === 'running');
+}
+
+async function shutdownDaemon(host, secret) {
+  const res = await requestJson('POST', `${daemonOrigin(host)}/api/shutdown`, { secret });
+  return res.status === 204;
+}
+
+async function runDaemonUpgrade(currentVersion, latestVersion) {
+  const node = systemNode || findSystemNode();
+  if (!node) {
+    dialog.showErrorBox('Git Cockpit', '未找到 Node.js，无法升级服务。');
+    return;
+  }
+  if (!versionAtLeast(node.version, MIN_NODE)) {
+    await promptNode(`当前是 Node.js ${formatVersion(node.version)}。请安装 22 或更高版本后再升级服务。`);
+    return;
+  }
+  systemNode = node;
+
+  const health = await fetchDaemonHealth();
+  if (!health.ok) {
+    dialog.showErrorBox('Git Cockpit', '无法连接 Git Cockpit 服务，已取消升级。');
+    return;
+  }
+
+  const secret = await fetchBootstrapSecret(health.host);
+  if (!secret) {
+    dialog.showErrorBox('Git Cockpit', '无法读取本机密钥，已取消升级。');
+    return;
+  }
+
+  if (await daemonHasRunningJobs(health.host, secret)) {
+    await dialog.showMessageBox({
+      type: 'warning',
+      title: 'Git Cockpit',
+      message: '有任务进行中，无法升级服务。',
+      detail: '请先在「任务」页等待任务结束，再重新打开应用或稍后重试。',
+      buttons: ['知道了']
+    });
+    return;
+  }
+
+  const resolvedBefore = resolveDaemonEntry(node.path);
+  if (resolvedBefore?.kind === 'dev') {
+    dialog.showErrorBox('Git Cockpit', '开发模式不自动升级全局服务。');
+    return;
+  }
+
+  const externalNote = spawnedByUs
+    ? ''
+    : '\n\n当前服务不是本窗口启动的（可能正在被 Cursor 使用），升级会停止 :3000 上的进程。';
+
+  const { response } = await dialog.showMessageBox({
+    type: 'question',
+    title: 'Git Cockpit',
+    message: '发现可升级的服务端版本',
+    detail: `当前 ${currentVersion} → 最新 ${latestVersion}。确认后将自动停止服务、安装 npm 包并重启（约 1～2 分钟）。${externalNote}`,
+    buttons: ['升级', '稍后'],
+    defaultId: 0,
+    cancelId: 1
+  });
+  if (response !== 0) return;
+
+  if (await daemonHasRunningJobs(health.host, secret)) {
+    await dialog.showMessageBox({
+      type: 'warning',
+      title: 'Git Cockpit',
+      message: '有任务进行中，无法升级服务。',
+      detail: '请先在「任务」页等待任务结束后再试。',
+      buttons: ['知道了']
+    });
+    return;
+  }
+
+  openInstallWindow();
+  try {
+    const stopped = await shutdownDaemon(health.host, secret);
+    if (!stopped && spawnedByUs && child && !child.killed) {
+      child.kill();
+    }
+    if (!(await waitDaemonDown(20000))) {
+      throw new Error('服务未能停止。请手动关闭 git-cockpit start 或占用 :3000 的进程后再试。');
+    }
+    child = null;
+
+    const spec = `${DAEMON_PKG}@${latestVersion}`;
+    const preferCustom = resolvedBefore?.kind === 'custom';
+    const installed = await installDaemonPackage(node.path, spec, { preferCustom });
+    if (!installed.ok) {
+      if (installCancelled) return;
+      const hint = installed.logFile ? `\n\n完整日志：${installed.logFile}` : '';
+      throw new Error(`安装服务失败。\n\n${tail(installed.output, 900)}${hint}\n\n也可手动执行：npm i -g ${spec}`);
+    }
+
+    const resolved = resolveDaemonEntry(node.path);
+    const probe = resolved ? probeEntry(node.path, resolved) : null;
+    if (!probe || !probe.ok) {
+      throw new Error(
+        `服务已安装，但仍无法运行（${resolved ? resolved.kind : '未找到入口'}）。\n\n${tail(probe ? probe.output : '', 900)}`
+      );
+    }
+
+    spawnDaemon(resolved);
+    const ok = await waitHealth(25000);
+    if (!ok) {
+      const hint = spawnLog.trim()
+        ? `\n\n${spawnLog.trim().slice(-800)}`
+        : `\n若 ${PORT} 已被占用，请关掉占用进程后再开。`;
+      throw new Error(`服务重启后未能连接（:${PORT}）。${hint}`);
+    }
+
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.reload();
+    }
+    await dialog.showMessageBox({
+      type: 'info',
+      title: 'Git Cockpit',
+      message: `服务已升级至 ${latestVersion}。`,
+      buttons: ['好的']
+    });
+  } catch (err) {
+    const logFile = writeUpdateLog(err instanceof Error ? err.stack || err.message : String(err));
+    const hint = logFile ? `\n\n日志：${logFile}` : '';
+    dialog.showErrorBox('Git Cockpit', `${err instanceof Error ? err.message : String(err)}${hint}`);
+  } finally {
+    closeInstallWindow();
+  }
+}
+
+function offerDaemonUpdate() {
+  if (!app.isPackaged) return;
+  if (process.env.GIT_COCKPIT_DAEMON_UPDATE === '0') return;
+  void (async () => {
+    try {
+      const health = await fetchDaemonHealth();
+      if (!health.ok) return;
+
+      const currentParsed = parseVersion(health.version);
+      if (!currentParsed) return;
+
+      const node = systemNode || findSystemNode();
+      if (!node || !versionAtLeast(node.version, MIN_NODE)) return;
+
+      const registry = fetchRegistryVersion(node.path);
+      if (!registry.ok) {
+        writeUpdateLog(registry.output || 'registry lookup failed');
+        return;
+      }
+
+      const latestParsed = parseVersion(registry.version);
+      if (!latestParsed || versionAtLeast(currentParsed, latestParsed)) return;
+
+      await runDaemonUpgrade(health.version, registry.version);
+    } catch (err) {
+      writeUpdateLog(err instanceof Error ? err.stack || err.message : String(err));
+    }
+  })();
 }

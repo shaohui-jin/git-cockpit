@@ -14,11 +14,13 @@ function stash(dir) {
   try {
     rmSync(dir, { recursive: true, force: true });
     return;
-  } catch (err) {
+  } catch {
     const dest = `${dir}.stale-${Date.now()}`;
     try {
       renameSync(dir, dest);
-      console.warn(`[desktop] ${path.basename(dir)} 被占用，已改名为 ${path.basename(dest)}。请关掉 Git Cockpit 后再删。`);
+      console.warn(
+        `[desktop] ${path.basename(dir)} 被占用，已改名为 ${path.basename(dest)}。请关掉 Git Cockpit 后再删。`
+      );
     } catch {
       console.warn(`[desktop] ${path.basename(dir)} 仍被占用，先留着。本次打包改到临时目录，不受它影响。`);
     }

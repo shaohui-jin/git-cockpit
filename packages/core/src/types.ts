@@ -295,20 +295,10 @@ export type MergeOutcome = 'clean' | 'conflicts' | 'unrelated';
  * 单对下一步：先认临时枝 / 已包含，再看 merge-tree 干净或冲突。
  * already_merged = from 已在 into 里且没有可用临时枝，网页只提示无需操作。
  */
-export type MergePairSituation =
-  | 'looking_at_temp'
-  | 'temp_remote'
-  | 'temp_local'
-  | 'already_merged'
-  | MergeOutcome;
+export type MergePairSituation = 'looking_at_temp' | 'temp_remote' | 'temp_local' | 'already_merged' | MergeOutcome;
 
 export type MrMergeGateCode =
-  | 'OK'
-  | 'CONFLICTS_UNRESOLVED'
-  | 'NOT_LANDED'
-  | 'TEMP_NOT_PUSHED'
-  | 'ALREADY_MERGED'
-  | 'REV_NOT_FOUND';
+  'OK' | 'CONFLICTS_UNRESOLVED' | 'NOT_LANDED' | 'TEMP_NOT_PUSHED' | 'ALREADY_MERGED' | 'REV_NOT_FOUND';
 
 export interface MrMergeGate {
   ok: boolean;
@@ -656,13 +646,7 @@ export const DEFAULT_CONFIG: GitCockpitConfig = {
   storage: { dataDir: '~/.git-cockpit' },
   git: { backupOnDangerousOps: true, allowedRepos: [] },
   permissions: {
-    disabledTools: [
-      'git_reset_hard',
-      'git_clean',
-      'git_push_force',
-      'git_branch_delete_force',
-      'git_rebase'
-    ],
+    disabledTools: ['git_reset_hard', 'git_clean', 'git_push_force', 'git_branch_delete_force', 'git_rebase'],
     requireApprovalFor: [],
     dryRunDefault: false
   },

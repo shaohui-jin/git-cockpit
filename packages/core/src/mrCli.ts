@@ -23,9 +23,7 @@ function expandWindowsEnv(s: string): string {
 function readRegistryPath(hive: 'HKCU' | 'HKLM'): string {
   if (process.platform !== 'win32') return '';
   const key =
-    hive === 'HKLM'
-      ? 'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment'
-      : 'HKCU\\Environment';
+    hive === 'HKLM' ? 'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment' : 'HKCU\\Environment';
   try {
     const r = spawnSync('reg.exe', ['query', key, '/v', 'Path'], {
       encoding: 'utf8',
@@ -115,11 +113,7 @@ export function resolveCliBin(which: 'gh' | 'glab'): string | null {
   return null;
 }
 
-function runCmd(
-  cmd: string,
-  args: string[],
-  cwd?: string
-): Promise<{ code: number; stdout: string; stderr: string }> {
+function runCmd(cmd: string, args: string[], cwd?: string): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
     const child = spawn(cmd, args, {
       cwd,
@@ -239,7 +233,6 @@ export async function runMrCli(
   args: string[],
   cwd: string
 ): Promise<{ code: number; stdout: string; stderr: string }> {
-  const resolved =
-    bin === 'gh' || bin === 'glab' ? resolveCliBin(bin) ?? bin : bin;
+  const resolved = bin === 'gh' || bin === 'glab' ? (resolveCliBin(bin) ?? bin) : bin;
   return runCmd(resolved, args, cwd);
 }
