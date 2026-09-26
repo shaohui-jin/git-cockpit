@@ -95,7 +95,6 @@ function onCancel(): void {
     </el-alert>
 
     <div v-if="command" class="cmd-box">
-      <div class="cmd-label">将执行的命令（dry-run 预览，未实际执行）</div>
       <pre class="cmd-pre mono">{{ command }}</pre>
     </div>
 

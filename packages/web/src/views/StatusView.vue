@@ -332,8 +332,7 @@ async function refresh(): Promise<void> {
 
 /** 通用写流程：dry-run 预览 → ConfirmDialog → 真实执行 → 刷新 */
 async function run(tool: string, params: Record<string, unknown> = {}): Promise<void> {
-  const ok = await previewAndConfirm(tool, params);
-  if (ok) ElMessage.info('请在确认对话框中查看 dry-run 预览');
+  await previewAndConfirm(tool, params);
 }
 
 async function onConfirmed(): Promise<void> {
@@ -454,10 +453,6 @@ function toggleFolder(node: ChangeTreeNode): void {
     for (const p of paths) checkedFiles.add(p);
   }
 }
-function checkAllCandidates(): void {
-  for (const p of stashCandidates.value) checkedFiles.add(p);
-}
-
 /** stash 可选文件：未暂存 + 未跟踪 */
 const stashCandidates = computed<string[]>(() => {
   const s = status.value;
@@ -484,11 +479,6 @@ function confirmStash(): void {
   stashVisible.value = false;
   checkedFiles.clear();
   void run('git_stash', params);
-}
-
-/** 静默暂存（对应 WebStorm Shelve Silently）：默认说明，跳过参数录入，直接预览确认 */
-function silentStash(): void {
-  void run('git_stash', {});
 }
 
 /** stash 行内操作 */
@@ -929,11 +919,8 @@ onUnmounted(() => {
                   >取消暂存全部</el-button
                 >
                 <el-badge :value="checkedCount" :hidden="checkedCount === 0" :offset="[2, 4]">
-                  <el-button type="success" plain @click="openStashDialog">暂存改动 Stash</el-button>
+                  <el-button type="success" plain @click="openStashDialog">Stash</el-button>
                 </el-badge>
-                <el-tooltip content="Shelve Silently：使用默认说明，一键暂存全部更改" placement="top">
-                  <el-button plain @click="silentStash">静默 Stash</el-button>
-                </el-tooltip>
                 <el-tooltip
                   content="把选中分支合并进当前检出分支（会改工作区）。预演请走底栏「合并」。"
                   placement="top"
@@ -1024,8 +1011,10 @@ onUnmounted(() => {
                       <el-badge :value="t.count" :hidden="t.count === 0" type="primary" class="tab-badge" />
                     </span>
                   </template>
-                  <div class="tab-hint">「{{ t.hint }}」</div>
-                  <div v-if="t.count === 0" class="file-empty">没有{{ t.label }}的文件</div>
+                  <div v-if="t.count === 0" class="file-empty">
+                    <span>没有{{ t.label }}的文件</span>
+                    <span class="file-empty-hint">「{{ t.hint }}」</span>
+                  </div>
                   <el-tree
                     v-else
                     :data="tabTrees[t.key]"
@@ -1316,11 +1305,15 @@ onUnmounted(() => {
       </template>
     </el-dialog>
 
-    <!-- stash：选择文件 + 静默选项 -->
-    <el-dialog v-model="stashVisible" title="暂存改动 Stash" width="660px">
+    <!-- stash：说明与未跟踪；文件范围来自左侧更改列表的勾选 -->
+    <el-dialog v-model="stashVisible" title="Stash" width="520px">
       <el-alert
         class="stash-tip"
-        title="可勾选左侧更改列表的文件随本次 stash 一起保存；不勾选则保存全部更改。"
+        :title="
+          checkedCount
+            ? `将暂存左侧已勾选的 ${checkedCount} 个文件。`
+            : '左侧未勾选文件，将暂存全部更改。要只暂存一部分，请先在更改列表勾选。'
+        "
         type="info"
         :closable="false"
         show-icon
@@ -1335,24 +1328,6 @@ onUnmounted(() => {
           >
         </el-form-item>
       </el-form>
-      <div v-if="stashCandidates.length" class="stash-files">
-        <div class="stash-files-head">
-          <span class="stash-files-title">选择文件（已选 {{ checkedCount }}）</span>
-          <div class="card-actions gc-gap-btns">
-            <el-button size="small" text @click="checkAllCandidates">全选</el-button>
-            <el-button size="small" text @click="clearChecked">清除选择</el-button>
-          </div>
-        </div>
-        <div class="file-list compact">
-          <div v-for="p in stashCandidates" :key="p" class="file-row gc-gap-btns">
-            <el-checkbox :model-value="isChecked(p)" @change="toggleChecked(p)" />
-            <span class="file-status" :class="status?.untracked.includes(p) ? 'new' : 'mod'">
-              {{ status?.untracked.includes(p) ? '?' : 'M' }}
-            </span>
-            <span class="file-path mono">{{ p }}</span>
-          </div>
-        </div>
-      </div>
       <template #footer>
         <el-button @click="stashVisible = false">取消</el-button>
         <el-button type="primary" @click="confirmStash">下一步（dry-run 预览）</el-button>
@@ -1738,11 +1713,17 @@ onUnmounted(() => {
 .file-empty {
   flex: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 6px;
   color: var(--el-text-color-secondary);
   font-size: var(--gc-text);
   padding: var(--gc-pad) 0;
+}
+.file-empty-hint {
+  font-size: 12px;
+  color: var(--el-text-color-placeholder);
 }
 .change-tree {
   flex: 1;
@@ -1935,20 +1916,5 @@ onUnmounted(() => {
 /* stash 弹窗 */
 .stash-tip {
   margin-bottom: var(--gc-gap);
-}
-.stash-files {
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 6px;
-  padding: 6px 8px;
-}
-.stash-files-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 4px 4px;
-}
-.stash-files-title {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
 }
 </style>
