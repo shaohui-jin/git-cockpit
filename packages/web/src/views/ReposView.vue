@@ -96,13 +96,6 @@ const currentOv = computed(() => (current.value ? overviewOf(current.value.path)
 const currentAttention = computed(() => attentionOf(currentOv.value));
 const currentMissing = computed(() => currentOv.value?.available === false);
 
-function formatOpened(iso: string | undefined): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString(undefined, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-}
-
 function setFilter(next: RepoFilter): void {
   filter.value = filter.value === next && next !== 'all' ? 'all' : next;
 }
@@ -326,9 +319,16 @@ onMounted(async () => {
       </div>
       <template v-else>
         <div class="hero-copy">
-          <p class="eyebrow">当前仓库</p>
-          <h3>{{ currentOv?.name || current.path.split(/[\\/]/).pop() }}</h3>
-          <p class="path mono">{{ current.path }}</p>
+          <div class="hero-line">
+            <h3>{{ currentOv?.name || current.path.split(/[\\/]/).pop() }}</h3>
+            <span class="path mono" :title="current.path">{{ current.path }}</span>
+            <span class="hero-spacer" />
+            <el-button type="primary" :disabled="currentMissing" @click="openStatus(current.id)">进入工作区</el-button>
+            <el-button :disabled="currentMissing" @click="openMerge(current.id)">预演合并</el-button>
+            <el-button v-if="currentMissing" type="danger" plain @click="removeRepo(current.id, current.path)"
+              >移除</el-button
+            >
+          </div>
           <div class="branch">
             <span class="wx" :class="currentAttention">{{
               currentMissing ? '丢失' : weatherOf(currentAttention)
@@ -347,21 +347,7 @@ onMounted(async () => {
                 >{{ currentOv.tempMergeBranchCount }} 合并草稿</span
               >
             </template>
-          </div>
-          <p class="hero-hint">
-            {{
-              currentMissing
-                ? '路径不存在或不是 Git 仓库。可以从列表移除，不会删磁盘。'
-                : weatherHint(currentAttention) +
-                  (formatOpened(current.lastOpenedAt) ? ` · 打开 ${formatOpened(current.lastOpenedAt)}` : '')
-            }}
-          </p>
-          <div class="hero-actions">
-            <el-button type="primary" :disabled="currentMissing" @click="openStatus(current.id)">进入工作区</el-button>
-            <el-button :disabled="currentMissing" @click="openMerge(current.id)">预演合并</el-button>
-            <el-button v-if="currentMissing" type="danger" plain @click="removeRepo(current.id, current.path)"
-              >移除</el-button
-            >
+            <span v-if="currentMissing" class="hero-hint">路径不存在或不是 Git 仓库，移除不会删磁盘</span>
           </div>
         </div>
         <ActivityHeatmap
@@ -504,8 +490,21 @@ onMounted(async () => {
 }
 .hero h3 {
   margin: 0;
+  flex: none;
   font-size: var(--el-font-size-extra-large);
   font-weight: 600;
+}
+.hero-line {
+  display: flex;
+  align-items: center;
+  gap: var(--gc-gap);
+  min-width: 0;
+}
+.hero-line .path {
+  min-width: 0;
+}
+.hero-spacer {
+  flex: 1;
 }
 .path {
   margin: 0;
@@ -569,7 +568,6 @@ onMounted(async () => {
   font-size: var(--gc-text);
   color: var(--el-text-color-secondary);
 }
-.hero-actions,
 .open-row {
   display: flex;
   flex-wrap: wrap;

@@ -24,8 +24,27 @@ const route = useRoute();
 const router = useRouter();
 const { bump, revision } = useRevision();
 
+type Frame = { x: number; y: number; w: number; h: number };
+type Grip = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
+
+type BallAnchor = { side: 'left' | 'right'; fromBottom: number };
+
 const chatOpen = ref(false);
-let hijackingChat = false;
+const chatPhase = ref<'idle' | 'streaming' | 'confirm' | 'error'>('idle');
+const frame = ref<Frame>({ x: 0, y: 0, w: 420, h: 560 });
+const ballPos = ref({ x: 0, y: 0 });
+const ballAnchor = ref<BallAnchor>({ side: 'right', fromBottom: 96 });
+const ballReady = ref(false);
+const ballDragging = ref(false);
+const ballSettling = ref(false);
+let ballDragged = false;
+
+const BALL = 52;
+const FRAME_MIN_W = 320;
+const FRAME_MIN_H = 360;
+const BALL_KEY = 'gc-chat-ball';
+const FRAME_KEY = 'gc-chat-frame';
+const GRIPS: Grip[] = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'];
 
 const workItems: DockItem[] = [
   { path: '/dashboard', label: '工作台' },
@@ -37,17 +56,10 @@ const systemItems: DockItem[] = [
   { path: '/logs', label: '日志' },
   { path: '/settings', label: '设置' }
 ];
+const dockItems = [...workItems, ...systemItems];
 
 const liveJob = computed(() => jobs.jobs.find((j) => j.status === 'running') ?? null);
 const liveJobTitle = computed(() => (liveJob.value ? jobLine(liveJob.value) : ''));
-
-const dockItems = computed(() => {
-  const chat: DockItem = { path: '/chat', label: '聊天' };
-  if (settings.llm?.tokenSet) return [chat, ...workItems, ...systemItems];
-  return [...workItems, chat, ...systemItems];
-});
-
-const isChatRoute = computed(() => route.path === '/chat');
 
 const chatRepoLabel = computed(() => {
   const p = repos.currentPath;
@@ -57,38 +69,227 @@ const chatRepoLabel = computed(() => {
 });
 
 function pageActive(path: string): boolean {
-  if (path === '/chat') return chatOpen.value || isChatRoute.value;
-  if (chatOpen.value) return false;
   if (path === '/logs') return route.path === '/logs';
   return route.path === path;
 }
 
 function goMenu(p: string): void {
-  if (p === '/chat') {
-    toggleChat();
-    return;
-  }
-  chatOpen.value = false;
   if (p === route.path) return;
   void router.push(p).catch(() => undefined);
-}
-
-function toggleChat(): void {
-  if (isChatRoute.value) {
-    chatOpen.value = true;
-    void router.replace('/dashboard');
-    return;
-  }
-  chatOpen.value = !chatOpen.value;
-}
-
-function closeChat(): void {
-  chatOpen.value = false;
 }
 
 function onChatLeave(): void {
   chatOpen.value = false;
 }
+
+function dockSpace(): number {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue('--gc-control');
+  const control = Number.parseFloat(raw) || 32;
+  return control + 48;
+}
+
+function clampBall(pos: { x: number; y: number }, aboveDock = false): { x: number; y: number } {
+  const bottom = aboveDock ? dockSpace() : 8;
+  return {
+    x: Math.min(window.innerWidth - BALL - 8, Math.max(8, pos.x)),
+    y: Math.min(window.innerHeight - BALL - bottom, Math.max(8, pos.y))
+  };
+}
+
+function defaultBall(): { x: number; y: number } {
+  ballAnchor.value = { side: 'right', fromBottom: dockSpace() + 16 };
+  return placeBall(ballAnchor.value);
+}
+
+function placeBall(anchor: BallAnchor): { x: number; y: number } {
+  const fromBottom = Math.max(dockSpace(), anchor.fromBottom);
+  const x = anchor.side === 'left' ? 16 : window.innerWidth - BALL - 16;
+  const y = window.innerHeight - BALL - fromBottom;
+  return clampBall({ x, y }, true);
+}
+
+function anchorFromPos(pos: { x: number; y: number }): BallAnchor {
+  return {
+    side: pos.x + BALL / 2 < window.innerWidth / 2 ? 'left' : 'right',
+    fromBottom: Math.max(dockSpace(), window.innerHeight - (pos.y + BALL))
+  };
+}
+
+function readAnchor(saved: { x?: number; y?: number; side?: string; fromBottom?: number }): BallAnchor | null {
+  if ((saved.side === 'left' || saved.side === 'right') && typeof saved.fromBottom === 'number') {
+    return { side: saved.side, fromBottom: saved.fromBottom };
+  }
+  if (typeof saved.x === 'number' && typeof saved.y === 'number') {
+    return {
+      side: saved.x + BALL / 2 < window.innerWidth / 2 ? 'left' : 'right',
+      fromBottom: Math.max(dockSpace(), window.innerHeight - (saved.y + BALL))
+    };
+  }
+  return null;
+}
+
+function clampFrame(next: Frame): Frame {
+  const w = Math.min(window.innerWidth - 16, Math.max(FRAME_MIN_W, next.w));
+  const h = Math.min(window.innerHeight - 16, Math.max(FRAME_MIN_H, next.h));
+  return {
+    w,
+    h,
+    x: Math.min(window.innerWidth - w - 8, Math.max(8, next.x)),
+    y: Math.min(window.innerHeight - h - 8, Math.max(8, next.y))
+  };
+}
+
+function defaultFrame(): Frame {
+  const margin = 16;
+  const w = Math.min(420, window.innerWidth - margin * 2);
+  const h = Math.min(Math.round(window.innerHeight * 0.7), window.innerHeight - dockSpace() - margin * 2);
+  return clampFrame({
+    x: window.innerWidth - w - margin,
+    y: window.innerHeight - dockSpace() - h - margin,
+    w,
+    h
+  });
+}
+
+function saveFrame(): void {
+  sessionStorage.setItem(FRAME_KEY, JSON.stringify(frame.value));
+}
+
+function loadChrome(): void {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(FRAME_KEY) || '') as Partial<Frame>;
+    if ([saved.x, saved.y, saved.w, saved.h].every((n) => typeof n === 'number')) {
+      frame.value = clampFrame(saved as Frame);
+    } else frame.value = defaultFrame();
+  } catch {
+    frame.value = defaultFrame();
+  }
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(BALL_KEY) || '') as {
+      x?: number;
+      y?: number;
+      side?: string;
+      fromBottom?: number;
+    };
+    const anchor = readAnchor(saved);
+    if (anchor) {
+      ballAnchor.value = anchor;
+      ballPos.value = placeBall(anchor);
+      ballReady.value = true;
+      return;
+    }
+  } catch {
+    /* 用默认位置 */
+  }
+  ballPos.value = defaultBall();
+  ballReady.value = true;
+}
+
+function resetFrameSize(): void {
+  const next = defaultFrame();
+  frame.value = clampFrame({ ...frame.value, w: next.w, h: next.h });
+  saveFrame();
+}
+
+function onBallDown(ev: PointerEvent): void {
+  ballDragged = false;
+  ballDragging.value = true;
+  ballSettling.value = false;
+  const startX = ev.clientX;
+  const startY = ev.clientY;
+  const origin = { ...ballPos.value };
+  const move = (e: PointerEvent) => {
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    if (Math.hypot(dx, dy) > 4) ballDragged = true;
+    ballPos.value = clampBall({ x: origin.x + dx, y: origin.y + dy });
+  };
+  const up = () => {
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up);
+    ballDragging.value = false;
+    if (ballDragged) {
+      ballAnchor.value = anchorFromPos(ballPos.value);
+      ballSettling.value = true;
+      ballPos.value = placeBall(ballAnchor.value);
+      window.setTimeout(() => {
+        ballSettling.value = false;
+      }, 180);
+    }
+    sessionStorage.setItem(BALL_KEY, JSON.stringify(ballAnchor.value));
+    if (!ballDragged) chatOpen.value = true;
+  };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+}
+
+function onPanelDragDown(ev: PointerEvent): void {
+  if ((ev.target as Element | null)?.closest('button')) return;
+  const startX = ev.clientX;
+  const startY = ev.clientY;
+  const origin = { ...frame.value };
+  const move = (e: PointerEvent) => {
+    frame.value = clampFrame({ ...origin, x: origin.x + e.clientX - startX, y: origin.y + e.clientY - startY });
+  };
+  const up = () => {
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up);
+    saveFrame();
+  };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+}
+
+function onFrameResize(grip: Grip, ev: PointerEvent): void {
+  ev.preventDefault();
+  ev.stopPropagation();
+  const startX = ev.clientX;
+  const startY = ev.clientY;
+  const origin = { ...frame.value };
+  const move = (e: PointerEvent) => {
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    let { x, y, w, h } = origin;
+    if (grip.includes('e')) w = origin.w + dx;
+    if (grip.includes('w')) {
+      w = origin.w - dx;
+      x = origin.x + dx;
+    }
+    if (grip.includes('s')) h = origin.h + dy;
+    if (grip.includes('n')) {
+      h = origin.h - dy;
+      y = origin.y + dy;
+    }
+    frame.value = clampFrame({ x, y, w, h });
+  };
+  const up = () => {
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up);
+    saveFrame();
+  };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+}
+
+function onPointerDown(ev: PointerEvent): void {
+  if (!chatOpen.value) return;
+  const target = ev.target;
+  if (!(target instanceof Element)) return;
+  if (target.closest('.chat-panel, .el-overlay, .el-popper, .el-message, .el-dialog')) return;
+  chatOpen.value = false;
+}
+
+function onResizeWindow(): void {
+  ballPos.value = placeBall(ballAnchor.value);
+  frame.value = clampFrame(frame.value);
+}
+
+const ballTitle = computed(() => {
+  if (chatPhase.value === 'streaming') return '回复中';
+  if (chatPhase.value === 'confirm') return '待确认';
+  if (chatPhase.value === 'error') return '回复中断';
+  return '打开聊天';
+});
 
 let unsubscribe: (() => void) | null = null;
 
@@ -119,20 +320,18 @@ onMounted(async () => {
     }
   });
   window.addEventListener('keydown', onKeydown);
+  window.addEventListener('resize', onResizeWindow);
+  window.addEventListener('pointerdown', onPointerDown);
+  loadChrome();
 });
 
 watch(
   () => route.path,
   async (p) => {
     if (p === '/chat') {
-      hijackingChat = true;
       chatOpen.value = true;
       await router.replace('/dashboard');
-      hijackingChat = false;
-      return;
     }
-    if (hijackingChat) return;
-    if (chatOpen.value) chatOpen.value = false;
   },
   { immediate: true }
 );
@@ -159,6 +358,8 @@ function onKeydown(ev: KeyboardEvent): void {
 onUnmounted(() => {
   unsubscribe?.();
   window.removeEventListener('keydown', onKeydown);
+  window.removeEventListener('resize', onResizeWindow);
+  window.removeEventListener('pointerdown', onPointerDown);
 });
 </script>
 
@@ -189,17 +390,46 @@ onUnmounted(() => {
       </router-view>
     </main>
 
-    <Transition name="chat-rise">
-      <aside v-show="chatOpen" class="chat-sheet-anchor" role="dialog" aria-label="聊天" :aria-hidden="!chatOpen">
-        <div class="chat-sheet">
-          <header class="sheet-bar">
-            <span>助手 · {{ chatRepoLabel }}</span>
-            <button type="button" class="sheet-close" @click="closeChat">关闭</button>
-          </header>
-          <ChatView embedded @leave="onChatLeave" />
-        </div>
-      </aside>
-    </Transition>
+    <aside
+      v-show="chatOpen"
+      class="chat-panel"
+      :style="{ left: `${frame.x}px`, top: `${frame.y}px`, width: `${frame.w}px`, height: `${frame.h}px` }"
+      role="dialog"
+      aria-label="聊天"
+    >
+      <div
+        v-for="grip in GRIPS"
+        :key="grip"
+        class="grip"
+        :class="'grip-' + grip"
+        @pointerdown="onFrameResize(grip, $event)"
+      />
+      <header class="sheet-bar" @pointerdown="onPanelDragDown">
+        <span>助手 · {{ chatRepoLabel }}</span>
+        <button type="button" class="sheet-close" @click="resetFrameSize">重置</button>
+      </header>
+      <ChatView embedded @leave="onChatLeave" @phase="chatPhase = $event" />
+    </aside>
+
+    <button
+      v-show="!chatOpen && ballReady"
+      type="button"
+      class="chat-ball"
+      :class="[chatPhase, { dragging: ballDragging, settling: ballSettling }]"
+      :style="{ left: `${ballPos.x}px`, top: `${ballPos.y}px` }"
+      :title="ballTitle"
+      aria-label="打开聊天"
+      @pointerdown="onBallDown"
+    >
+      <span class="ball-ring" />
+      <svg class="ball-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          fill="currentColor"
+          d="M5 5.5A2.5 2.5 0 0 1 7.5 3h9A2.5 2.5 0 0 1 19 5.5v7A2.5 2.5 0 0 1 16.5 15H12l-3.6 3.2c-.6.5-1.4.1-1.4-.7V15H7.5A2.5 2.5 0 0 1 5 12.5v-7Z"
+        />
+      </svg>
+      <i v-if="chatPhase === 'confirm'" class="ball-dot" />
+    </button>
 
     <nav class="dock" aria-label="主导航">
       <button
@@ -324,41 +554,149 @@ onUnmounted(() => {
   min-height: 0;
   min-width: 0;
 }
-/* 低于 dock(25) 与 Element 对话框(~2000)，避开底栏 */
-.chat-sheet-anchor {
+/* 低于 dock(25) 与 Element 对话框(~2000) */
+.chat-panel {
   position: absolute;
   z-index: 20;
-  left: 50%;
-  bottom: var(--gc-dock-space);
-  transform: translateX(-50%);
-  width: min(640px, calc(100% - var(--gc-pad) * 2));
-  height: min(70%, calc(100% - var(--gc-line) - var(--gc-dock-space) - var(--gc-pad)));
-}
-.chat-rise-enter-active,
-.chat-rise-leave-active {
-  transition:
-    opacity 0.22s ease,
-    transform 0.22s ease;
-}
-.chat-rise-leave-active {
-  pointer-events: none;
-}
-.chat-rise-enter-from,
-.chat-rise-leave-to {
-  opacity: 0;
-  transform: translateX(-50%) translateY(20px);
-}
-.chat-sheet {
   display: flex;
   flex-direction: column;
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  background: color-mix(in srgb, var(--el-bg-color-overlay) 88%, transparent);
+  min-width: 0;
+  background: color-mix(in srgb, var(--el-bg-color-overlay) 94%, transparent);
   border: 1px solid var(--el-border-color);
   border-radius: var(--gc-radius);
   box-shadow: var(--gc-shadow-menu);
   backdrop-filter: blur(16px);
+}
+.grip {
+  position: absolute;
+  z-index: 2;
+}
+.grip-n,
+.grip-s {
+  left: 10px;
+  right: 10px;
+  height: 6px;
+  cursor: ns-resize;
+}
+.grip-n {
+  top: -3px;
+}
+.grip-s {
+  bottom: -3px;
+}
+.grip-e,
+.grip-w {
+  top: 10px;
+  bottom: 10px;
+  width: 6px;
+  cursor: ew-resize;
+}
+.grip-e {
+  right: -3px;
+}
+.grip-w {
+  left: -3px;
+}
+.grip-ne,
+.grip-nw,
+.grip-se,
+.grip-sw {
+  width: 12px;
+  height: 12px;
+}
+.grip-ne {
+  top: -4px;
+  right: -4px;
+  cursor: nesw-resize;
+}
+.grip-nw {
+  top: -4px;
+  left: -4px;
+  cursor: nwse-resize;
+}
+.grip-se {
+  right: -4px;
+  bottom: -4px;
+  cursor: nwse-resize;
+}
+.grip-sw {
+  left: -4px;
+  bottom: -4px;
+  cursor: nesw-resize;
+}
+.chat-panel :deep(.chat-page) {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  overflow: hidden;
+  padding: var(--gc-pad);
+}
+.chat-ball {
+  position: absolute;
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--el-color-primary);
+  color: #fff;
+  box-shadow: var(--gc-shadow-menu);
+  cursor: grab;
+  touch-action: none;
+}
+.chat-ball.dragging {
+  transform: scale(1.06);
+  cursor: grabbing;
+}
+.chat-ball.settling {
+  transition:
+    left 0.16s ease,
+    top 0.16s ease;
+}
+.ball-ring {
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+}
+.chat-ball.streaming .ball-ring {
+  border-color: rgb(255 255 255 / 28%);
+  border-top-color: #fff;
+  animation: ball-spin 0.8s linear infinite;
+}
+.chat-ball.confirm {
+  box-shadow:
+    var(--gc-shadow-menu),
+    0 0 0 2px var(--el-color-warning);
+}
+.chat-ball.error {
+  box-shadow:
+    var(--gc-shadow-menu),
+    0 0 0 2px var(--el-color-danger);
+}
+.ball-icon {
+  position: relative;
+  width: 22px;
+  height: 22px;
+}
+.ball-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--el-color-warning);
+  box-shadow: 0 0 0 2px var(--el-color-primary);
+}
+@keyframes ball-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 .sheet-bar {
   flex: none;
@@ -370,6 +708,12 @@ onUnmounted(() => {
   font-weight: 600;
   min-width: 0;
   gap: var(--gc-gap);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+.sheet-bar:active {
+  cursor: grabbing;
 }
 .sheet-bar span {
   overflow: hidden;
@@ -387,13 +731,6 @@ onUnmounted(() => {
   font: inherit;
   font-size: var(--gc-text);
   cursor: pointer;
-}
-.chat-sheet :deep(.chat-page) {
-  flex: 1;
-  min-height: 0;
-  height: auto;
-  overflow: hidden;
-  padding: var(--gc-pad);
 }
 .dock {
   position: absolute;

@@ -36,6 +36,7 @@ import type {
   PrepareMrResult,
   ConflictBlameResult
 } from './types';
+import { readChatByteStream, type ChatEvent } from '@/components/chat/events';
 
 /** 后端 DiffResult 把 +/- 放在 stats 里，前端类型是平铺字段 */
 type DiffPayload = DiffResult & { stats?: { insertions?: number; deletions?: number } };
@@ -432,15 +433,7 @@ export function getHealth(): Promise<HealthInfo> {
 }
 
 export interface ChatSseHandlers {
-  onDelta?: (text: string) => void;
-  onConfirm?: (payload: {
-    token: string;
-    tool: string;
-    preview: { command: string; affectedFiles: string[]; args?: string[]; note?: string };
-  }) => void;
-  onTool?: (payload: { tool: string; success: boolean }) => void;
-  onError?: (message: string) => void;
-  onDone?: () => void;
+  onEvent?: (event: ChatEvent) => void;
 }
 
 export async function streamChat(
@@ -470,49 +463,8 @@ export async function streamChat(
     }
     throw new Error(msg);
   }
-  const reader = res.body?.getReader();
-  if (!reader) throw new Error('无法读取对话流');
-  const decoder = new TextDecoder();
-  let buf = '';
-  let event = 'message';
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += decoder.decode(value, { stream: true });
-    const parts = buf.split('\n');
-    buf = parts.pop() ?? '';
-    for (const line of parts) {
-      if (line.startsWith('event:')) {
-        event = line.slice(6).trim();
-        continue;
-      }
-      if (line.startsWith('data:')) {
-        const raw = line.slice(5).trim();
-        if (!raw) continue;
-        let data: unknown = raw;
-        try {
-          data = JSON.parse(raw);
-        } catch {
-          /* keep string */
-        }
-        if (event === 'delta' && data && typeof data === 'object' && 'text' in data) {
-          handlers.onDelta?.(String((data as { text: string }).text));
-        } else if (event === 'confirm' && data && typeof data === 'object') {
-          handlers.onConfirm?.(
-            data as { token: string; tool: string; preview: { command: string; affectedFiles: string[] } }
-          );
-        } else if (event === 'tool' && data && typeof data === 'object') {
-          handlers.onTool?.(data as { tool: string; success: boolean });
-        } else if (event === 'error' && data && typeof data === 'object' && 'error' in data) {
-          handlers.onError?.(String((data as { error: string }).error));
-        } else if (event === 'done') {
-          handlers.onDone?.();
-        }
-        event = 'message';
-      }
-    }
-  }
-  handlers.onDone?.();
+  if (!res.body) throw new Error('无法读取对话流');
+  await readChatByteStream(res.body, (event) => handlers.onEvent?.(event));
 }
 
 export function confirmChat(

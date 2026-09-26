@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { useReposStore } from '@/stores/repos';
@@ -7,6 +7,8 @@ import { useSettingsStore } from '@/stores/settings';
 import * as api from '@/api/client';
 import MessageList from '@/components/chat/MessageList.vue';
 import ConfirmBar from '@/components/chat/ConfirmBar.vue';
+import { readChatByteStream, type ChatEvent } from '@/components/chat/events';
+import { isMockConfirmToken, mockChatBody } from '@/components/chat/mockReplies';
 import type { ChatLine, PendingConfirm } from '@/components/chat/types';
 
 const props = defineProps<{
@@ -14,6 +16,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{
   leave: [];
+  phase: [phase: 'idle' | 'streaming' | 'confirm' | 'error'];
 }>();
 
 const repos = useReposStore();
@@ -30,13 +33,37 @@ const streaming = ref(false);
 const confirming = ref(false);
 const lines = ref<ChatLine[]>([]);
 const pending = ref<PendingConfirm[]>([]);
+const errorHold = ref(false);
+let errorPending = false;
+let errorTimer = 0;
 let seq = 0;
 const listEl = ref<HTMLElement | null>(null);
 
 const repoPath = computed(() => repos.currentPath);
-const canSend = computed(() =>
-  Boolean(repoPath.value && settings.llm?.tokenSet && repos.healthOk && input.value.trim() && !streaming.value)
-);
+const mockPreview = computed(() => !settings.llm?.tokenSet);
+const canSend = computed(() => Boolean(repoPath.value && repos.healthOk && input.value.trim() && !streaming.value));
+const chatPhase = computed(() => {
+  if (pending.value.length) return 'confirm' as const;
+  if (streaming.value) return 'streaming' as const;
+  if (errorHold.value) return 'error' as const;
+  return 'idle' as const;
+});
+
+watch(chatPhase, (phase) => emit('phase', phase), { immediate: true });
+
+function noteStreamError(): void {
+  errorPending = true;
+}
+
+watch(streaming, (on) => {
+  if (on || !errorPending) return;
+  errorPending = false;
+  errorHold.value = true;
+  window.clearTimeout(errorTimer);
+  errorTimer = window.setTimeout(() => {
+    errorHold.value = false;
+  }, 1200);
+});
 
 function sessionIdFor(path: string): string {
   const key = `gc-chat-session:${path}`;
@@ -70,48 +97,29 @@ async function send(): Promise<void> {
   const text = input.value.trim();
   const path = repoPath.value;
   if (!text || !path || streaming.value) return;
-  if (!settings.llm?.tokenSet) {
-    ElMessage.warning('请先在设置「模型」填写 API Key');
-    return;
-  }
   input.value = '';
   push('user', text);
   const assistant = push('assistant', '');
   streaming.value = true;
   await scrollBottom();
-  const history = lines.value
-    .filter((l) => l.role === 'user' || (l.role === 'assistant' && l.text.trim()))
-    .map((l) => ({ role: l.role as 'user' | 'assistant', content: l.text }));
   try {
-    await api.streamChat(
-      { messages: history, repoPath: path, sessionId: sessionIdFor(path) },
-      {
-        onDelta: (t) => {
-          assistant.text += t;
-          void scrollBottom();
-        },
-        onConfirm: (p) => {
-          pending.value.push({
-            token: p.token,
-            tool: p.tool,
-            command: p.preview.command,
-            affectedFiles: p.preview.affectedFiles ?? [],
-            note: p.preview.note
-          });
-        },
-        onTool: (p) => {
-          push('tool', '', { tool: p.tool, success: p.success });
-          void scrollBottom();
-        },
-        onError: (msg) => {
-          if (!assistant.text) assistant.text = msg;
-          else assistant.text += `\n${msg}`;
-        }
-      }
-    );
+    const onEvent = (event: ChatEvent) => {
+      applyEvent(assistant, event);
+      void scrollBottom();
+    };
+    if (mockPreview.value) {
+      await readChatByteStream(mockChatBody(), onEvent);
+    } else {
+      const history = lines.value
+        .filter((l) => l.role === 'user' || (l.role === 'assistant' && l.text.trim()))
+        .map((l) => ({ role: l.role as 'user' | 'assistant', content: l.text }));
+      await api.streamChat({ messages: history, repoPath: path, sessionId: sessionIdFor(path) }, { onEvent });
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    if (!assistant.text) assistant.text = msg;
+    const row = lines.value.find((l) => l.id === assistant.id);
+    if (row && !row.text) row.text = msg;
+    noteStreamError();
     ElMessage.error(msg);
   } finally {
     streaming.value = false;
@@ -119,9 +127,35 @@ async function send(): Promise<void> {
   }
 }
 
+function applyEvent(assistant: ChatLine, event: ChatEvent): void {
+  const row = lines.value.find((l) => l.id === assistant.id) ?? assistant;
+  if (event.type === 'delta') row.text += event.text;
+  else if (event.type === 'confirm') {
+    pending.value.push({
+      token: event.token,
+      tool: event.tool,
+      command: event.preview.command,
+      affectedFiles: event.preview.affectedFiles ?? [],
+      note: event.preview.note
+    });
+  } else if (event.type === 'tool') {
+    push('tool', '', { tool: event.tool, success: event.success });
+  } else if (event.type === 'error') {
+    noteStreamError();
+    if (!row.text) row.text = event.error;
+    else row.text += `\n${event.error}`;
+  }
+}
+
 async function confirmOne(item: PendingConfirm): Promise<void> {
   confirming.value = true;
   try {
+    if (isMockConfirmToken(item.token)) {
+      pending.value = pending.value.filter((p) => p.token !== item.token);
+      push('system', `本地预览：未执行 ${item.tool}：${item.command}`);
+      confirming.value = false;
+      return;
+    }
     const res = await api.confirmChat(item.token);
     pending.value = pending.value.filter((p) => p.token !== item.token);
     if (!res.ok) {
@@ -140,6 +174,12 @@ async function confirmOne(item: PendingConfirm): Promise<void> {
 async function cancelOne(item: PendingConfirm): Promise<void> {
   confirming.value = true;
   try {
+    if (isMockConfirmToken(item.token)) {
+      pending.value = pending.value.filter((p) => p.token !== item.token);
+      push('system', `已取消 ${item.tool}`);
+      confirming.value = false;
+      return;
+    }
     const res = await api.confirmChat(item.token, { cancel: true });
     pending.value = pending.value.filter((p) => p.token !== item.token);
     if (!res.ok) {
@@ -156,6 +196,10 @@ async function cancelOne(item: PendingConfirm): Promise<void> {
 
 onMounted(() => {
   void settings.load(repos.currentId).catch(() => undefined);
+});
+
+onUnmounted(() => {
+  window.clearTimeout(errorTimer);
 });
 </script>
 
@@ -175,14 +219,14 @@ onMounted(() => {
       class="mb"
     />
     <el-alert
-      v-else-if="!settings.llm?.tokenSet"
-      title="尚未配置模型 API Key"
-      type="warning"
+      v-else-if="mockPreview"
+      title="本地预览，未连接模型。回复来自内置样本，确认不会写入仓库。"
+      type="info"
       :closable="false"
       show-icon
       class="mb"
     >
-      <el-button link type="primary" @click="leaveTo('/settings', { tab: 'llm' })">去设置</el-button>
+      <el-button link type="primary" @click="leaveTo('/settings', { tab: 'llm' })">去配置模型</el-button>
     </el-alert>
     <el-alert
       v-else-if="!repoPath"
@@ -206,7 +250,7 @@ onMounted(() => {
           v-model="input"
           type="textarea"
           :rows="3"
-          :disabled="streaming || !repoPath || !settings.llm?.tokenSet || !repos.healthOk"
+          :disabled="streaming || !repoPath || !repos.healthOk"
           placeholder="例如：看看改了什么，帮我提交"
           @keydown.enter.exact.prevent="send"
         />
