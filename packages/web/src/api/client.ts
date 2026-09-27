@@ -14,6 +14,8 @@ import type {
   HealthInfo,
   ServiceUpdateInfo,
   JobProgressPayload,
+  ChatConversationSummary,
+  ChatLogMessage,
   LogEntry,
   MrSettings,
   MrTemplate,
@@ -437,6 +439,32 @@ export function getServiceUpdate(): Promise<ServiceUpdateInfo> {
   return request('GET', '/api/service-update');
 }
 
+/** 204 无正文。force 仅在用户已确认要中断进行中的任务时传递。 */
+export async function shutdownService(opts?: { force?: boolean }): Promise<void> {
+  const secret = await loadSecret();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (secret) headers['X-Git-Cockpit-Secret'] = secret;
+  let res: Response;
+  try {
+    res = await fetch('/api/shutdown', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ force: Boolean(opts?.force) })
+    });
+  } catch (err) {
+    throw new ApiError(`无法连接后端服务（/api/shutdown）：${err instanceof Error ? err.message : String(err)}`, 0);
+  }
+  if (res.status === 204) return;
+  let message = res.statusText || `HTTP ${res.status}`;
+  try {
+    const data = (await res.json()) as { error?: string };
+    if (typeof data.error === 'string' && data.error) message = data.error;
+  } catch {
+    /* 非 JSON */
+  }
+  throw new ApiError(message, res.status);
+}
+
 export interface ChatSseHandlers {
   onEvent?: (event: ChatEvent) => void;
 }
@@ -470,6 +498,36 @@ export async function streamChat(
   }
   if (!res.body) throw new Error('无法读取对话流');
   await readChatByteStream(res.body, (event) => handlers.onEvent?.(event));
+}
+
+export function listChatConversations(
+  opts: { repoPath?: string; limit?: number } = {}
+): Promise<{ conversations: ChatConversationSummary[] }> {
+  const q = new URLSearchParams();
+  if (opts.repoPath) q.set('repoPath', opts.repoPath);
+  if (opts.limit) q.set('limit', String(opts.limit));
+  const qs = q.toString();
+  return request('GET', `/api/chat/conversations${qs ? `?${qs}` : ''}`);
+}
+
+export function getChatConversation(
+  id: string
+): Promise<{ conversation: ChatConversationSummary; messages: ChatLogMessage[] }> {
+  return request('GET', `/api/chat/conversations/${encodeURIComponent(id)}`);
+}
+
+export function deleteChatConversation(id: string): Promise<{ ok: boolean }> {
+  return request('DELETE', `/api/chat/conversations/${encodeURIComponent(id)}`);
+}
+
+export function appendChatMessages(
+  id: string,
+  body: {
+    repoPath: string;
+    messages: Array<{ role: ChatLogMessage['role']; text: string; tool?: string | null; success?: boolean | null }>;
+  }
+): Promise<{ conversation: ChatConversationSummary }> {
+  return request('POST', `/api/chat/conversations/${encodeURIComponent(id)}/messages`, body);
 }
 
 export function confirmChat(

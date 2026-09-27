@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createWebServer } from '../src/webServer.ts';
 import { ConfirmGate, previewFromExecResult } from '../src/chat/confirmGate.ts';
 import {
   CHAT_ALLOWED_TOOLS,
@@ -168,5 +169,79 @@ describe('chat session', () => {
 
     disposeTestRuntime(runtime);
     cleanupTmp();
+  });
+});
+
+describe('chat conversations api', () => {
+  it('本地预览消息可入库、回看并整组删除', async () => {
+    const sample = await createSampleRepo();
+    const other = await createSampleRepo();
+    const runtime = createTestRuntime();
+    await runtime.repoManager.open(sample.dir);
+    const server = await createWebServer(runtime, { staticDir: null, noListen: true });
+    const headers = {
+      'content-type': 'application/json',
+      'x-git-cockpit-secret': runtime.config.auth.localSecret
+    };
+    const id = '11111111-1111-4111-8111-111111111111';
+    try {
+      const closed = await server.app.inject({
+        method: 'POST',
+        url: `/api/chat/conversations/${id}/messages`,
+        headers,
+        payload: { repoPath: other.dir, messages: [{ role: 'user', text: '未打开' }] }
+      });
+      expect(closed.statusCode).toBe(400);
+      expect(closed.json().code).toBe('REPO_NOT_OPEN');
+
+      const created = await server.app.inject({
+        method: 'POST',
+        url: `/api/chat/conversations/${id}/messages`,
+        headers,
+        payload: {
+          repoPath: sample.dir,
+          messages: [
+            { role: 'user', text: '看看改了什么' },
+            { role: 'assistant', text: '本地预览样本' }
+          ]
+        }
+      });
+      expect(created.statusCode).toBe(200);
+      expect(created.json().conversation.title).toBe('看看改了什么');
+
+      await runtime.repoManager.open(other.dir);
+      const mismatch = await server.app.inject({
+        method: 'POST',
+        url: `/api/chat/conversations/${id}/messages`,
+        headers,
+        payload: { repoPath: other.dir, messages: [{ role: 'user', text: '换仓' }] }
+      });
+      expect(mismatch.statusCode).toBe(409);
+
+      const got = await server.app.inject({
+        method: 'GET',
+        url: `/api/chat/conversations/${id}`,
+        headers: { 'x-git-cockpit-secret': runtime.config.auth.localSecret }
+      });
+      expect(got.statusCode).toBe(200);
+      expect(got.json().messages).toHaveLength(2);
+
+      const removed = await server.app.inject({
+        method: 'DELETE',
+        url: `/api/chat/conversations/${id}`,
+        headers: { 'x-git-cockpit-secret': runtime.config.auth.localSecret }
+      });
+      expect(removed.statusCode).toBe(200);
+      const missing = await server.app.inject({
+        method: 'GET',
+        url: `/api/chat/conversations/${id}`,
+        headers: { 'x-git-cockpit-secret': runtime.config.auth.localSecret }
+      });
+      expect(missing.statusCode).toBe(404);
+    } finally {
+      await server.close();
+      disposeTestRuntime(runtime);
+      cleanupTmp();
+    }
   });
 });

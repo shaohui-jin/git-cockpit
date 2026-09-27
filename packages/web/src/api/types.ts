@@ -283,6 +283,26 @@ export interface WritePreview {
   note?: string;
 }
 
+export interface ChatConversationSummary {
+  id: string;
+  repoPath: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  messageCount: number;
+}
+
+export interface ChatLogMessage {
+  id: number;
+  conversationId: string;
+  role: 'user' | 'assistant' | 'system' | 'tool';
+  text: string;
+  tool: string | null;
+  success: boolean | null;
+  seq: number;
+  createdAt: string;
+}
+
 export interface LogEntry {
   id: number;
   timestamp: string;

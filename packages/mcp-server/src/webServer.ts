@@ -171,8 +171,9 @@ export async function createWebServer(
     return { secret: runtime.config.auth.localSecret };
   });
 
-  app.post('/api/shutdown', async (_req, reply) => {
-    if (jobs.list().some((j) => j.status === 'running')) {
+  app.post<{ Body: { force?: boolean } }>('/api/shutdown', async (req, reply) => {
+    const force = req.body?.force === true;
+    if (!force && jobs.list().some((j) => j.status === 'running')) {
       return reply.code(409).send({ error: '有任务进行中，请先等待结束' });
     }
     await reply.code(204).send();

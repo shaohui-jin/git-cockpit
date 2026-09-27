@@ -231,10 +231,7 @@ export class JobEngine {
     return job;
   }
 
-  reportDesktopDownload(
-    id: string,
-    body: { phase?: 'ready' | 'error'; percent?: number; error?: string }
-  ): Job {
+  reportDesktopDownload(id: string, body: { phase?: 'ready' | 'error'; percent?: number; error?: string }): Job {
     const job = this.jobs.get(id);
     if (!job || job.kind !== 'desktop-download') throw new Error('任务不存在');
     if (job.status !== 'running') return job;

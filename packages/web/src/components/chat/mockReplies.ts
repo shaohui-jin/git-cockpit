@@ -2,7 +2,7 @@ import { encodeChatEvent, type ChatEvent } from './events';
 
 /**
  * 未配置模型 Key 时的本地回复。每条是一轮完整事件序列，界面按同一规范播放。
- * 确认令牌以 mock: 开头，只在页面内确认或取消，不请求后端，也不执行 git。
+ * 确认令牌以 mock: 开头，只在页面内确认或取消，不执行 git。对话正文仍会写入对话记录。
  */
 export const MOCK_REPLIES: ChatEvent[][] = [
   [

@@ -70,6 +70,28 @@ function migrate(db: DatabaseSync): void {
       finished_at TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_jobs_started ON jobs(started_at DESC);
+
+    CREATE TABLE IF NOT EXISTS chat_conversations (
+      id TEXT PRIMARY KEY,
+      repo_path TEXT NOT NULL,
+      title TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_chat_conversations_updated ON chat_conversations(updated_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_chat_conversations_repo ON chat_conversations(repo_path, updated_at DESC);
+
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      conversation_id TEXT NOT NULL,
+      role TEXT NOT NULL,
+      text TEXT NOT NULL,
+      tool TEXT,
+      success INTEGER,
+      seq INTEGER NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_chat_messages_conv ON chat_messages(conversation_id, seq);
   `);
   migrateCloneJobs(db);
   migrateRepoPinOrder(db);

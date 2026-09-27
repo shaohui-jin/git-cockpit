@@ -25,6 +25,7 @@ export * from './jobTypes.ts';
 export * from './jobStore.ts';
 export * from './jobEngine.ts';
 export * from './db.ts';
+export * from './chatLog.ts';
 export {
   branchNameForMr,
   classifyMergePair,

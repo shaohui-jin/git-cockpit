@@ -7,6 +7,7 @@ import { EventEmitter } from 'node:events';
 import type { DatabaseSync } from 'node:sqlite';
 import {
   AuditLogger,
+  ChatLogStore,
   JobEngine,
   JobStore,
   PermissionManager,
@@ -29,6 +30,7 @@ export interface Runtime {
   config: GitCockpitConfig;
   db: DatabaseSync;
   auditLogger: AuditLogger;
+  chatLog: ChatLogStore;
   permissions: PermissionManager;
   repoStore: RepoStore;
   repoManager: RepoManager;
@@ -47,6 +49,7 @@ export function createRuntime(options: RuntimeOptions = {}): Runtime {
   eventBus.setMaxListeners(200);
 
   const auditLogger = new AuditLogger(db, config.logging);
+  const chatLog = new ChatLogStore(db);
   const permissions = new PermissionManager(config);
   const repoStore = new RepoStore(db);
   const repoManager = new RepoManager({ repoStore, eventBus, getConfig: () => configStore.get() });
@@ -66,6 +69,7 @@ export function createRuntime(options: RuntimeOptions = {}): Runtime {
     config,
     db,
     auditLogger,
+    chatLog,
     permissions,
     repoStore,
     repoManager,

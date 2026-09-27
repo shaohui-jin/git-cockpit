@@ -14,7 +14,10 @@ const REST_META: Record<string, { summary: string; tags: string[] }> = {
   'get /api/service-update': { summary: '服务端是否有更新（npm 最新版，带缓存）', tags: ['系统'] },
   'post /api/jobs/desktop-download': { summary: '登记桌面安装包下载任务（由壳子回报进度）', tags: ['仓库'] },
   'post /api/jobs/{id}/desktop-progress': { summary: '更新桌面下载进度；完成后不再占着进行中', tags: ['仓库'] },
-  'post /api/shutdown': { summary: '优雅退出 daemon（本机密钥；有 running 任务时 409）', tags: ['系统'] },
+  'post /api/shutdown': {
+    summary: '优雅退出 daemon（本机密钥；有 running 任务时 409，force 确认后仍退出）',
+    tags: ['系统']
+  },
   'get /api/repos': { summary: '已打开仓库列表', tags: ['仓库'] },
   'get /api/repos/overview': { summary: '已打开仓库脉搏（工作台，全量）', tags: ['仓库'] },
   'get /api/repos/{id}/overview': { summary: '单个仓库脉搏（工作台增量）', tags: ['仓库'] },
@@ -50,6 +53,10 @@ const REST_META: Record<string, { summary: string; tags: string[] }> = {
   'post /api/jobs/clone': { summary: '后台克隆远程仓库', tags: ['仓库'] },
   'get /api/tools': { summary: '工具注册表（含风险与是否启用）', tags: ['系统'] },
   'get /api/logs': { summary: '操作审计日志', tags: ['系统'] },
+  'get /api/chat/conversations': { summary: '对话记录列表', tags: ['聊天'] },
+  'get /api/chat/conversations/{id}': { summary: '一组对话的全文', tags: ['聊天'] },
+  'delete /api/chat/conversations/{id}': { summary: '删除一组对话', tags: ['聊天'] },
+  'post /api/chat/conversations/{id}/messages': { summary: '追加一轮对话（含本地预览）', tags: ['聊天'] },
   'get /api/settings': { summary: '配置与权限', tags: ['设置'] },
   'put /api/settings': { summary: '更新权限或 MR 配置（Token 明文不回读，保存前校验）', tags: ['设置'] },
   'post /api/settings/mr-template/parse': { summary: '导入 Markdown 为 MR 正文模板字段（不落盘）', tags: ['设置'] },

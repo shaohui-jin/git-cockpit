@@ -5,7 +5,13 @@
 import type { FastifyInstance } from 'fastify';
 import { streamText, tool, stepCountIs } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
-import { applyLlmEnvOverrides, llmBaseUrl } from '@shaohui_jin/git-cockpit-core';
+import {
+  applyLlmEnvOverrides,
+  isChatLogRole,
+  llmBaseUrl,
+  RepoNotFoundError,
+  type ChatLogMessageInput
+} from '@shaohui_jin/git-cockpit-core';
 import type { Runtime } from '../runtime.ts';
 import { ConfirmGate } from './confirmGate.ts';
 import { ChatSessions, resolveChatRepo } from './session.ts';
@@ -147,4 +153,98 @@ export function registerChatRoutes(app: FastifyInstance, runtime: Runtime): void
     if (!out.ok) return reply.code(409).send(out);
     return out;
   });
+
+  app.get<{ Querystring: { repoPath?: string; limit?: string } }>('/api/chat/conversations', async (req) => {
+    let repoPath = typeof req.query.repoPath === 'string' ? req.query.repoPath.trim() : '';
+    if (repoPath) repoPath = openedRepoPath(runtime, repoPath) ?? repoPath;
+    return {
+      conversations: runtime.chatLog.list({
+        repoPath: repoPath || undefined,
+        limit: clampLimit(req.query.limit)
+      })
+    };
+  });
+
+  app.get<{ Params: { id: string } }>('/api/chat/conversations/:id', async (req, reply) => {
+    const id = validConversationId(req.params.id);
+    if (!id) return reply.code(400).send({ error: '对话 id 无效' });
+    const found = runtime.chatLog.get(id);
+    if (!found) return reply.code(404).send({ error: '对话不存在' });
+    return found;
+  });
+
+  app.delete<{ Params: { id: string } }>('/api/chat/conversations/:id', async (req, reply) => {
+    const id = validConversationId(req.params.id);
+    if (!id) return reply.code(400).send({ error: '对话 id 无效' });
+    if (!runtime.chatLog.remove(id)) return reply.code(404).send({ error: '对话不存在' });
+    return { ok: true };
+  });
+
+  app.post<{
+    Params: { id: string };
+    Body: { repoPath?: string; messages?: ChatLogMessageInput[] };
+  }>('/api/chat/conversations/:id/messages', async (req, reply) => {
+    const id = validConversationId(req.params.id);
+    if (!id) return reply.code(400).send({ error: '对话 id 无效' });
+    const requested = typeof req.body?.repoPath === 'string' ? req.body.repoPath.trim() : '';
+    if (!requested) return reply.code(400).send({ error: '请先选择仓库', code: 'NO_ACTIVE_REPO' });
+    const repoPath = openedRepoPath(runtime, requested);
+    if (!repoPath) {
+      return reply.code(400).send({ error: '请先在工作台打开该仓库', code: 'REPO_NOT_OPEN' });
+    }
+    const parsed = parseChatLogMessages(req.body?.messages);
+    if (!parsed.ok) return reply.code(400).send({ error: parsed.error });
+    const saved = runtime.chatLog.append(id, repoPath, parsed.messages);
+    if (!saved.ok) {
+      return reply.code(409).send({ error: '这组对话属于另一个仓库', code: 'CONVERSATION_REPO_MISMATCH' });
+    }
+    return { conversation: saved.conversation };
+  });
+}
+
+const CONVERSATION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const MAX_MESSAGES = 20;
+const MAX_TEXT = 100_000;
+
+function validConversationId(raw: string): string | null {
+  const id = raw.trim();
+  return CONVERSATION_ID.test(id) ? id : null;
+}
+
+function clampLimit(raw: string | undefined): number {
+  const n = raw == null || raw === '' ? 100 : Number(raw);
+  if (!Number.isFinite(n)) return 100;
+  return Math.min(Math.max(Math.floor(n), 1), 200);
+}
+
+function openedRepoPath(runtime: Runtime, repoPath: string): string | null {
+  try {
+    return runtime.repoManager.getByPath(repoPath).service.repoPath;
+  } catch (err) {
+    if (err instanceof RepoNotFoundError) return null;
+    throw err;
+  }
+}
+
+function parseChatLogMessages(
+  raw: unknown
+): { ok: true; messages: ChatLogMessageInput[] } | { ok: false; error: string } {
+  if (!Array.isArray(raw) || raw.length === 0) return { ok: false, error: 'messages 不能为空' };
+  if (raw.length > MAX_MESSAGES) return { ok: false, error: '一次最多追加 20 条消息' };
+  const messages: ChatLogMessageInput[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') return { ok: false, error: '消息格式无效' };
+    const row = item as { role?: unknown; text?: unknown; tool?: unknown; success?: unknown };
+    if (typeof row.role !== 'string' || !isChatLogRole(row.role)) return { ok: false, error: '消息角色无效' };
+    if (typeof row.text !== 'string' || row.text.length > MAX_TEXT) return { ok: false, error: '消息正文无效' };
+    if (row.tool != null && typeof row.tool !== 'string') return { ok: false, error: '工具名无效' };
+    if (row.success != null && typeof row.success !== 'boolean') return { ok: false, error: '工具结果无效' };
+    messages.push({
+      role: row.role,
+      text: row.text,
+      tool: typeof row.tool === 'string' ? row.tool : null,
+      success: typeof row.success === 'boolean' ? row.success : null
+    });
+  }
+  return { ok: true, messages };
 }

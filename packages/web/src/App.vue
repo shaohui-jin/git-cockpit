@@ -9,8 +9,9 @@ import { useSettingsStore } from '@/stores/settings';
 import { useBranchesStore } from '@/stores/branches';
 import { useMergeSessionStore } from '@/stores/mergeSession';
 import { useJobsStore } from '@/stores/jobs';
+import { repoLeaf, useChatStore } from '@/stores/chat';
 import { useOverviewStore } from '@/stores/overview';
-import { subscribeEvents } from '@/api/client';
+import { ApiError, shutdownService, subscribeEvents } from '@/api/client';
 import { useRevision } from '@/composables/revision';
 import { jobLine, notifyJobEnded } from '@/utils/jobNotify';
 import ChatView from '@/views/ChatView.vue';
@@ -22,6 +23,7 @@ const settings = useSettingsStore();
 const branches = useBranchesStore();
 const mergeSession = useMergeSessionStore();
 const jobs = useJobsStore();
+const threads = useChatStore();
 const overview = useOverviewStore();
 const route = useRoute();
 const router = useRouter();
@@ -57,6 +59,7 @@ const workItems: DockItem[] = [
 const systemItems: DockItem[] = [
   { path: '/jobs', label: '任务' },
   { path: '/logs', label: '日志' },
+  { path: '/conversations', label: '对话记录' },
   { path: '/settings', label: '设置' }
 ];
 const dockItems = [...workItems, ...systemItems];
@@ -91,10 +94,7 @@ async function onServiceUpdate(): Promise<void> {
   }
   const bridge = getDesktopBridge();
   if (!bridge) {
-    await ElMessageBox.alert(
-      `当前页面不能自动停服。可以手动执行：\n${repos.serviceUpdateCommand}`,
-      '服务可更新'
-    );
+    await ElMessageBox.alert(`当前页面不能自动停服。可以手动执行：\n${repos.serviceUpdateCommand}`, '服务可更新');
     return;
   }
   try {
@@ -108,6 +108,47 @@ async function onServiceUpdate(): Promise<void> {
   }
   const result = await bridge.upgradeService();
   if (!result.ok && result.error) ElMessage.error(result.error);
+}
+
+async function confirmStop(running: number): Promise<boolean> {
+  const message =
+    running > 0 ? `有 ${running} 个任务进行中。退出会停下这些任务。` : '退出后当前后端进程结束，标签变为未连接。';
+  try {
+    await ElMessageBox.confirm(message, '退出后端服务', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function onServiceStop(): Promise<void> {
+  if (!backendConnected.value) return;
+  await jobs.load().catch(() => undefined);
+  const force = jobs.runningCount > 0;
+  if (!(await confirmStop(jobs.runningCount))) return;
+  try {
+    await shutdownService({ force });
+  } catch (err) {
+    const blocked = err instanceof ApiError && err.status === 409;
+    if (!blocked) {
+      ElMessage.error(err instanceof Error ? err.message : String(err));
+      return;
+    }
+    await jobs.load().catch(() => undefined);
+    if (!(await confirmStop(Math.max(jobs.runningCount, 1)))) return;
+    try {
+      await shutdownService({ force: true });
+    } catch (again) {
+      ElMessage.error(again instanceof Error ? again.message : String(again));
+      return;
+    }
+  }
+  repos.healthOk = false;
+  ElMessage.success('后端已退出');
 }
 
 async function onDesktopUpdate(): Promise<void> {
@@ -128,12 +169,7 @@ async function onDesktopUpdate(): Promise<void> {
   }
 }
 
-const chatRepoLabel = computed(() => {
-  const p = repos.currentPath;
-  if (!p) return '未选择仓库';
-  const leaf = p.replace(/\\/g, '/').split('/').filter(Boolean).pop();
-  return leaf || p;
-});
+const chatRepoLabel = computed(() => (threads.repoPath ? repoLeaf(threads.repoPath) : '未选择仓库'));
 
 function pageActive(path: string): boolean {
   if (path === '/logs') return route.path === '/logs';
@@ -414,6 +450,13 @@ watch(
 );
 
 watch(
+  () => threads.revealSeq,
+  (n, prev) => {
+    if (prev !== undefined && n !== prev) chatOpen.value = true;
+  }
+);
+
+watch(
   () => repos.currentId,
   () => {
     void branches.load();
@@ -465,6 +508,23 @@ onUnmounted(() => {
           >
             <svg viewBox="0 0 12 12" aria-hidden="true">
               <path d="M6 1.5 10 6.2H7.6V10.5H4.4V6.2H2L6 1.5Z" fill="currentColor" />
+            </svg>
+          </button>
+          <button
+            v-if="backendConnected"
+            type="button"
+            class="tag-off"
+            title="退出后端服务"
+            @click.stop="onServiceStop"
+          >
+            <svg viewBox="0 0 12 12" aria-hidden="true">
+              <path
+                d="M6 1.3v3.5M3.2 3.05a4 4 0 1 0 5.6 0"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.4"
+                stroke-linecap="round"
+              />
             </svg>
           </button>
         </el-tag>
@@ -634,7 +694,8 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
 }
-.tag-up {
+.tag-up,
+.tag-off {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -643,13 +704,20 @@ onUnmounted(() => {
   margin-left: 4px;
   padding: 0;
   border: 0;
-  border-radius: 50%;
-  background: var(--el-color-warning);
-  color: #fff;
+  background: transparent;
   cursor: pointer;
   flex: none;
 }
-.tag-up svg {
+.tag-up {
+  border-radius: 50%;
+  background: var(--el-color-warning);
+  color: #fff;
+}
+.tag-off {
+  color: var(--el-color-danger);
+}
+.tag-up svg,
+.tag-off svg {
   width: 12px;
   height: 12px;
 }

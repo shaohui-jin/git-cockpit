@@ -699,6 +699,13 @@ describe('POST /api/shutdown', () => {
       });
       expect(res.statusCode).toBe(409);
       expect(res.json().error).toMatch(/任务进行中/);
+      const forced = await server.app.inject({
+        method: 'POST',
+        url: '/api/shutdown',
+        headers: { 'x-git-cockpit-secret': runtime.config.auth.localSecret, 'content-type': 'application/json' },
+        payload: { force: true }
+      });
+      expect(forced.statusCode).toBe(204);
     } finally {
       await server.close();
       disposeTestRuntime(runtime);
