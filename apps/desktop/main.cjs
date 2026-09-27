@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, shell } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron');
 const { spawn, spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const http = require('node:http');
@@ -34,6 +34,19 @@ let pendingLog = '';
 let baseMainTitle = '';
 /** 非空表示正在显示宿主级进度（任务栏 + 标题），second-instance 不要覆盖标题。 */
 let hostProgressLabel = null;
+
+const RELEASE_URL = 'https://github.com/shaohui-jin/git-cockpit/releases/latest';
+let desktopLatest = null;
+let desktopUpdateAvailable = false;
+let desktopDownloaded = false;
+let desktopPercent = null;
+let desktopInstallMode = 'none';
+let desktopJobId = null;
+let desktopDownloading = false;
+let downloadToken = null;
+let downloadCancelled = false;
+let desktopReadyPosted = false;
+let jobProgressAt = 0;
 
 function probeUrl(url) {
   return new Promise((resolve) => {
@@ -676,12 +689,16 @@ function createWindow(origin) {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true
+      sandbox: true,
+      preload: path.join(__dirname, 'preload.cjs')
     }
   });
   const url = `${origin}/#/dashboard`;
   baseMainTitle = `Git Cockpit · ${origin}`;
   mainWindow.setTitle(baseMainTitle);
+  mainWindow.webContents.on('did-finish-load', () => {
+    publishDesktopState();
+  });
   void mainWindow.loadURL(url);
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -704,7 +721,6 @@ app.whenReady().then(async () => {
     createWindow(origin);
     starting = false;
     offerUpdate();
-    offerDaemonUpdate();
   } catch (err) {
     const silent =
       err instanceof Error && (err.message === '__node_prompted__' || err.message === '__install_declined__');
@@ -739,69 +755,69 @@ function isZipInstall() {
   return !fs.existsSync(path.join(path.dirname(process.execPath), 'Uninstall Git Cockpit.exe'));
 }
 
+let autoUpdaterRef = null;
+
+function desktopSnapshot() {
+  return {
+    version: app.getVersion(),
+    latest: desktopLatest,
+    updateAvailable: desktopUpdateAvailable,
+    downloaded: desktopDownloaded,
+    percent: desktopPercent,
+    installMode: desktopInstallMode,
+    jobId: desktopJobId
+  };
+}
+
+function publishDesktopState() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send('desktop:state', desktopSnapshot());
+}
+
 function offerUpdate() {
+  desktopInstallMode = !app.isPackaged ? 'none' : isZipInstall() ? 'zip' : 'nsis';
+  publishDesktopState();
   if (!app.isPackaged) return;
-  let autoUpdater;
+  let updater;
   try {
-    ({ autoUpdater } = require('electron-updater'));
+    ({ autoUpdater: updater } = require('electron-updater'));
   } catch {
     return;
   }
-  autoUpdater.autoDownload = false;
-  autoUpdater.autoInstallOnAppQuit = false;
-  const releaseUrl = 'https://github.com/shaohui-jin/git-cockpit/releases/latest';
-  if (isZipInstall()) {
-    autoUpdater.once('update-available', () => {
-      dialog
-        .showMessageBox({
-          type: 'info',
-          message: '有新版本。zip 解压版不会自动安装。',
-          buttons: ['打开 Release', '稍后']
-        })
-        .then(({ response }) => {
-          if (response === 0) void require('electron').shell.openExternal(releaseUrl);
-        })
-        .catch(() => undefined);
-    });
-  } else {
-    autoUpdater.on('update-available', (info) => {
-      dialog
-        .showMessageBox({
-          type: 'info',
-          message: `有新版本 ${info.version}。下载后再决定是否安装。`,
-          buttons: ['下载', '稍后']
-        })
-        .then(({ response }) => {
-          if (response !== 0) return;
-          setHostProgress('下载桌面包', null);
-          void autoUpdater.downloadUpdate();
-        })
-        .catch(() => undefined);
-    });
-    autoUpdater.on('download-progress', (info) => {
+  autoUpdaterRef = updater;
+  updater.autoDownload = false;
+  updater.autoInstallOnAppQuit = false;
+  updater.on('update-available', (info) => {
+    desktopLatest = info && info.version ? String(info.version) : desktopLatest;
+    desktopUpdateAvailable = true;
+    publishDesktopState();
+  });
+  if (desktopInstallMode === 'nsis') {
+    updater.on('download-progress', (info) => {
+      desktopPercent = typeof info.percent === 'number' ? info.percent : desktopPercent;
       setHostProgress('下载桌面包', info.percent);
+      publishDesktopState();
+      void reportDesktopJobPercent(info.percent);
     });
-    autoUpdater.on('update-downloaded', () => {
+    updater.on('update-downloaded', () => {
+      if (downloadCancelled) return;
+      desktopDownloaded = true;
+      desktopDownloading = false;
+      desktopPercent = 100;
       clearHostProgress();
-      const extra = spawnedByUs ? '' : '\n\n本窗口没有拉起 :3000。若外部 git-cockpit start 占着端口，请先自己关掉它。';
-      dialog
-        .showMessageBox({
-          type: 'info',
-          message: `新版本已下载。现在安装并重启？${extra}`,
-          buttons: ['安装', '稍后']
-        })
-        .then(({ response }) => {
-          if (response !== 0) return;
-          if (spawnedByUs && child && !child.killed) child.kill();
-          autoUpdater.quitAndInstall();
-        })
-        .catch(() => undefined);
+      publishDesktopState();
+      void markDesktopJobReady();
     });
-    autoUpdater.on('error', () => {
+    updater.on('error', (err) => {
       clearHostProgress();
+      desktopDownloading = false;
+      publishDesktopState();
+      if (!downloadCancelled) {
+        void reportDesktopJobError(err instanceof Error ? err.message : String(err));
+      }
     });
   }
-  autoUpdater.checkForUpdates().catch(() => undefined);
+  updater.checkForUpdates().catch(() => undefined);
 }
 
 function fetchRegistryVersion(nodePath) {
@@ -850,71 +866,27 @@ async function shutdownDaemon(host, secret) {
   return res.status === 204;
 }
 
-async function runDaemonUpgrade(currentVersion, latestVersion) {
+async function runDaemonUpgrade(_currentVersion, latestVersion) {
   const node = systemNode || findSystemNode();
-  if (!node) {
-    dialog.showErrorBox('Git Cockpit', '未找到 Node.js，无法升级服务。');
-    return;
-  }
+  if (!node) return { ok: false, error: '未找到 Node.js，无法升级服务。' };
   if (!versionAtLeast(node.version, MIN_NODE)) {
-    await promptNode(`当前是 Node.js ${formatVersion(node.version)}。请安装 22 或更高版本后再升级服务。`);
-    return;
+    return { ok: false, error: `当前是 Node.js ${formatVersion(node.version)}。请安装 22 或更高版本后再升级服务。` };
   }
   systemNode = node;
 
   const health = await fetchDaemonHealth();
-  if (!health.ok) {
-    dialog.showErrorBox('Git Cockpit', '无法连接 Git Cockpit 服务，已取消升级。');
-    return;
-  }
+  if (!health.ok) return { ok: false, error: '无法连接 Git Cockpit 服务，已取消升级。' };
 
   const secret = await fetchBootstrapSecret(health.host);
-  if (!secret) {
-    dialog.showErrorBox('Git Cockpit', '无法读取本机密钥，已取消升级。');
-    return;
-  }
+  if (!secret) return { ok: false, error: '无法读取本机密钥，已取消升级。' };
 
   if (await daemonHasRunningJobs(health.host, secret)) {
-    await dialog.showMessageBox({
-      type: 'warning',
-      title: 'Git Cockpit',
-      message: '有任务进行中，无法升级服务。',
-      detail: '请先在「任务」页等待任务结束，再重新打开应用或稍后重试。',
-      buttons: ['知道了']
-    });
-    return;
+    return { ok: false, error: '有任务进行中，无法升级服务。请先在「任务」页等待任务结束。' };
   }
 
   const resolvedBefore = resolveDaemonEntry(node.path);
   if (resolvedBefore?.kind === 'dev') {
-    dialog.showErrorBox('Git Cockpit', '开发模式不自动升级全局服务。');
-    return;
-  }
-
-  const externalNote = spawnedByUs
-    ? ''
-    : '\n\n当前服务不是本窗口启动的（可能正在被 Cursor 使用），升级会停止 :3000 上的进程。';
-
-  const { response } = await dialog.showMessageBox({
-    type: 'question',
-    title: 'Git Cockpit',
-    message: '发现可升级的服务端版本',
-    detail: `当前 ${currentVersion} → 最新 ${latestVersion}。确认后将自动停止服务、安装 npm 包并重启（约 1～2 分钟）。${externalNote}`,
-    buttons: ['升级', '稍后'],
-    defaultId: 0,
-    cancelId: 1
-  });
-  if (response !== 0) return;
-
-  if (await daemonHasRunningJobs(health.host, secret)) {
-    await dialog.showMessageBox({
-      type: 'warning',
-      title: 'Git Cockpit',
-      message: '有任务进行中，无法升级服务。',
-      detail: '请先在「任务」页等待任务结束后再试。',
-      buttons: ['知道了']
-    });
-    return;
+    return { ok: false, error: '开发模式不自动升级全局服务。' };
   }
 
   setHostProgress('升级服务', null);
@@ -932,7 +904,7 @@ async function runDaemonUpgrade(currentVersion, latestVersion) {
     const preferCustom = resolvedBefore?.kind === 'custom';
     const installed = await installDaemonPackage(node.path, spec, { preferCustom });
     if (!installed.ok) {
-      if (installCancelled) return;
+      if (installCancelled) return { ok: false, error: '已取消安装' };
       const hint = installed.logFile ? `\n\n完整日志：${installed.logFile}` : '';
       throw new Error(`安装服务失败。\n\n${tail(installed.output, 900)}${hint}\n\n也可手动执行：npm i -g ${spec}`);
     }
@@ -963,41 +935,156 @@ async function runDaemonUpgrade(currentVersion, latestVersion) {
       message: `服务已升级至 ${latestVersion}。`,
       buttons: ['好的']
     });
+    return { ok: true };
   } catch (err) {
     const logFile = writeUpdateLog(err instanceof Error ? err.stack || err.message : String(err));
     const hint = logFile ? `\n\n日志：${logFile}` : '';
-    dialog.showErrorBox('Git Cockpit', `${err instanceof Error ? err.message : String(err)}${hint}`);
+    const message = `${err instanceof Error ? err.message : String(err)}${hint}`;
+    dialog.showErrorBox('Git Cockpit', message);
+    return { ok: false, error: message };
   } finally {
     clearHostProgress();
   }
 }
 
-function offerDaemonUpdate() {
-  if (!app.isPackaged) return;
-  if (process.env.GIT_COCKPIT_DAEMON_UPDATE === '0') return;
-  void (async () => {
-    try {
-      const health = await fetchDaemonHealth();
-      if (!health.ok) return;
-
-      const currentParsed = parseVersion(health.version);
-      if (!currentParsed) return;
-
-      const node = systemNode || findSystemNode();
-      if (!node || !versionAtLeast(node.version, MIN_NODE)) return;
-
-      const registry = fetchRegistryVersion(node.path);
-      if (!registry.ok) {
-        writeUpdateLog(registry.output || 'registry lookup failed');
-        return;
-      }
-
-      const latestParsed = parseVersion(registry.version);
-      if (!latestParsed || versionAtLeast(currentParsed, latestParsed)) return;
-
-      await runDaemonUpgrade(health.version, registry.version);
-    } catch (err) {
-      writeUpdateLog(err instanceof Error ? err.stack || err.message : String(err));
-    }
-  })();
+async function daemonApi(method, pathname, body) {
+  const health = await fetchDaemonHealth();
+  if (!health.ok) return null;
+  const secret = await fetchBootstrapSecret(health.host);
+  if (!secret) return null;
+  return requestJson(method, `${daemonOrigin(health.host)}${pathname}`, { secret, body, timeout: 20000 });
 }
+
+async function ensureDesktopJob() {
+  if (desktopJobId) return desktopJobId;
+  if (!desktopLatest) return null;
+  const res = await daemonApi('POST', '/api/jobs/desktop-download', {
+    version: app.getVersion(),
+    latest: desktopLatest
+  });
+  const id = res && res.data && res.data.job ? res.data.job.id : null;
+  if (typeof id === 'string' && id) {
+    desktopJobId = id;
+    publishDesktopState();
+  }
+  return desktopJobId;
+}
+
+async function reportDesktopJobPercent(percent) {
+  if (!desktopJobId || downloadCancelled) return;
+  const now = Date.now();
+  if (now - jobProgressAt < 400 && percent < 100) return;
+  jobProgressAt = now;
+  await daemonApi('POST', `/api/jobs/${desktopJobId}/desktop-progress`, { percent });
+}
+
+async function markDesktopJobReady() {
+  if (desktopReadyPosted) return;
+  desktopReadyPosted = true;
+  const id = desktopJobId || (await ensureDesktopJob());
+  if (!id) return;
+  await daemonApi('POST', `/api/jobs/${id}/desktop-progress`, { phase: 'ready', percent: 100 });
+}
+
+async function reportDesktopJobError(message) {
+  const id = desktopJobId;
+  desktopDownloading = false;
+  if (id) {
+    await daemonApi('POST', `/api/jobs/${id}/desktop-progress`, { phase: 'error', error: message });
+  }
+  desktopJobId = null;
+  desktopReadyPosted = false;
+  publishDesktopState();
+}
+
+function loadCancellationToken() {
+  try {
+    return require('builder-util-runtime').CancellationToken;
+  } catch {
+    return null;
+  }
+}
+
+ipcMain.handle('desktop:get-state', () => desktopSnapshot());
+
+ipcMain.handle('desktop:open-release', async () => {
+  await shell.openExternal(RELEASE_URL);
+});
+
+ipcMain.handle('desktop:download', async () => {
+  if (!app.isPackaged || desktopInstallMode === 'none') {
+    return { ok: false, error: '开发模式不能下载桌面安装包' };
+  }
+  if (desktopInstallMode === 'zip') {
+    await shell.openExternal(RELEASE_URL);
+    return { ok: true };
+  }
+  if (!desktopUpdateAvailable || !autoUpdaterRef) {
+    return { ok: false, error: '没有可下载的桌面更新' };
+  }
+  if (desktopDownloaded || desktopDownloading) return { ok: true, jobId: desktopJobId };
+  desktopDownloading = true;
+  downloadCancelled = false;
+  desktopReadyPosted = false;
+  desktopPercent = 0;
+  const jobId = await ensureDesktopJob();
+  publishDesktopState();
+  setHostProgress('下载桌面包', 0);
+  const Token = loadCancellationToken();
+  downloadToken = Token ? new Token() : null;
+  void autoUpdaterRef.downloadUpdate(downloadToken || undefined).catch((err) => {
+    if (downloadCancelled) return;
+    clearHostProgress();
+    void reportDesktopJobError(err instanceof Error ? err.message : String(err));
+  });
+  return { ok: true, jobId };
+});
+
+ipcMain.handle('desktop:install', () => {
+  if (desktopInstallMode === 'zip') {
+    void shell.openExternal(RELEASE_URL);
+    return { ok: true };
+  }
+  if (!desktopDownloaded || !autoUpdaterRef) return { ok: false, error: '安装包还没下载完' };
+  if (spawnedByUs && child && !child.killed) child.kill();
+  autoUpdaterRef.quitAndInstall();
+  return { ok: true };
+});
+
+ipcMain.handle('desktop:cancel-download', async () => {
+  downloadCancelled = true;
+  desktopDownloading = false;
+  try {
+    if (downloadToken) downloadToken.cancel();
+  } catch {
+    /* 没有取消口时只把任务记成取消 */
+  }
+  downloadToken = null;
+  clearHostProgress();
+  if (desktopJobId) {
+    await daemonApi('POST', `/api/jobs/${desktopJobId}/desktop-progress`, {
+      phase: 'error',
+      error: '用户取消'
+    });
+  }
+  desktopJobId = null;
+  desktopReadyPosted = false;
+  desktopDownloaded = false;
+  publishDesktopState();
+  return { ok: true };
+});
+
+ipcMain.handle('desktop:upgrade-service', async () => {
+  const node = systemNode || findSystemNode();
+  if (!node) return { ok: false, error: '未找到 Node.js，无法升级服务。' };
+  const health = await fetchDaemonHealth();
+  if (!health.ok) return { ok: false, error: '无法连接 Git Cockpit 服务。' };
+  const registry = fetchRegistryVersion(node.path);
+  if (!registry.ok) return { ok: false, error: '查不到已发布的服务版本。' };
+  const currentParsed = parseVersion(health.version);
+  const latestParsed = parseVersion(registry.version);
+  if (!currentParsed || !latestParsed || versionAtLeast(currentParsed, latestParsed)) {
+    return { ok: false, error: '服务已是最新版本。' };
+  }
+  return runDaemonUpgrade(health.version, registry.version);
+});

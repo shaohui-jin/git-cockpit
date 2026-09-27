@@ -209,10 +209,69 @@ export class JobEngine {
     return job;
   }
 
+  beginDesktopDownload(opts: { version: string; latest: string }): Job {
+    const running = this.list().find((j) => j.kind === 'desktop-download' && j.status === 'running');
+    if (running) return running;
+    const version = opts.version.trim();
+    const latest = opts.latest.trim();
+    const job: Job = {
+      id: `desktop-${randomUUID()}`,
+      kind: 'desktop-download',
+      status: 'running',
+      title: `桌面 ${version} → ${latest}`,
+      payload: { version, latest, installReady: false },
+      logs: [],
+      progress: { current: 0, total: 100 },
+      startedAt: new Date().toISOString()
+    };
+    this.jobs.set(job.id, job);
+    this.persist(job);
+    this.prune();
+    this.emit(job, true);
+    return job;
+  }
+
+  reportDesktopDownload(
+    id: string,
+    body: { phase?: 'ready' | 'error'; percent?: number; error?: string }
+  ): Job {
+    const job = this.jobs.get(id);
+    if (!job || job.kind !== 'desktop-download') throw new Error('任务不存在');
+    if (job.status !== 'running') return job;
+    if (typeof body.percent === 'number' && Number.isFinite(body.percent)) {
+      const current = Math.max(0, Math.min(100, body.percent));
+      job.progress = { current, total: 100 };
+    }
+    if (body.phase === 'ready') {
+      job.progress = { current: 100, total: 100 };
+      job.status = 'ok';
+      job.payload = { ...job.payload, installReady: true };
+      job.finishedAt = new Date().toISOString();
+      this.emit(job, true);
+      return job;
+    }
+    if (body.phase === 'error') {
+      job.status = 'error';
+      job.error = body.error?.trim() || '下载失败';
+      job.finishedAt = new Date().toISOString();
+      this.emit(job, true);
+      return job;
+    }
+    this.emit(job);
+    return job;
+  }
+
   cancel(id: string): Job {
     const job = this.jobs.get(id);
     if (!job) throw new Error('任务不存在');
     if (job.status !== 'running') throw new Error('任务已结束，无法取消');
+    if (job.kind === 'desktop-download') {
+      job.status = 'error';
+      job.error = '用户取消';
+      job.finishedAt = new Date().toISOString();
+      this.emit(job, true);
+      return job;
+    }
     const ac = this.aborts.get(id);
     if (!ac) throw new Error('任务无法取消');
     ac.abort();
@@ -464,7 +523,9 @@ export class JobEngine {
       startedAt: job.startedAt,
       finishedAt: job.finishedAt,
       repoId: job.repoId,
-      logCount: job.logs.length
+      logCount: job.logs.length,
+      progress: job.progress,
+      payload: job.kind === 'desktop-download' ? job.payload : undefined
     };
     this.eventBus.emit('job-progress', payload);
   }

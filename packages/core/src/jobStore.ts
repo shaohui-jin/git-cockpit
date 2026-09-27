@@ -93,7 +93,10 @@ export class JobStore {
         progress = undefined;
       }
     }
-    const kind = r.kind === 'survey' || r.kind === 'fetch' || r.kind === 'clone' ? r.kind : 'clone';
+    const kind =
+      r.kind === 'survey' || r.kind === 'fetch' || r.kind === 'clone' || r.kind === 'desktop-download'
+        ? r.kind
+        : 'clone';
     const job: Job = {
       id: String(r.id),
       kind,

@@ -55,6 +55,7 @@ import { TOOL_DEF_MAP, toolSummaries } from './tools/index.ts';
 import { registerApiDocs } from './openapi.ts';
 import { registerChatRoutes } from './chat/chatRoute.ts';
 import { version } from '../package.json';
+import { readServiceUpdate } from './serviceUpdate.ts';
 
 export interface WebServerHandle {
   app: FastifyInstance;
@@ -161,6 +162,8 @@ export async function createWebServer(
     uptimeMs: process.uptime() * 1000
   }));
 
+  app.get('/api/service-update', async () => readServiceUpdate(version));
+
   app.get('/api/bootstrap', async (req, reply) => {
     if (req.headers.origin) {
       return reply.code(403).send({ error: 'bootstrap 不给跨站页面' });
@@ -191,6 +194,33 @@ export async function createWebServer(
     const job = jobs.get(req.params.id);
     if (!job) return reply.code(404).send({ error: '任务不存在' });
     return { job: jobs.detail(job) };
+  });
+
+  app.post<{ Body: { version?: string; latest?: string } }>('/api/jobs/desktop-download', async (req, reply) => {
+    const current = req.body?.version?.trim() ?? '';
+    const latest = req.body?.latest?.trim() ?? '';
+    if (!current || !latest) {
+      return reply.code(400).send({ error: '需要 version 与 latest' } as never);
+    }
+    const job = jobs.beginDesktopDownload({ version: current, latest });
+    return { job: jobs.summary(job) };
+  });
+
+  app.post<{
+    Params: { id: string };
+    Body: { phase?: 'ready' | 'error'; percent?: number; error?: string };
+  }>('/api/jobs/:id/desktop-progress', async (req, reply) => {
+    try {
+      const job = jobs.reportDesktopDownload(req.params.id, {
+        phase: req.body?.phase,
+        percent: req.body?.percent,
+        error: req.body?.error
+      });
+      return { job: jobs.summary(job) };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return reply.code(msg === '任务不存在' ? 404 : 400).send({ error: msg } as never);
+    }
   });
 
   app.post<{ Params: { id: string } }>('/api/jobs/:id/cancel', async (req, reply) => {

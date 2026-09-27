@@ -1,5 +1,5 @@
 export type JobStatus = 'running' | 'ok' | 'error';
-export type JobKind = 'clone' | 'survey' | 'fetch';
+export type JobKind = 'clone' | 'survey' | 'fetch' | 'desktop-download';
 
 export const SURVEY_ASYNC_THRESHOLD = 20;
 
@@ -59,6 +59,8 @@ export interface JobProgressPayload {
   finishedAt?: string;
   repoId?: number;
   logCount: number;
+  progress?: JobProgress;
+  payload?: Record<string, unknown>;
 }
 
 export function clonePayload(job: Job): { url?: string; destDir?: string } {

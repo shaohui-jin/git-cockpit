@@ -87,7 +87,9 @@ export const useJobsStore = defineStore('jobs', {
         repoId: p.repoId,
         logCount: p.logCount,
         tail: logs.slice(-3).join('\n'),
-        logs
+        logs,
+        progress: p.progress ?? cur?.progress,
+        payload: p.payload ?? cur?.payload
       });
       if (status === 'ok' || status === 'error') {
         void this.loadDetail(p.id).catch(() => undefined);

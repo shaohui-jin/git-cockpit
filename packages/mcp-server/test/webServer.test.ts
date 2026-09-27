@@ -14,6 +14,7 @@ import {
   commitFile
 } from './helpers.ts';
 import { createWebServer } from '../src/webServer.ts';
+import { setServiceUpdateLookup } from '../src/serviceUpdate.ts';
 import type { Runtime } from '../src/index.ts';
 import type { WebServerHandle } from '../src/index.ts';
 import type { SimpleGit } from 'simple-git';
@@ -54,6 +55,48 @@ describe('Web API', () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.ok).toBe(true);
+  });
+
+  it('GET /api/service-update 比较已发布版本', async () => {
+    setServiceUpdateLookup(async () => '99.0.0');
+    try {
+      const res = await server.app.inject({ method: 'GET', url: '/api/service-update' });
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.updateAvailable).toBe(true);
+      expect(body.latestVersion).toBe('99.0.0');
+      expect(body.command).toContain('99.0.0');
+    } finally {
+      setServiceUpdateLookup(null);
+    }
+  });
+
+  it('桌面下载完成后不再算进行中', async () => {
+    const created = await server.app.inject({
+      method: 'POST',
+      url: '/api/jobs/desktop-download',
+      payload: { version: '0.1.0', latest: '0.2.0' }
+    });
+    expect(created.statusCode).toBe(200);
+    const id = created.json().job.id as string;
+    expect(created.json().job.status).toBe('running');
+    const prog = await server.app.inject({
+      method: 'POST',
+      url: `/api/jobs/${id}/desktop-progress`,
+      payload: { percent: 40 }
+    });
+    expect(prog.json().job.progress.current).toBe(40);
+    expect(prog.json().job.status).toBe('running');
+    const done = await server.app.inject({
+      method: 'POST',
+      url: `/api/jobs/${id}/desktop-progress`,
+      payload: { phase: 'ready' }
+    });
+    expect(done.json().job.status).toBe('ok');
+    expect(done.json().job.payload.installReady).toBe(true);
+    const listed = await server.app.inject({ method: 'GET', url: '/api/jobs' });
+    const row = (listed.json().jobs as Array<{ id: string; status: string }>).find((j) => j.id === id);
+    expect(row?.status).toBe('ok');
   });
 
   it('没有密钥时接口 401，bootstrap 不给带 Origin 的请求', async () => {

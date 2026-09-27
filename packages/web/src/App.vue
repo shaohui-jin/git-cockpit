@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import { version as pageVersion } from '../package.json';
+import { getDesktopBridge, type DesktopUpdateState } from '@/desktopBridge';
 import { useReposStore } from '@/stores/repos';
 import { useSettingsStore } from '@/stores/settings';
 import { useBranchesStore } from '@/stores/branches';
@@ -60,6 +63,70 @@ const dockItems = [...workItems, ...systemItems];
 
 const liveJob = computed(() => jobs.jobs.find((j) => j.status === 'running') ?? null);
 const liveJobTitle = computed(() => (liveJob.value ? jobLine(liveJob.value) : ''));
+
+const desktop = ref<DesktopUpdateState>({
+  version: '',
+  latest: null,
+  updateAvailable: false,
+  downloaded: false,
+  percent: null,
+  installMode: 'none',
+  jobId: null
+});
+const backendVersion = computed(() => repos.serverVersion || pageVersion);
+const backendConnected = computed(() => repos.healthOk === true);
+const desktopVersion = computed(() => desktop.value.version || pageVersion);
+const desktopConnected = computed(() => Boolean(desktop.value.version));
+let unsubscribeDesktop: (() => void) | null = null;
+
+function applyDesktopState(state: DesktopUpdateState): void {
+  desktop.value = state;
+}
+
+async function onServiceUpdate(): Promise<void> {
+  if (!repos.serviceUpdateAvailable || !repos.serviceUpdateCommand) return;
+  if (jobs.runningCount > 0) {
+    ElMessage.warning('有任务进行中，请先等任务结束再升级服务');
+    return;
+  }
+  const bridge = getDesktopBridge();
+  if (!bridge) {
+    await ElMessageBox.alert(
+      `当前页面不能自动停服。可以手动执行：\n${repos.serviceUpdateCommand}`,
+      '服务可更新'
+    );
+    return;
+  }
+  try {
+    await ElMessageBox.confirm(
+      `当前 ${repos.serverVersion || pageVersion} → ${repos.serviceLatest ?? ''}。确认后将停止服务、安装并重启。`,
+      '升级服务',
+      { confirmButtonText: '升级', cancelButtonText: '稍后' }
+    );
+  } catch {
+    return;
+  }
+  const result = await bridge.upgradeService();
+  if (!result.ok && result.error) ElMessage.error(result.error);
+}
+
+async function onDesktopUpdate(): Promise<void> {
+  const bridge = getDesktopBridge();
+  if (!bridge || !desktop.value.updateAvailable) return;
+  if (desktop.value.installMode === 'zip') {
+    await bridge.openRelease();
+    return;
+  }
+  const result = await bridge.download();
+  if (!result.ok) {
+    if (result.error) ElMessage.error(result.error);
+    return;
+  }
+  if (result.jobId) {
+    await jobs.load();
+    await router.push({ path: '/jobs', query: { id: result.jobId } });
+  }
+}
 
 const chatRepoLabel = computed(() => {
   const p = repos.currentPath;
@@ -295,6 +362,16 @@ let unsubscribe: (() => void) | null = null;
 
 onMounted(async () => {
   await repos.checkHealth();
+  void repos.refreshServiceUpdate();
+  const bridge = getDesktopBridge();
+  if (bridge) {
+    try {
+      applyDesktopState(await bridge.getState());
+    } catch {
+      /* 壳子还没准备好时保持「未知」 */
+    }
+    unsubscribeDesktop = bridge.onState(applyDesktopState);
+  }
   await repos.load();
   await Promise.all([settings.load(repos.currentId).catch(() => undefined), branches.load(), jobs.load()]);
   unsubscribe = subscribeEvents({
@@ -357,6 +434,7 @@ function onKeydown(ev: KeyboardEvent): void {
 
 onUnmounted(() => {
   unsubscribe?.();
+  unsubscribeDesktop?.();
   window.removeEventListener('keydown', onKeydown);
   window.removeEventListener('resize', onResizeWindow);
   window.removeEventListener('pointerdown', onPointerDown);
@@ -375,10 +453,35 @@ onUnmounted(() => {
           <i /><span>{{ liveJobTitle }}</span>
           <em v-if="jobs.runningCount > 1">{{ jobs.runningCount }}</em>
         </button>
-        <el-tag v-if="repos.healthOk" size="small" type="success">后端已连接</el-tag>
-        <el-tag v-else-if="repos.healthOk === false" size="small" type="danger">后端离线</el-tag>
-        <el-tag v-else size="small" type="info">连接中…</el-tag>
-        <span v-if="repos.serverVersion" class="top-version">{{ repos.serverVersion }}</span>
+        <el-tag size="small" type="success">页面 {{ pageVersion }} 已连接</el-tag>
+        <el-tag size="small" :type="backendConnected ? 'success' : 'danger'">
+          后端 {{ backendVersion }} {{ backendConnected ? '已连接' : '未连接' }}
+          <button
+            v-if="repos.serviceUpdateAvailable"
+            type="button"
+            class="tag-up"
+            :title="repos.serviceUpdateCommand || '升级服务'"
+            @click.stop="onServiceUpdate"
+          >
+            <svg viewBox="0 0 12 12" aria-hidden="true">
+              <path d="M6 1.5 10 6.2H7.6V10.5H4.4V6.2H2L6 1.5Z" fill="currentColor" />
+            </svg>
+          </button>
+        </el-tag>
+        <el-tag size="small" :type="desktopConnected ? 'success' : 'danger'">
+          桌面 {{ desktopVersion }} {{ desktopConnected ? '已连接' : '未连接' }}
+          <button
+            v-if="desktop.updateAvailable"
+            type="button"
+            class="tag-up"
+            :title="desktop.installMode === 'zip' ? '打开 Release 页面' : '下载桌面安装包'"
+            @click.stop="onDesktopUpdate"
+          >
+            <svg viewBox="0 0 12 12" aria-hidden="true">
+              <path d="M6 1.5 10 6.2H7.6V10.5H4.4V6.2H2L6 1.5Z" fill="currentColor" />
+            </svg>
+          </button>
+        </el-tag>
       </div>
     </header>
 
@@ -527,9 +630,28 @@ onUnmounted(() => {
   line-height: 16px;
   text-align: center;
 }
-.top-version {
-  font-size: var(--gc-text);
-  color: var(--el-text-color-secondary);
+.top-end :deep(.el-tag__content) {
+  display: inline-flex;
+  align-items: center;
+}
+.tag-up {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  margin-left: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--el-color-warning);
+  color: #fff;
+  cursor: pointer;
+  flex: none;
+}
+.tag-up svg {
+  width: 12px;
+  height: 12px;
 }
 .main-content {
   flex: 1;

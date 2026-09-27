@@ -1,6 +1,6 @@
 {
   "name": "@shaohui_jin/git-cockpit-desktop",
-  "version": "0.1.27",
+  "version": "0.1.28",
   "private": true,
   "author": "Git Cockpit",
   "description": "Git Cockpit 桌面窗壳：用本机 Node 拉起或复用 daemon，窗口加载现有 Web",
@@ -25,6 +25,7 @@
     },
     "files": [
       "main.cjs",
+      "preload.cjs",
       "package.json"
     ],
     "win": {

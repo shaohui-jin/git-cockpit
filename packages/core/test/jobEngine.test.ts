@@ -76,4 +76,20 @@ describe('JobEngine 批量 fetch', () => {
     release();
     await waitDone(engine, first.id);
   });
+
+  it('桌面下载完成后状态为成功，不再占着进行中', () => {
+    const store = new JobStore(openDatabase(dir));
+    const engine = new JobEngine(new EventEmitter(), store);
+    const job = engine.beginDesktopDownload({ version: '0.1.0', latest: '0.2.0' });
+    expect(job.status).toBe('running');
+    expect(engine.list().some((j) => j.status === 'running')).toBe(true);
+    const again = engine.beginDesktopDownload({ version: '0.1.0', latest: '0.2.0' });
+    expect(again.id).toBe(job.id);
+    engine.reportDesktopDownload(job.id, { percent: 30 });
+    expect(engine.get(job.id)?.progress?.current).toBe(30);
+    const done = engine.reportDesktopDownload(job.id, { phase: 'ready' });
+    expect(done.status).toBe('ok');
+    expect(done.payload.installReady).toBe(true);
+    expect(engine.list().some((j) => j.status === 'running')).toBe(false);
+  });
 });

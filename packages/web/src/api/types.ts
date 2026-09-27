@@ -180,7 +180,13 @@ export interface WorktreeInfo {
 }
 
 export type JobStatus = 'running' | 'ok' | 'error';
-export type JobKind = 'clone' | 'survey' | 'fetch';
+export type JobKind = 'clone' | 'survey' | 'fetch' | 'desktop-download';
+
+export interface JobProgress {
+  current: number;
+  total: number;
+  message?: string;
+}
 
 export interface CloneJobSummary {
   id: string;
@@ -196,6 +202,8 @@ export interface CloneJobSummary {
   repoId?: number;
   logCount: number;
   tail: string;
+  progress?: JobProgress;
+  payload?: Record<string, unknown>;
 }
 
 export interface CloneJobDetail extends Omit<CloneJobSummary, 'logCount' | 'tail'> {
@@ -217,6 +225,8 @@ export interface JobProgressPayload {
   finishedAt?: string;
   repoId?: number;
   logCount: number;
+  progress?: JobProgress;
+  payload?: Record<string, unknown>;
 }
 
 export interface RepoOverview {
@@ -394,6 +404,13 @@ export interface HealthInfo {
   service: string;
   version: string;
   uptimeMs: number;
+}
+
+export interface ServiceUpdateInfo {
+  version: string;
+  latestVersion: string | null;
+  updateAvailable: boolean;
+  command: string | null;
 }
 
 export interface ConflictFile {

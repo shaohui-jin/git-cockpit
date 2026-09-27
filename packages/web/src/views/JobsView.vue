@@ -6,6 +6,7 @@ import { useJobsStore } from '@/stores/jobs';
 import * as api from '@/api/client';
 import CloneDialog from '@/components/CloneDialog.vue';
 import { jobLine, kindLabel, notifyJobStarted, statusLabel } from '@/utils/jobNotify';
+import { getDesktopBridge } from '@/desktopBridge';
 import type { CloneJobSummary, JobStatus } from '@/api/types';
 
 type Filter = 'all' | JobStatus;
@@ -46,8 +47,22 @@ const jobLogText = computed(() => (activeJob.value?.logs ?? []).join('\n').repla
 
 function tailOf(j: CloneJobSummary): string {
   if (j.error) return j.error;
+  if (j.kind === 'desktop-download') {
+    const percent = jobPercent(j);
+    if (j.status === 'running' && percent != null) return `下载 ${percent}%`;
+    if (installReady(j)) return '下载完成，可以安装';
+  }
   if (j.tail) return j.tail.split('\n').filter(Boolean).at(-1) ?? '';
   return '';
+}
+
+function jobPercent(j: CloneJobSummary): number | null {
+  if (!j.progress || !j.progress.total) return null;
+  return Math.max(0, Math.min(100, Math.round((j.progress.current / j.progress.total) * 100)));
+}
+
+function installReady(j: CloneJobSummary): boolean {
+  return j.kind === 'desktop-download' && j.status === 'ok' && j.payload?.installReady === true;
 }
 
 function formatTime(iso: string): string {
@@ -91,6 +106,16 @@ function setFilter(next: Filter): void {
 async function cancelJob(id: string): Promise<void> {
   cancellingId.value = id;
   try {
+    const row = jobs.jobs.find((j) => j.id === id);
+    if (row?.kind === 'desktop-download') {
+      const bridge = getDesktopBridge();
+      if (bridge) {
+        const result = await bridge.cancelDownload();
+        if (!result.ok && result.error) ElMessage.error(result.error);
+        else ElMessage.success('已请求取消');
+        return;
+      }
+    }
     await jobs.cancel(id);
     ElMessage.success('已请求取消');
   } catch (err) {
@@ -133,6 +158,16 @@ async function startClone(): Promise<void> {
   } finally {
     cloning.value = false;
   }
+}
+
+async function installDownloaded(): Promise<void> {
+  const bridge = getDesktopBridge();
+  if (!bridge) {
+    ElMessage.warning('请在桌面窗口里安装');
+    return;
+  }
+  const result = await bridge.install();
+  if (!result.ok && result.error) ElMessage.error(result.error);
 }
 
 async function scrollLog(): Promise<void> {
@@ -212,6 +247,14 @@ onMounted(async () => {
             <span>{{ kindLabel(activeJob.kind) }} · {{ formatTime(activeJob.startedAt) }}</span>
             <span class="grow" />
             <el-button
+              v-if="activeJob.kind === 'desktop-download'"
+              type="primary"
+              plain
+              :disabled="!installReady(activeJob)"
+              @click="installDownloaded"
+              >安装</el-button
+            >
+            <el-button
               v-if="activeJob.status === 'running'"
               type="danger"
               plain
@@ -229,7 +272,15 @@ onMounted(async () => {
           </header>
           <p class="meta mono">{{ jobLine(activeJob) }}</p>
           <p v-if="activeJob.error" class="banner-err">{{ activeJob.error }}</p>
-          <pre ref="logEl">{{ jobLogText || '（等待输出）' }}</pre>
+          <div v-if="activeJob.kind === 'desktop-download'" class="dl">
+            <el-progress
+              :percentage="jobPercent(activeJob) ?? 0"
+              :status="activeJob.status === 'error' ? 'exception' : activeJob.status === 'ok' ? 'success' : undefined"
+            />
+            <p v-if="activeJob.status === 'running'">正在下载桌面安装包。</p>
+            <p v-else-if="installReady(activeJob)">下载完成。安装会退出并重启应用。</p>
+          </div>
+          <pre v-else ref="logEl">{{ jobLogText || '（等待输出）' }}</pre>
         </template>
         <p v-else class="miss">点左侧任务看日志</p>
       </section>
@@ -367,6 +418,17 @@ header {
   font-size: var(--gc-text);
   color: var(--el-text-color-secondary);
   word-break: break-all;
+}
+.dl {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gc-gap);
+}
+.dl p {
+  margin: 0;
+  font-size: var(--gc-text);
+  color: var(--el-text-color-secondary);
 }
 .banner-err {
   margin: 0;

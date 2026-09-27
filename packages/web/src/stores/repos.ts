@@ -9,6 +9,9 @@ interface State {
   error: string | null;
   healthOk: boolean | null;
   serverVersion: string | null;
+  serviceLatest: string | null;
+  serviceUpdateAvailable: boolean;
+  serviceUpdateCommand: string | null;
 }
 
 /** 当前仓库记忆：刷新后恢复上次进入的仓库 */
@@ -39,7 +42,10 @@ export const useReposStore = defineStore('repos', {
     loading: false,
     error: null,
     healthOk: null,
-    serverVersion: null
+    serverVersion: null,
+    serviceLatest: null,
+    serviceUpdateAvailable: false,
+    serviceUpdateCommand: null
   }),
   getters: {
     current(state): OpenedRepo | null {
@@ -57,9 +63,19 @@ export const useReposStore = defineStore('repos', {
         this.serverVersion = h.version || null;
       } catch {
         this.healthOk = false;
-        this.serverVersion = null;
       }
       return this.healthOk === true;
+    },
+    async refreshServiceUpdate(): Promise<void> {
+      try {
+        const info = await api.getServiceUpdate();
+        this.serviceLatest = info.latestVersion;
+        this.serviceUpdateAvailable = info.updateAvailable;
+        this.serviceUpdateCommand = info.command;
+      } catch {
+        this.serviceUpdateAvailable = false;
+        this.serviceUpdateCommand = null;
+      }
     },
     async load(): Promise<void> {
       this.loading = true;

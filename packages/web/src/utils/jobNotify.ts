@@ -8,6 +8,7 @@ export function kindLabel(kind: JobKind | string): string {
   if (kind === 'clone') return '克隆';
   if (kind === 'survey') return '矩阵扫描';
   if (kind === 'fetch') return '抓取';
+  if (kind === 'desktop-download') return '桌面下载';
   return kind;
 }
 
@@ -23,6 +24,7 @@ export function jobLine(j: {
   if (j.kind === 'clone') {
     return [j.url, j.destDir ? `→ ${j.destDir}` : ''].filter(Boolean).join(' ');
   }
+  if (j.kind === 'desktop-download') return j.title?.trim() || '桌面安装包';
   const title = j.title?.trim() || '';
   const repo = j.repoPath?.trim() || '';
   if (repo && title && !title.includes(repo)) return `${title} → ${repo}`;

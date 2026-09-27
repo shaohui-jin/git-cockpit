@@ -12,6 +12,7 @@ import type {
   DiffResult,
   GraphData,
   HealthInfo,
+  ServiceUpdateInfo,
   JobProgressPayload,
   LogEntry,
   MrSettings,
@@ -430,6 +431,10 @@ export function previewMrTemplate(
 
 export function getHealth(): Promise<HealthInfo> {
   return request('GET', '/api/health');
+}
+
+export function getServiceUpdate(): Promise<ServiceUpdateInfo> {
+  return request('GET', '/api/service-update');
 }
 
 export interface ChatSseHandlers {

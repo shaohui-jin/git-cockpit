@@ -11,6 +11,9 @@ import { TOOL_DEFS } from './tools/index.ts';
 
 const REST_META: Record<string, { summary: string; tags: string[] }> = {
   'get /api/health': { summary: '探活', tags: ['系统'] },
+  'get /api/service-update': { summary: '服务端是否有更新（npm 最新版，带缓存）', tags: ['系统'] },
+  'post /api/jobs/desktop-download': { summary: '登记桌面安装包下载任务（由壳子回报进度）', tags: ['仓库'] },
+  'post /api/jobs/{id}/desktop-progress': { summary: '更新桌面下载进度；完成后不再占着进行中', tags: ['仓库'] },
   'post /api/shutdown': { summary: '优雅退出 daemon（本机密钥；有 running 任务时 409）', tags: ['系统'] },
   'get /api/repos': { summary: '已打开仓库列表', tags: ['仓库'] },
   'get /api/repos/overview': { summary: '已打开仓库脉搏（工作台，全量）', tags: ['仓库'] },
