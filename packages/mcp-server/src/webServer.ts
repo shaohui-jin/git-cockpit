@@ -178,11 +178,25 @@ export async function createWebServer(
     }
     await reply.code(204).send();
     setImmediate(() => {
-      void (async () => {
-        mcpHttp.dispose();
-        await app.close();
-        disposeRuntime(runtime);
+      const finish = () => {
         if (!process.env.VITEST) process.exit(0);
+      };
+      // 长连接（页面事件流）会让 close 一直等。先掐掉连接，超时仍退出，避免进程占着安装目录。
+      const timer = setTimeout(finish, 2000);
+      if (typeof timer.unref === 'function') timer.unref();
+      void (async () => {
+        try {
+          mcpHttp.dispose();
+          const server = app.server;
+          if (server && typeof server.closeAllConnections === 'function') server.closeAllConnections();
+          await app.close();
+          disposeRuntime(runtime);
+        } catch {
+          /* 连接已断时 close 可能抛，仍然退出 */
+        } finally {
+          clearTimeout(timer);
+          finish();
+        }
       })();
     });
   });

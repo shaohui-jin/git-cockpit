@@ -151,6 +151,75 @@ async function waitDaemonDown(ms) {
   return false;
 }
 
+function killChild(proc) {
+  if (!proc || proc.exitCode != null) return;
+  try {
+    proc.kill();
+  } catch {
+    /* 已经退出 */
+  }
+}
+
+function waitProcExit(proc, ms) {
+  if (!proc || proc.exitCode != null) return Promise.resolve();
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    proc.once('exit', () => {
+      clearTimeout(timer);
+      resolve();
+    });
+  });
+}
+
+/** 命令行里带着全局包路径的进程。npm 改名这个目录时，这些进程还开着文件就会 EBUSY。 */
+function listPackageProcesses() {
+  if (process.platform !== 'win32') return [];
+  const command = [
+    "Get-CimInstance Win32_Process |",
+    "Where-Object { $_.CommandLine -like '*git-cockpit-mcp-server*' } |",
+    "ForEach-Object { Write-Output ($_.ProcessId.ToString() + [char]9 + (($_.CommandLine -replace '[\\r\\n]',' '))) }"
+  ].join(' ');
+  const res = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', command], {
+    encoding: 'utf8',
+    windowsHide: true,
+    timeout: 20000
+  });
+  const rows = [];
+  for (const line of `${res.stdout || ''}`.split(/\r?\n/)) {
+    const tab = line.indexOf('\t');
+    if (tab <= 0) continue;
+    const pid = Number(line.slice(0, tab).trim());
+    const cmd = line.slice(tab + 1).trim();
+    if (!Number.isInteger(pid) || pid <= 0 || !cmd) continue;
+    rows.push({ pid, cmd });
+  }
+  return rows;
+}
+
+function packageHolders() {
+  const own = installProc && installProc.pid ? installProc.pid : 0;
+  return listPackageProcesses().filter((row) => row.pid !== process.pid && row.pid !== own);
+}
+
+function describePackageHolders() {
+  return packageHolders()
+    .map((row) => `PID ${row.pid} ${row.cmd.slice(0, 180)}`)
+    .join('\n');
+}
+
+async function releasePackageLocks() {
+  killChild(child);
+  await waitProcExit(child, 4000);
+  const holders = packageHolders();
+  for (const row of holders) {
+    spawnSync('taskkill', ['/PID', String(row.pid), '/T', '/F'], {
+      windowsHide: true,
+      timeout: 10000
+    });
+  }
+  if (holders.length > 0) await new Promise((r) => setTimeout(r, 600));
+}
+
 async function waitHealth(ms) {
   const t0 = Date.now();
   while (Date.now() - t0 < ms) {
@@ -892,21 +961,30 @@ async function runDaemonUpgrade(_currentVersion, latestVersion) {
   setHostProgress('升级服务', null);
   try {
     const stopped = await shutdownDaemon(health.host, secret);
-    if (!stopped && spawnedByUs && child && !child.killed) {
-      child.kill();
-    }
+    if (!stopped) killChild(child);
     if (!(await waitDaemonDown(20000))) {
       throw new Error('服务未能停止。请手动关闭 git-cockpit start 或占用 :3000 的进程后再试。');
     }
+    // 健康检查失败只说明端口停了。全局包目录还可能被本进程或 Cursor 的 mcp 占着。
+    await releasePackageLocks();
     child = null;
 
     const spec = `${DAEMON_PKG}@${latestVersion}`;
     const preferCustom = resolvedBefore?.kind === 'custom';
-    const installed = await installDaemonPackage(node.path, spec, { preferCustom });
+    let installed = await installDaemonPackage(node.path, spec, { preferCustom });
+    if (!installed.ok && /EBUSY/.test(installed.output || '')) {
+      await releasePackageLocks();
+      await new Promise((r) => setTimeout(r, 1000));
+      installed = await installDaemonPackage(node.path, spec, { preferCustom });
+    }
     if (!installed.ok) {
       if (installCancelled) return { ok: false, error: '已取消安装' };
       const hint = installed.logFile ? `\n\n完整日志：${installed.logFile}` : '';
-      throw new Error(`安装服务失败。\n\n${tail(installed.output, 900)}${hint}\n\n也可手动执行：npm i -g ${spec}`);
+      const holders = describePackageHolders();
+      const holdHint = holders ? `\n\n仍占用安装目录的进程：\n${holders}` : '';
+      throw new Error(
+        `安装服务失败。\n\n${tail(installed.output, 900)}${hint}${holdHint}\n\n也可手动执行：npm i -g ${spec}`
+      );
     }
 
     const resolved = resolveDaemonEntry(node.path);
