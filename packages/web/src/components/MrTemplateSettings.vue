@@ -183,7 +183,8 @@ async function clearTemplate(): Promise<void> {
     await ElMessageBox.confirm('清除已保存的正文规范？未启用时开单行为与现在相同。', '清除模板', {
       confirmButtonText: '清除',
       cancelButtonText: '取消',
-      type: 'warning'
+      type: 'warning',
+      closeOnClickModal: false
     });
   } catch {
     return;

@@ -51,10 +51,10 @@ const affectedFiles = computed(() => {
 
 const riskText = computed(() =>
   risk.value === 'dangerous'
-    ? { type: 'danger', label: '高风险' }
+    ? { type: 'danger' as const, label: '高风险' }
     : risk.value === 'write'
-      ? { type: 'warning', label: '写操作' }
-      : { type: 'info', label: '只读' }
+      ? { type: 'warning' as const, label: '写操作' }
+      : { type: 'info' as const, label: '只读' }
 );
 
 const previewNote = computed(() => {

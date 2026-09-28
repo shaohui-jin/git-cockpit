@@ -340,10 +340,10 @@ describe('createPullOrMergeRequest', () => {
     expect(r.via).toBe('browser');
     expect(r.url).toContain('/compare/');
     expect(r.body).toBe('');
-    expect(r.messages.join(' ')).toContain('未调用 Token / CLI');
+    expect(r.messages.join(' ')).not.toContain('请复制下面的正文');
   });
 
-  it('method=browser 带回正文；规范启用时提示改用 Token/CLI', async () => {
+  it('method=browser 带回正文；规范启用时说明创建页不会写入正文', async () => {
     const r = await createPullOrMergeRequest({
       prep: fakePrep(),
       mr: {
@@ -363,8 +363,8 @@ describe('createPullOrMergeRequest', () => {
     if ('dryRun' in r) throw new Error('unexpected dryRun');
     expect(r.via).toBe('browser');
     expect(r.body).toBe('## 变更目的\n说明原因');
-    expect(r.messages.join(' ')).toContain('建议在设置 → MR 配置改用 Token 或本机 CLI');
-    expect(r.messages.join(' ')).toContain('请复制下面的正文');
+    expect(r.messages.join(' ')).toContain('浏览器创建页不会写入这段正文');
+    expect(r.messages.join(' ')).not.toContain('请复制下面的正文');
 
     const dry = await createPullOrMergeRequest({
       prep: fakePrep(),

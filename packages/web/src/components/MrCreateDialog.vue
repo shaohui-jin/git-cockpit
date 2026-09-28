@@ -178,31 +178,26 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <el-dialog v-model="visible" width="920px" class="mr-create-dialog" destroy-on-close append-to-body>
-    <template #header>
-      <div class="dlg-head">
-        <p class="gc-eyebrow">申请 MR</p>
-        <span>创建 PR / MR</span>
-      </div>
-    </template>
+  <el-dialog
+    v-model="visible"
+    width="920px"
+    class="mr-create-dialog"
+    destroy-on-close
+    append-to-body
+    :close-on-click-modal="false"
+  >
+    <template #header>申请 MR</template>
     <el-alert v-if="error" type="error" :closable="false" :title="error" class="mb" />
     <el-skeleton v-if="loading" :rows="6" animated />
     <template v-else-if="prepare">
       <p class="pair">{{ into }} ← {{ from }}</p>
       <el-alert v-if="prepare.cliError" type="warning" :closable="false" :title="prepare.cliError" class="mb" />
       <el-alert
-        v-if="prepare.cliInstallUrl && !prepare.cli"
-        type="info"
-        :closable="false"
-        class="mb"
-        :title="`未检测到本机 CLI，可安装 ${prepare.cliInstallUrl}`"
-      />
-      <el-alert
         v-if="browserTemplateHint"
         type="warning"
         :closable="false"
         class="mb"
-        title="当前仓开单方式是浏览器页。平台创建页不会写入这段正文，请复制预览后粘贴；或到设置 → MR 配置改用 Token / 本机 CLI。"
+        title="浏览器创建页不会写入这段正文，请复制预览后粘贴。"
       />
       <div class="split">
         <div class="pane form">
@@ -310,9 +305,6 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.dlg-head .gc-eyebrow {
-  margin: 0 0 4px;
-}
 .mb {
   margin-bottom: var(--gc-gap);
 }

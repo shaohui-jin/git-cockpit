@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
+import { computed, defineAsyncComponent, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import * as api from '@/api/client';
@@ -8,8 +8,6 @@ import { useMergeSessionStore } from '@/stores/mergeSession';
 import { useToolAction } from '@/composables/useToolAction';
 import { useRevision } from '@/composables/revision';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
-import DiffViewer from '@/components/DiffViewer.vue';
-import CommitGraph from '@/components/CommitGraph.vue';
 import CommitLogPanel from '@/components/CommitLogPanel.vue';
 import BranchTreeSelect from '@/components/BranchTreeSelect.vue';
 import ConflictResolvePanel from '@/components/ConflictResolvePanel.vue';
@@ -29,6 +27,9 @@ import type {
   WorktreeInfo,
   WorkspaceConflicts
 } from '@/api/types';
+
+const DiffViewer = defineAsyncComponent(() => import('@/components/DiffViewer.vue'));
+const CommitGraph = defineAsyncComponent(() => import('@/components/CommitGraph.vue'));
 
 const repos = useReposStore();
 const branchStore = useBranchesStore();
@@ -492,7 +493,8 @@ function dropStash(s: StashInfo): void {
   ElMessageBox.confirm(`确定删除 ${s.ref} 吗？删除后不可直接恢复。`, '删除 stash', {
     type: 'warning',
     confirmButtonText: '继续',
-    cancelButtonText: '取消'
+    cancelButtonText: '取消',
+    closeOnClickModal: false
   })
     .then(() => void run('git_stash_drop', { index: s.index }))
     .catch(() => undefined);
@@ -526,7 +528,7 @@ function removeWorktree(w: WorktreeInfo): void {
   ElMessageBox.confirm(
     `确定移除 worktree ${w.path}？不会删除主仓库。不要在 linked worktree 里当第二套工作区做 merge。`,
     '移除 worktree',
-    { type: 'warning', confirmButtonText: '继续', cancelButtonText: '取消' }
+    { type: 'warning', confirmButtonText: '继续', cancelButtonText: '取消', closeOnClickModal: false }
   )
     .then(() => void run('git_worktree_remove', { path: w.path }))
     .catch(() => undefined);
@@ -665,7 +667,8 @@ function deleteBranch(n: BranchTreeNode, force: boolean): void {
     ElMessageBox.confirm(`强制删除本地分支 ${name}？（不检查是否已合并；高风险，执行前会备份）`, '强制删除分支', {
       type: 'warning',
       confirmButtonText: '继续',
-      cancelButtonText: '取消'
+      cancelButtonText: '取消',
+      closeOnClickModal: false
     })
       .then(() => void run('git_branch_delete_force', { name }))
       .catch(() => undefined);
@@ -1242,7 +1245,13 @@ onUnmounted(() => {
     />
 
     <!-- 提交 -->
-    <el-dialog v-model="commitVisible" title="提交 Commit" width="520px" @closed="commitMessage = ''">
+    <el-dialog
+      v-model="commitVisible"
+      title="提交 Commit"
+      width="520px"
+      :close-on-click-modal="false"
+      @closed="commitMessage = ''"
+    >
       <el-input
         v-model="commitMessage"
         type="textarea"
@@ -1261,6 +1270,7 @@ onUnmounted(() => {
       v-model="branchVisible"
       title="新建分支"
       width="480px"
+      :close-on-click-modal="false"
       @closed="
         branchName = '';
         branchStart = '';
@@ -1280,7 +1290,17 @@ onUnmounted(() => {
       </template>
     </el-dialog>
 
-    <el-dialog v-model="worktreeVisible" title="添加 worktree" width="560px">
+    <el-dialog
+      v-model="worktreeVisible"
+      title="添加 worktree"
+      width="560px"
+      :close-on-click-modal="false"
+      @closed="
+        worktreePath = '';
+        worktreeBranch = '';
+        worktreeStart = '';
+      "
+    >
       <el-alert
         class="stash-tip"
         title="在独立目录检出，不切换主工作区。不要把 linked worktree 当成第二套工作区做 merge。"
@@ -1306,7 +1326,16 @@ onUnmounted(() => {
     </el-dialog>
 
     <!-- stash：说明与未跟踪；文件范围来自左侧更改列表的勾选 -->
-    <el-dialog v-model="stashVisible" title="Stash" width="520px">
+    <el-dialog
+      v-model="stashVisible"
+      title="Stash"
+      width="520px"
+      :close-on-click-modal="false"
+      @closed="
+        stashMessage = '';
+        stashIncludeUntracked = false;
+      "
+    >
       <el-alert
         class="stash-tip"
         :title="
@@ -1335,7 +1364,13 @@ onUnmounted(() => {
     </el-dialog>
 
     <!-- 硬重置 -->
-    <el-dialog v-model="resetVisible" title="硬重置（高风险）" width="480px" @closed="resetTarget = ''">
+    <el-dialog
+      v-model="resetVisible"
+      title="硬重置（高风险）"
+      width="480px"
+      :close-on-click-modal="false"
+      @closed="resetTarget = ''"
+    >
       <el-alert
         title="将丢弃索引与工作区所有更改（不可逆），执行前会自动创建备份"
         type="error"
@@ -1350,7 +1385,16 @@ onUnmounted(() => {
       </template>
     </el-dialog>
 
-    <el-dialog v-model="checkoutAsVisible" title="检出为本地分支" width="480px">
+    <el-dialog
+      v-model="checkoutAsVisible"
+      title="检出为本地分支"
+      width="480px"
+      :close-on-click-modal="false"
+      @closed="
+        checkoutLocalName = '';
+        checkoutStart = '';
+      "
+    >
       <el-alert
         class="mb"
         :title="`从 ${checkoutStart} 新建并检出本地分支，并跟踪该远程。`"
@@ -1365,7 +1409,13 @@ onUnmounted(() => {
       </template>
     </el-dialog>
 
-    <el-dialog v-model="mergeVisible" title="工作区合并" width="480px" @closed="mergeBranch = ''">
+    <el-dialog
+      v-model="mergeVisible"
+      title="工作区合并"
+      width="480px"
+      :close-on-click-modal="false"
+      @closed="mergeBranch = ''"
+    >
       <el-alert
         class="mb"
         title="会把所选分支合并进当前检出分支，可能产生冲突。只想预演、不改工作区请用底栏「合并」。"
@@ -1384,7 +1434,16 @@ onUnmounted(() => {
       </template>
     </el-dialog>
 
-    <el-dialog v-model="tagVisible" title="打标签" width="480px">
+    <el-dialog
+      v-model="tagVisible"
+      title="打标签"
+      width="480px"
+      :close-on-click-modal="false"
+      @closed="
+        tagName = '';
+        tagMessage = '';
+      "
+    >
       <el-form label-width="100px">
         <el-form-item label="标签名">
           <el-input v-model="tagName" placeholder="v1.0.0" />
@@ -1399,7 +1458,13 @@ onUnmounted(() => {
       </template>
     </el-dialog>
 
-    <el-dialog v-model="rebaseVisible" title="变基（高风险）" width="480px" @closed="rebaseOnto = ''">
+    <el-dialog
+      v-model="rebaseVisible"
+      title="变基（高风险）"
+      width="480px"
+      :close-on-click-modal="false"
+      @closed="rebaseOnto = ''"
+    >
       <el-alert
         title="将把当前分支变基到所选目标，可能改写历史；执行前会自动备份"
         type="error"

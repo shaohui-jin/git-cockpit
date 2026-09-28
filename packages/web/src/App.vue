@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { version as pageVersion } from '../package.json';
@@ -10,11 +10,11 @@ import { useBranchesStore } from '@/stores/branches';
 import { useMergeSessionStore } from '@/stores/mergeSession';
 import { useJobsStore } from '@/stores/jobs';
 import { repoLeaf, useChatStore } from '@/stores/chat';
-import { useOverviewStore } from '@/stores/overview';
 import { ApiError, shutdownService, subscribeEvents } from '@/api/client';
 import { useRevision } from '@/composables/revision';
 import { jobLine, notifyJobEnded } from '@/utils/jobNotify';
-import ChatView from '@/views/ChatView.vue';
+
+const ChatView = defineAsyncComponent(() => import('@/views/ChatView.vue'));
 
 type DockItem = { path: string; label: string };
 
@@ -24,10 +24,9 @@ const branches = useBranchesStore();
 const mergeSession = useMergeSessionStore();
 const jobs = useJobsStore();
 const threads = useChatStore();
-const overview = useOverviewStore();
 const route = useRoute();
 const router = useRouter();
-const { bump, revision } = useRevision();
+const { bump } = useRevision();
 
 type Frame = { x: number; y: number; w: number; h: number };
 type Grip = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
@@ -35,6 +34,7 @@ type Grip = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
 type BallAnchor = { side: 'left' | 'right'; fromBottom: number };
 
 const chatOpen = ref(false);
+const chatAlive = ref(false);
 const chatPhase = ref<'idle' | 'streaming' | 'confirm' | 'error'>('idle');
 const frame = ref<Frame>({ x: 0, y: 0, w: 420, h: 560 });
 const ballPos = ref({ x: 0, y: 0 });
@@ -101,7 +101,7 @@ async function onServiceUpdate(): Promise<void> {
     await ElMessageBox.confirm(
       `当前 ${repos.serverVersion || pageVersion} → ${repos.serviceLatest ?? ''}。确认后将停止服务、安装并重启。`,
       '升级服务',
-      { confirmButtonText: '升级', cancelButtonText: '稍后' }
+      { confirmButtonText: '升级', cancelButtonText: '稍后', closeOnClickModal: false }
     );
   } catch {
     return;
@@ -117,6 +117,7 @@ async function confirmStop(running: number): Promise<boolean> {
     await ElMessageBox.confirm(message, '退出后端服务', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
+      closeOnClickModal: false,
       type: 'warning'
     });
     return true;
@@ -420,12 +421,7 @@ onMounted(async () => {
       jobs.onProgress(payload);
       notifyJobEnded(payload, router);
       if (payload.status === 'ok') {
-        bump();
-        void repos.load().then(() => {
-          const ids = repos.repos.map((r) => r.id);
-          overview.prune(ids);
-          void overview.refresh(ids, { force: true, background: true });
-        });
+        void repos.load().finally(() => bump());
       }
     },
     onError: () => {
@@ -457,19 +453,20 @@ watch(
 );
 
 watch(
+  chatOpen,
+  (open) => {
+    if (open) chatAlive.value = true;
+  },
+  { immediate: true }
+);
+
+watch(
   () => repos.currentId,
   () => {
     void branches.load();
     void settings.load(repos.currentId).catch(() => undefined);
   }
 );
-watch(revision, () => {
-  void branches.load();
-  const ids = repos.repos.map((r) => r.id);
-  if (ids.length) {
-    void overview.refresh(ids, { force: true, background: true });
-  }
-});
 
 function onKeydown(ev: KeyboardEvent): void {
   if (ev.key === 'Escape' && chatOpen.value) chatOpen.value = false;
@@ -554,6 +551,7 @@ onUnmounted(() => {
     </main>
 
     <aside
+      v-if="chatAlive"
       v-show="chatOpen"
       class="chat-panel"
       :style="{ left: `${frame.x}px`, top: `${frame.y}px`, width: `${frame.w}px`, height: `${frame.h}px` }"

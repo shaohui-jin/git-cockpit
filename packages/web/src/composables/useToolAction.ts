@@ -89,7 +89,7 @@ export function useToolAction(repoId: () => number | null) {
         ElMessageBox.confirm(
           `操作 ${exec.tool} 属于高风险操作，当前默认禁用，需要在设置中开启后才能执行。是否前往设置？`,
           '该工具已禁用',
-          { confirmButtonText: '去开启', cancelButtonText: '取消', type: 'warning' }
+          { confirmButtonText: '去开启', cancelButtonText: '取消', type: 'warning', closeOnClickModal: false }
         )
           .then(() => router.push({ path: '/settings', query: { tab: 'git' } }))
           .catch(() => undefined);
@@ -102,7 +102,8 @@ export function useToolAction(repoId: () => number | null) {
       ElMessageBox.confirm(exec.error.message || '当前域名尚未配置 Token。', '未配置 Token', {
         confirmButtonText: '去 MR 配置',
         cancelButtonText: '取消',
-        type: 'warning'
+        type: 'warning',
+        closeOnClickModal: false
       })
         .then(() => router.push({ path: '/settings' }))
         .catch(() => undefined);

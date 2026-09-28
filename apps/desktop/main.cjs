@@ -14,7 +14,8 @@ const DAEMON_SPEC = process.env.GIT_COCKPIT_DAEMON_SPEC || `${DAEMON_PKG}@latest
 const INSTALL_TIMEOUT_MS = 5 * 60 * 1000;
 const PROBE_TIMEOUT_MS = 15 * 1000;
 
-const PORT = Number(process.env.GIT_COCKPIT_PORT) || 3000;
+// 未打包的开发窗与仓库 daemon 同用 3010；安装包固定 3000。显式 GIT_COCKPIT_PORT 优先。
+const PORT = Number(process.env.GIT_COCKPIT_PORT) || (app.isPackaged ? 3000 : 3010);
 const DEV_UI_PORT = Number(process.env.GIT_COCKPIT_DEV_UI_PORT) || 5173;
 const HOSTS = Array.from(new Set([process.env.GIT_COCKPIT_HOST || '127.0.0.1', '127.0.0.1', 'localhost']));
 
@@ -175,7 +176,7 @@ function waitProcExit(proc, ms) {
 function listPackageProcesses() {
   if (process.platform !== 'win32') return [];
   const command = [
-    "Get-CimInstance Win32_Process |",
+    'Get-CimInstance Win32_Process |',
     "Where-Object { $_.CommandLine -like '*git-cockpit-mcp-server*' } |",
     "ForEach-Object { Write-Output ($_.ProcessId.ToString() + [char]9 + (($_.CommandLine -replace '[\\r\\n]',' '))) }"
   ].join(' ');
@@ -963,7 +964,7 @@ async function runDaemonUpgrade(_currentVersion, latestVersion) {
     const stopped = await shutdownDaemon(health.host, secret);
     if (!stopped) killChild(child);
     if (!(await waitDaemonDown(20000))) {
-      throw new Error('服务未能停止。请手动关闭 git-cockpit start 或占用 :3000 的进程后再试。');
+      throw new Error(`服务未能停止。请手动关闭 git-cockpit start 或占用 :${PORT} 的进程后再试。`);
     }
     // 健康检查失败只说明端口停了。全局包目录还可能被本进程或 Cursor 的 mcp 占着。
     await releasePackageLocks();

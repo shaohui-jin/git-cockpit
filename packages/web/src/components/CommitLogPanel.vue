@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import * as api from '@/api/client';
 import { useReposStore } from '@/stores/repos';
 import { useBranchesStore } from '@/stores/branches';
-import DiffViewer from '@/components/DiffViewer.vue';
 import BranchTreeSelect from '@/components/BranchTreeSelect.vue';
 import type { CommitInfo, DiffResult } from '@/api/types';
+
+const DiffViewer = defineAsyncComponent(() => import('@/components/DiffViewer.vue'));
 
 const repos = useReposStore();
 const branchStore = useBranchesStore();
@@ -148,7 +149,7 @@ defineExpose({ refresh: loadLog, loading });
       </div>
     </div>
 
-    <el-drawer v-model="showVisible" size="60%" destroy-on-close>
+    <el-drawer v-model="showVisible" size="60%" destroy-on-close :close-on-click-modal="false">
       <template #header>
         <div v-if="showCommit" class="commit-title">
           <span class="commit-subject" :title="showCommit.subject">{{ showCommit.subject }}</span>

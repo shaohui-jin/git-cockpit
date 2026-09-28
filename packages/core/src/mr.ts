@@ -649,11 +649,7 @@ export async function createPullOrMergeRequest(options: {
       messages.push(probe.error ?? cliMissingHint(which!));
     }
     if (templateEnabled) {
-      messages.push('已启用正文规范。浏览器创建页不会写入这段正文，建议在设置 → MR 配置改用 Token 或本机 CLI。');
-    }
-    messages.push('未调用 Token / CLI，请用浏览器打开创建页。');
-    if (body.trim()) {
-      messages.push('请复制下面的正文，粘贴到平台创建页。');
+      messages.push('浏览器创建页不会写入这段正文。');
     }
     return {
       via: 'browser',

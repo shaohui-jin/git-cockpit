@@ -596,13 +596,11 @@ watch([pairInto, pairFrom], () => {
           <p v-else-if="situation === 'already_merged'" class="tip tip-inline">
             「我的分支」已经包含在合入目标里，没有可合并的新提交，无需操作。
           </p>
-          <p v-else-if="preview.outcome === 'conflicts'" class="tip tip-inline">
+          <p v-else-if="preview.outcome === 'conflicts' && (truncatedConflicts || fromMatrix)" class="tip tip-inline">
             {{
               truncatedConflicts
                 ? '冲突文件超过展示上限，无法在网页选边。请缩小范围或提高 maxFiles。'
-                : fromMatrix
-                  ? '红块选边后点「完成冲突处理」：写入本地临时分支，不推送，随后回矩阵。'
-                  : '红块用 ≫ / ≪ 选线上或我的；绿=新增、蓝=修改，已自动进入结果。'
+                : '红块选边后点「完成冲突处理」：写入本地临时分支，不推送，随后回矩阵。'
             }}
           </p>
           <p v-else-if="preview.outcome === 'unrelated'" class="tip tip-inline">
@@ -625,10 +623,6 @@ watch([pairInto, pairFrom], () => {
             :from="pairFrom"
             @progress="resolvePending = $event.pending"
           />
-          <p v-else-if="situation === 'already_merged'" class="hint-empty">没有可合并的新提交，无需操作。</p>
-          <p v-else-if="preview.clean && canApply" class="hint-empty">
-            没有冲突文件。落盘只写临时枝，不改你正在看的分支。
-          </p>
         </section>
 
         <section v-if="applyResult" class="gc-glass pad next-pane fill">
@@ -638,10 +632,6 @@ watch([pairInto, pairFrom], () => {
           </div>
           <dl class="apply-meta">
             <div>
-              <dt>临时分支</dt>
-              <dd class="mono">{{ applyResult.tempBranch }}</dd>
-            </div>
-            <div>
               <dt>提交</dt>
               <dd class="mono">{{ applyResult.commitSha.slice(0, 7) }}</dd>
             </div>
@@ -650,10 +640,6 @@ watch([pairInto, pairFrom], () => {
             <a :href="applyResult.createMrUrl" target="_blank" rel="noreferrer">打开创建 MR/PR 页面</a>
           </p>
           <el-alert v-if="mrPrep?.cliError && !mrPrep.cli" type="warning" :closable="false" :title="mrPrep.cliError" />
-          <p v-if="mrPrep?.cliInstallUrl && !mrPrep.cli" class="apply-link">
-            官方下载：
-            <a :href="mrPrep.cliInstallUrl" target="_blank" rel="noreferrer">{{ mrPrep.cliInstallUrl }}</a>
-          </p>
           <div class="apply-actions">
             <el-button type="primary" @click="runCreatePr">创建 PR/MR</el-button>
             <el-button @click="runPreview">重新预演</el-button>
@@ -679,10 +665,6 @@ watch([pairInto, pairFrom], () => {
                 ? '打开创建页'
                 : `已创建${prResult.number != null ? ' #' + prResult.number : ''}`
             }}</a>
-          </p>
-          <p v-if="prResult.cliInstallUrl" class="apply-link">
-            未检测到本机 CLI，请自行安装：
-            <a :href="prResult.cliInstallUrl" target="_blank" rel="noreferrer">{{ prResult.cliInstallUrl }}</a>
           </p>
           <div v-if="prResult.via === 'browser' && prResult.body?.trim()" class="pr-body">
             <header>
@@ -892,11 +874,6 @@ watch([pairInto, pairFrom], () => {
 .empty p {
   margin: 0;
   font-size: var(--gc-text);
-}
-.hint-empty {
-  margin: var(--gc-pad) 0 0;
-  font-size: var(--gc-text);
-  color: var(--el-text-color-secondary);
 }
 .grow {
   flex: 1;

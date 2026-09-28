@@ -87,7 +87,8 @@ async function removeOne(row: ChatConversationSummary): Promise<void> {
     await ElMessageBox.confirm(`删除「${titleOf(row)}」？正在查看这一组时，聊天面板会换成空白新对话。`, '删除对话', {
       confirmButtonText: '删除',
       cancelButtonText: '取消',
-      type: 'warning'
+      type: 'warning',
+      closeOnClickModal: false
     });
   } catch {
     return;
@@ -146,7 +147,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <el-dialog v-model="detailOpen" :title="detailTitle" width="720px">
+    <el-dialog v-model="detailOpen" :title="detailTitle" width="720px" :close-on-click-modal="false">
       <div class="detail">
         <MessageList :lines="detailLines" :streaming="false" />
       </div>

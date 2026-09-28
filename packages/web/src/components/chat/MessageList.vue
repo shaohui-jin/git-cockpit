@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
-import mermaid from 'mermaid';
 import { renderChatMarkdown } from './markdown';
 import type { ChatLine } from './types';
 import ToolCallCard from './ToolCallCard.vue';
@@ -12,6 +11,20 @@ const props = defineProps<{
 
 const listEl = ref<HTMLElement | null>(null);
 const svgCache = new Map<string, string>();
+let mermaidApi: typeof import('mermaid').default | null = null;
+
+async function loadMermaid(): Promise<typeof import('mermaid').default> {
+  if (!mermaidApi) {
+    mermaidApi = (await import('mermaid')).default;
+    mermaidApi.initialize({
+      startOnLoad: false,
+      securityLevel: 'strict',
+      theme: 'dark',
+      fontFamily: 'inherit'
+    });
+  }
+  return mermaidApi;
+}
 
 const streamingId = computed(() => {
   if (!props.streaming) return null;
@@ -21,18 +34,15 @@ const streamingId = computed(() => {
   return null;
 });
 
-mermaid.initialize({
-  startOnLoad: false,
-  securityLevel: 'strict',
-  theme: 'dark',
-  fontFamily: 'inherit'
-});
-
 async function paintMermaid(): Promise<void> {
   await nextTick();
   const host = listEl.value;
   if (!host) return;
-  const nodes = host.querySelectorAll<HTMLElement>('.md-mermaid');
+  const nodes = [...host.querySelectorAll<HTMLElement>('.md-mermaid')].filter((node) =>
+    node.querySelector('.md-mermaid-src')
+  );
+  if (!nodes.length) return;
+  const mermaid = await loadMermaid();
   for (const node of nodes) {
     const src = node.querySelector('.md-mermaid-src')?.textContent?.trim() ?? '';
     if (!src) continue;
@@ -52,16 +62,24 @@ async function paintMermaid(): Promise<void> {
   }
 }
 
+/** 正在输出的那条不参与，避免每个字都重画已完成的图。 */
+const mermaidKey = computed(() => {
+  const streaming = streamingId.value;
+  let key = '';
+  for (const line of props.lines) {
+    if (line.role !== 'assistant' || line.id === streaming) continue;
+    key += `${line.id}\0${line.text}\0`;
+  }
+  return key;
+});
+
 onMounted(() => {
   void paintMermaid();
 });
 
-watch(
-  () => props.lines.map((line) => `${line.id}:${line.text}`).join('\n'),
-  () => {
-    void paintMermaid();
-  }
-);
+watch(mermaidKey, () => {
+  void paintMermaid();
+});
 </script>
 
 <template>

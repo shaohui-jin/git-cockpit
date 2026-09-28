@@ -14,7 +14,16 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <el-dialog v-model="visible" :title="retrying ? '修改并重新克隆' : '克隆到本地'" width="560px">
+  <el-dialog
+    v-model="visible"
+    :title="retrying ? '修改并重新克隆' : '克隆到本地'"
+    width="560px"
+    :close-on-click-modal="false"
+    @closed="
+      url = '';
+      dest = '';
+    "
+  >
     <el-alert
       title="提交后后台克隆，不占用当前仓库队列。地址不要带 token。完成后会自动加入仓库一览。"
       type="info"

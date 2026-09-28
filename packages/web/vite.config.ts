@@ -4,9 +4,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
+import Components from 'unplugin-vue-components/vite';
+import { ElementPlusResolver } from 'unplugin-vue-components/resolvers';
 import type { ProxyOptions } from 'vite';
 
-const backendPort = process.env.GIT_COCKPIT_PORT ?? '3000';
+const backendPort = process.env.GIT_COCKPIT_PORT ?? '3010';
 const backendHost = process.env.GIT_COCKPIT_HOST ?? '127.0.0.1';
 
 function localSecret(): string {
@@ -31,7 +33,13 @@ const injectSecret: ProxyOptions['configure'] = (proxy) => {
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [
+    vue(),
+    Components({
+      dts: 'src/components.d.ts',
+      resolvers: [ElementPlusResolver({ importStyle: 'css' })]
+    })
+  ],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url))
@@ -62,8 +70,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          vue: ['vue', 'vue-router', 'pinia'],
-          'element-plus': ['element-plus']
+          vue: ['vue', 'vue-router', 'pinia']
         }
       }
     }

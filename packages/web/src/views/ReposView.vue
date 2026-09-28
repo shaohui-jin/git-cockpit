@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { useRevision } from '@/composables/revision';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { useReposStore } from '@/stores/repos';
@@ -21,6 +22,7 @@ import {
 import { moveAmong } from '@/utils/repoOrder';
 const repos = useReposStore();
 const overview = useOverviewStore();
+const { revision } = useRevision();
 const jobs = useJobsStore();
 const router = useRouter();
 
@@ -199,7 +201,8 @@ async function removeRepo(id: number, path: string): Promise<void> {
     await ElMessageBox.confirm(`确定从列表移除 ${path}？注意：不会删除磁盘上的仓库文件。`, '移除仓库', {
       type: 'warning',
       confirmButtonText: '移除',
-      cancelButtonText: '取消'
+      cancelButtonText: '取消',
+      closeOnClickModal: false
     });
   } catch {
     return;
@@ -279,9 +282,20 @@ async function startClone(): Promise<void> {
   }
 }
 
-onMounted(async () => {
-  await repos.load();
-  await overview.sync(repos.repos);
+watch(
+  () => repos.repos.map((r) => r.id).join(','),
+  () => {
+    void overview.sync(repos.repos, {
+      force: overview.hasCache,
+      background: overview.hasCache
+    });
+  },
+  { immediate: true }
+);
+
+watch(revision, () => {
+  if (!repos.repos.length) return;
+  void overview.sync(repos.repos, { force: true, background: true });
 });
 </script>
 

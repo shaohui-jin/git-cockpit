@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
+import 'diff2html/bundles/css/diff2html.min.css';
 import { html as diffToHtml, parse } from 'diff2html';
 import { ColorSchemeType, type DiffFile } from 'diff2html/lib-esm/types';
 

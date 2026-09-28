@@ -200,7 +200,7 @@ const tokenHint = computed(() => {
 
 const tokenPlaceholder = computed(() => {
   const preview = current.value?.tokenPreview?.trim();
-  if (current.value?.tokenSet && preview) return `已保存 ${preview}，输入新 Token 覆盖`;
+  if (current.value?.tokenSet && preview) return `已保存 ${preview}，明文不回填，输入新 Token 覆盖`;
   if (platform.value === 'github') return 'ghp_… 或 github_pat_…';
   if (platform.value === 'gitlab') return 'glpat-…';
   return '输入 Token';
@@ -459,7 +459,8 @@ async function removeHost(host: string): Promise<void> {
     await ElMessageBox.confirm(`清除 ${host} 上保存的 Token 与覆盖项？`, '删除域名配置', {
       confirmButtonText: '清除',
       cancelButtonText: '取消',
-      type: 'warning'
+      type: 'warning',
+      closeOnClickModal: false
     });
   } catch {
     return;
@@ -513,7 +514,8 @@ async function clearLlmKey(): Promise<void> {
     await ElMessageBox.confirm('清除已保存的模型 API Key？聊天将无法调用模型。', '确认', {
       confirmButtonText: '清除',
       cancelButtonText: '取消',
-      type: 'warning'
+      type: 'warning',
+      closeOnClickModal: false
     });
   } catch {
     return;
@@ -650,9 +652,6 @@ async function clearLlmKey(): Promise<void> {
                         :placeholder="tokenPlaceholder"
                         :disabled="platform === 'unknown' || validatingToken"
                       />
-                      <p v-if="current.tokenSet && current.tokenPreview" class="mr-hint">
-                        已保存 {{ current.tokenPreview }}（明文不回填，输入新 Token 可覆盖）
-                      </p>
                       <p class="mr-hint">{{ tokenHint }}</p>
                     </div>
                   </el-form-item>
