@@ -32,11 +32,12 @@ const injectSecret: ProxyOptions['configure'] = (proxy) => {
 };
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [
     vue(),
     Components({
-      dts: 'src/components.d.ts',
+      // 生产构建不改写 src，否则发布前的 vite build 会弄脏工作区，pnpm publish 报 GIT_UNCLEAN
+      dts: command === 'serve' ? 'src/components.d.ts' : false,
       resolvers: [ElementPlusResolver({ importStyle: 'css' })]
     })
   ],
@@ -75,4 +76,4 @@ export default defineConfig({
       }
     }
   }
-});
+}));
