@@ -8,6 +8,7 @@ import 'element-plus/es/components/notification/style/css';
 import 'element-plus/es/components/loading/style/css';
 import App from './App.vue';
 import { router } from './router';
+import GcIcon from './components/GcIcon.vue';
 import './style.css';
 import './theme.css';
 
@@ -18,4 +19,5 @@ const app = createApp(App);
 app.use(createPinia());
 app.use(router);
 app.use(ElLoading);
+app.component('GcIcon', GcIcon);
 app.mount('#app');

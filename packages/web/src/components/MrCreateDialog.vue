@@ -334,7 +334,7 @@ onUnmounted(() => {
   margin: 0;
   white-space: pre-wrap;
   word-break: break-word;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   line-height: 1.5;
   color: var(--el-text-color-regular);
 }
@@ -364,18 +364,18 @@ onUnmounted(() => {
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-word;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   line-height: 1.5;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 .muted {
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   color: var(--el-text-color-secondary);
 }
 .missing {
   float: left;
   line-height: var(--gc-control);
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   color: var(--el-color-danger);
 }
 @media (max-width: 800px) {

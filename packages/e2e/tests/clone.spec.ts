@@ -23,7 +23,7 @@ test('工作台克隆后任务列表出现克隆任务', async ({ app }) => {
 
   await page.locator('.dock-btn', { hasText: '任务' }).click();
   await expect(page).toHaveURL(/#\/jobs/);
-  const row = page.locator('.job-row').filter({ hasText: '克隆' }).first();
+  const row = page.locator('aside.list .row').filter({ hasText: '克隆' }).first();
   await expect(row).toBeVisible();
   await expect(row).toContainText(/进行中|成功/);
 });

@@ -199,13 +199,13 @@ onMounted(async () => {
   <div class="page jobs-page">
     <h2 class="page-title">任务</h2>
 
-    <div v-if="!jobs.loading && !jobs.jobs.length" class="empty gc-glass">
+    <div v-if="!jobs.loading && !jobs.jobs.length" class="empty gc-card">
       <strong>还没有后台任务</strong>
       <p>克隆、矩阵扫描、抓取远程会排在这里。去工作台克隆一个仓。</p>
     </div>
 
     <div v-else class="split" v-loading="jobs.loading && !jobs.jobs.length">
-      <aside class="gc-glass list">
+      <aside class="gc-card list">
         <div class="chips">
           <button type="button" class="chip" :class="{ on: filter === 'all' }" @click="setFilter('all')">
             全部 {{ counts.all }}
@@ -231,7 +231,7 @@ onMounted(async () => {
           @click="openJob(j.id)"
         >
           <div class="top">
-            <b :class="j.status">{{ statusLabel(j.status) }}</b>
+            <span class="st" :class="j.status">{{ statusLabel(j.status) }}</span>
             <span>{{ kindLabel(j.kind) }}</span>
             <em>{{ formatTime(j.startedAt) }}</em>
           </div>
@@ -240,10 +240,10 @@ onMounted(async () => {
         </button>
       </aside>
 
-      <section class="gc-glass log" v-loading="jobDetailLoading">
+      <section class="gc-card log" v-loading="jobDetailLoading">
         <template v-if="activeJob">
           <header>
-            <b :class="activeJob.status">{{ statusLabel(activeJob.status) }}</b>
+            <span class="st" :class="activeJob.status">{{ statusLabel(activeJob.status) }}</span>
             <span>{{ kindLabel(activeJob.kind) }} · {{ formatTime(activeJob.startedAt) }}</span>
             <span class="grow" />
             <el-button
@@ -273,10 +273,10 @@ onMounted(async () => {
           <p class="meta mono">{{ jobLine(activeJob) }}</p>
           <p v-if="activeJob.error" class="banner-err">{{ activeJob.error }}</p>
           <div v-if="activeJob.kind === 'desktop-download'" class="dl">
-            <el-progress
-              :percentage="jobPercent(activeJob) ?? 0"
-              :status="activeJob.status === 'error' ? 'exception' : activeJob.status === 'ok' ? 'success' : undefined"
-            />
+            <div class="bar" :class="activeJob.status">
+              <i class="fill" :style="{ width: (jobPercent(activeJob) ?? 0) + '%' }" />
+              <i v-if="activeJob.status === 'running'" class="scan" />
+            </div>
             <p v-if="activeJob.status === 'running'">正在下载桌面安装包。</p>
             <p v-else-if="installReady(activeJob)">下载完成。安装会退出并重启应用。</p>
           </div>
@@ -343,12 +343,12 @@ onMounted(async () => {
   background: var(--el-fill-color-light);
   color: inherit;
   font: inherit;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   cursor: pointer;
 }
 .chips .chip.on {
-  background: color-mix(in srgb, var(--el-color-primary) 22%, transparent);
-  color: var(--el-color-primary);
+  background: var(--gc-accent-weak);
+  color: var(--gc-accent-text);
 }
 .row {
   display: block;
@@ -363,18 +363,45 @@ onMounted(async () => {
   font: inherit;
 }
 .row.on {
-  background: color-mix(in srgb, var(--el-color-primary) 12%, transparent);
+  background: var(--gc-accent-weak);
 }
 .top {
   display: flex;
   gap: var(--gc-gap);
   align-items: center;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
 }
 .top em {
   margin-left: auto;
   font-style: normal;
-  color: var(--el-text-color-secondary);
+  color: var(--gc-text-3);
+}
+/* 状态 chip：进行中琥珀 / 成功绿 / 失败红 / 排队中性 */
+.st {
+  flex: none;
+  height: 18px;
+  padding: 0 8px;
+  border-radius: var(--gc-r-tag);
+  font-size: var(--gc-fs-meta);
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+}
+.st.running {
+  background: var(--gc-amber-weak);
+  color: var(--gc-amber);
+}
+.st.ok {
+  background: var(--gc-green-weak);
+  color: var(--gc-green);
+}
+.st.error {
+  background: var(--gc-red-weak);
+  color: var(--gc-red);
+}
+.st.queued {
+  background: var(--el-fill-color);
+  color: var(--gc-text-3);
 }
 .title,
 .tail {
@@ -383,31 +410,61 @@ onMounted(async () => {
   white-space: nowrap;
 }
 .title {
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   margin: 2px 0;
 }
 .tail {
-  font-size: var(--gc-text);
-  color: var(--el-text-color-secondary);
+  font-size: var(--gc-fs-body);
+  color: var(--gc-text-3);
 }
-.tail.err,
-.top b.error,
-header b.error {
-  color: var(--el-color-danger);
+.tail.err {
+  color: var(--gc-red);
 }
-.top b.running,
-header b.running {
-  color: var(--el-color-warning);
+/* 双段进度条：4px 轨道 + 信号填充 + 运行中纯色扫描段（禁渐变） */
+.bar {
+  position: relative;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--gc-accent-weak);
+  overflow: hidden;
 }
-.top b.ok,
-header b.ok {
-  color: var(--el-color-success);
+.bar .fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--gc-signal-bar);
+  box-shadow: var(--gc-glow-bar);
+  transition: width var(--gc-t-open) var(--gc-ease);
+}
+.bar.ok .fill {
+  background: var(--gc-signal-done);
+}
+.bar.error .fill {
+  background: var(--gc-red);
+  box-shadow: 0 0 8px rgba(255, 133, 133, 0.35);
+}
+.bar .scan {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 48px;
+  background: var(--gc-signal-scan);
+  opacity: 0.9;
+  animation: gc-scan-bar 1800ms linear infinite;
+}
+@keyframes gc-scan-bar {
+  from {
+    left: -48px;
+  }
+  to {
+    left: 100%;
+  }
 }
 header {
   display: flex;
   gap: var(--gc-gap);
   align-items: center;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   flex: none;
 }
 .grow {
@@ -415,7 +472,7 @@ header {
 }
 .meta {
   margin: 0;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   color: var(--el-text-color-secondary);
   word-break: break-all;
 }
@@ -427,16 +484,16 @@ header {
 }
 .dl p {
   margin: 0;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   color: var(--el-text-color-secondary);
 }
 .banner-err {
   margin: 0;
   padding: var(--gc-gap) var(--gc-pad);
   border-radius: var(--gc-radius);
-  background: color-mix(in srgb, var(--el-color-danger) 16%, transparent);
-  color: var(--el-color-danger);
-  font-size: var(--gc-text);
+  background: var(--gc-red-weak);
+  color: var(--gc-red);
+  font-size: var(--gc-fs-body);
   line-height: 1.45;
 }
 pre {
@@ -446,15 +503,15 @@ pre {
   overflow: auto;
   padding: var(--gc-pad);
   border-radius: var(--gc-radius);
-  background: color-mix(in srgb, var(--el-bg-color-page) 88%, #000);
-  font-size: var(--gc-text);
+  background: var(--gc-page);
+  font-size: var(--gc-fs-body);
   line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-all;
 }
 .miss {
   margin: 0;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   color: var(--el-text-color-secondary);
   padding: var(--gc-pad);
 }
@@ -474,6 +531,6 @@ pre {
 }
 .empty p {
   margin: 0;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
 }
 </style>

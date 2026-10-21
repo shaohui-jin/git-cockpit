@@ -1601,7 +1601,7 @@ onUnmounted(() => {
   background: transparent;
 }
 .tree-dir {
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   font-weight: 600;
   color: var(--el-text-color-regular);
   overflow: hidden;
@@ -1637,7 +1637,7 @@ onUnmounted(() => {
 .node-name {
   flex: 1;
   min-width: 0;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1686,7 +1686,7 @@ onUnmounted(() => {
   flex-wrap: wrap;
   align-items: center;
   gap: var(--gc-gap);
-  min-height: var(--gc-line);
+  min-height: var(--gc-row-lg);
 }
 .lineage-bar .field-label {
   color: var(--el-text-color-secondary);
@@ -1783,7 +1783,7 @@ onUnmounted(() => {
   justify-content: center;
   gap: 6px;
   color: var(--el-text-color-secondary);
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   padding: var(--gc-pad) 0;
 }
 .file-empty-hint {
@@ -1802,7 +1802,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: var(--gc-gap);
-  height: var(--gc-line);
+  height: var(--gc-row-lg);
   padding: 0 4px;
   border-radius: var(--gc-radius);
 }
@@ -1815,7 +1815,7 @@ onUnmounted(() => {
 .dir-name {
   flex: 1;
   min-width: 0;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1823,7 +1823,7 @@ onUnmounted(() => {
 }
 .dir-count {
   flex: none;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   color: var(--el-text-color-secondary);
 }
 .file-list.compact {
@@ -1835,7 +1835,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: var(--gc-gap);
-  height: var(--gc-line);
+  height: var(--gc-row-lg);
   padding: 0 var(--gc-pad);
   border-bottom: 1px solid var(--el-border-color-lighter);
 }
@@ -1869,7 +1869,7 @@ onUnmounted(() => {
 .file-path {
   flex: 1;
   min-width: 0;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1886,7 +1886,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: var(--gc-gap);
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   color: var(--el-text-color-secondary);
 }
 .monitor-stat .add {
@@ -1906,9 +1906,9 @@ onUnmounted(() => {
 }
 .monitor-file {
   margin: 0;
-  height: var(--gc-line);
-  line-height: var(--gc-line);
-  font-size: var(--gc-text);
+  height: var(--gc-row-lg);
+  line-height: var(--gc-row-lg);
+  font-size: var(--gc-fs-body);
   color: var(--el-text-color-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1933,7 +1933,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: var(--gc-gap);
-  height: var(--gc-line);
+  height: var(--gc-row-lg);
   padding: 0 2px;
   box-sizing: border-box;
   border-bottom: 1px solid var(--el-border-color-lighter);
@@ -1951,14 +1951,14 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: var(--gc-gap);
-  height: var(--gc-line);
+  height: var(--gc-row-lg);
   overflow: hidden;
 }
 .stash-ref {
   flex: none;
   color: var(--el-color-primary);
   font-weight: 600;
-  line-height: var(--gc-line);
+  line-height: var(--gc-row-lg);
 }
 .stash-msg {
   flex: 1;
@@ -1966,7 +1966,7 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  line-height: var(--gc-line);
+  line-height: var(--gc-row-lg);
 }
 .stash-date {
   flex: none;

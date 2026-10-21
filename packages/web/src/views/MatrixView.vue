@@ -241,7 +241,7 @@ function isActive(cell: MergeSurveyCell): boolean {
 
 <template>
   <div class="matrix-panel">
-    <section class="gc-glass pad filter-card">
+    <section class="gc-card pad filter-card">
       <p class="gc-eyebrow">矩阵 · into × from</p>
       <div class="filter-bar">
         <div class="field">
@@ -290,7 +290,7 @@ function isActive(cell: MergeSurveyCell): boolean {
     </section>
 
     <div v-if="survey" class="matrix-body">
-      <div class="gc-glass pad matrix-table-wrap">
+      <div class="gc-card pad matrix-table-wrap">
         <el-alert
           v-if="surveyStale"
           title="仓库刚有过写操作，矩阵可能过期"
@@ -319,6 +319,16 @@ function isActive(cell: MergeSurveyCell): boolean {
           <el-button v-if="nextActionText" type="primary" :disabled="!canRun || loading" @click="nextMatrixAction">{{
             nextActionText
           }}</el-button>
+        </div>
+        <div class="legend">
+          <span class="lg"><i class="sw is-clean" />干净</span>
+          <span class="lg"><i class="sw is-conflicts" />冲突</span>
+          <span class="lg"><i class="sw is-unrelated" />无共祖</span>
+          <span class="lg"><i class="sw is-same" />同名</span>
+          <span class="lg-sep" />
+          <span class="lg"><i class="sw is-stage-local" />本地临时枝</span>
+          <span class="lg"><i class="sw is-stage-resolved" />已处理</span>
+          <span class="lg"><i class="sw is-stage-page" />已开 MR</span>
         </div>
         <table class="grid">
           <thead>
@@ -350,7 +360,25 @@ function isActive(cell: MergeSurveyCell): boolean {
                     :title="cellTitle(col.cell)"
                     @click="session.active = col.cell"
                   >
-                    {{ cellLabel(col.cell) }}
+                    <GcIcon
+                      v-if="col.cell.outcome === 'clean'"
+                      name="check"
+                      :size="12"
+                      class="cell-ico"
+                    />
+                    <GcIcon
+                      v-else-if="col.cell.outcome === 'conflicts'"
+                      name="close"
+                      :size="12"
+                      class="cell-ico"
+                    />
+                    <GcIcon
+                      v-else-if="col.cell.outcome === 'unrelated'"
+                      name="minus"
+                      :size="12"
+                      class="cell-ico"
+                    />
+                    <span class="cell-text">{{ cellLabel(col.cell) }}</span>
                   </button>
                 </td>
               </tr>
@@ -358,7 +386,7 @@ function isActive(cell: MergeSurveyCell): boolean {
           </tbody>
         </table>
       </div>
-      <aside v-if="active" class="gc-glass pad detail">
+      <aside v-if="active" class="gc-card pad detail">
         <h3 class="mono">{{ active.from }} → {{ active.into }}</h3>
         <p>{{ OUTCOME_TEXT[active.outcome] }}{{ active.error ? ` · ${active.error}` : '' }}</p>
         <p v-if="active.tempBranch" class="tip">
@@ -416,7 +444,7 @@ function isActive(cell: MergeSurveyCell): boolean {
   align-items: center;
 }
 .field-label {
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   color: var(--el-text-color-secondary);
 }
 .chips {
@@ -428,17 +456,17 @@ function isActive(cell: MergeSurveyCell): boolean {
 }
 .chip-label {
   font-family: ui-monospace, monospace;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   color: var(--el-text-color-secondary);
   margin-right: 4px;
 }
 .hint {
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   color: var(--el-text-color-placeholder);
 }
 .tip {
   margin: var(--gc-gap) 0 0;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   color: var(--el-text-color-secondary);
 }
 .matrix-body {
@@ -459,7 +487,7 @@ function isActive(cell: MergeSurveyCell): boolean {
   align-items: center;
   gap: var(--gc-gap);
   margin-bottom: var(--gc-gap);
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   color: var(--el-text-color-secondary);
 }
 .summary-spacer {
@@ -467,15 +495,66 @@ function isActive(cell: MergeSurveyCell): boolean {
   min-width: 8px;
 }
 .ok {
-  color: var(--el-color-success);
+  color: var(--gc-green);
 }
 .bad {
-  color: var(--el-color-danger);
+  color: var(--gc-red);
+}
+/* 图例：结果色块 + 阶段色条 */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gc-gap);
+  margin-bottom: var(--gc-gap);
+  font-size: var(--gc-fs-meta);
+  color: var(--gc-text-3);
+}
+.lg {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.lg .sw {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex: none;
+}
+.lg .sw.is-clean {
+  background: var(--gc-matrix-clean);
+  box-shadow: inset 0 0 0 1px var(--gc-green);
+}
+.lg .sw.is-conflicts {
+  background: var(--gc-matrix-conflict);
+  box-shadow: inset 0 0 0 1px var(--gc-red);
+}
+.lg .sw.is-unrelated {
+  background: var(--gc-matrix-unrelated);
+  box-shadow: inset 0 0 0 1px var(--gc-amber);
+}
+.lg .sw.is-same {
+  background: var(--gc-matrix-same);
+  box-shadow: inset 0 0 0 1px var(--gc-line-strong);
+}
+.lg .sw.is-stage-local {
+  background: var(--gc-amber);
+}
+.lg .sw.is-stage-resolved {
+  background: var(--gc-green);
+}
+.lg .sw.is-stage-page {
+  background: var(--gc-accent);
+}
+.lg-sep {
+  width: 1px;
+  height: 12px;
+  background: var(--gc-line);
 }
 .grid {
   border-collapse: separate;
   border-spacing: 6px;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   width: 100%;
 }
 .grid th,
@@ -496,58 +575,73 @@ function isActive(cell: MergeSurveyCell): boolean {
   display: inline-block;
   min-width: 1.2em;
   margin-right: 4px;
-  color: var(--el-color-primary);
+  color: var(--gc-accent);
 }
 .divider {
   background: var(--el-fill-color);
-  color: var(--el-color-warning);
-  font-size: var(--gc-text);
+  color: var(--gc-amber);
+  font-size: var(--gc-fs-body);
   text-align: center;
 }
 .cell {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   width: 100%;
   min-width: 72px;
-  min-height: var(--gc-line);
+  min-height: var(--gc-row-lg);
   padding: 0 var(--gc-gap);
   border: 0;
   cursor: pointer;
   font: inherit;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   text-align: left;
   border-radius: var(--gc-radius);
-  color: var(--el-text-color-primary);
+  color: var(--gc-text);
+}
+.cell .cell-ico {
+  flex: none;
+}
+.cell .cell-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .cell.active {
-  outline: 1px solid var(--el-color-primary);
+  outline: 1px solid var(--gc-accent);
 }
 .cell.is-clean {
   background: var(--gc-matrix-clean);
+  color: var(--gc-green);
 }
 .cell.is-conflicts {
   background: var(--gc-matrix-conflict);
+  color: var(--gc-red);
 }
 .cell.is-unrelated {
   background: var(--gc-matrix-unrelated);
+  color: var(--gc-amber);
 }
 .cell.is-same {
   background: var(--gc-matrix-same);
+  color: var(--gc-text-3);
 }
 .cell.is-error {
   background: var(--gc-matrix-error);
+  color: var(--gc-text-2);
 }
 .stale-alert {
   margin-bottom: var(--gc-gap);
 }
 .cell.is-stage-local {
-  box-shadow: inset 2px 0 0 var(--el-color-warning);
+  box-shadow: inset 2px 0 0 var(--gc-amber);
 }
 .cell.is-stage-resolved,
 .cell.is-stage-mr {
-  box-shadow: inset 2px 0 0 var(--el-color-success);
+  box-shadow: inset 2px 0 0 var(--gc-green);
 }
 .cell.is-stage-page {
-  box-shadow: inset 2px 0 0 var(--el-color-primary);
+  box-shadow: inset 2px 0 0 var(--gc-accent);
 }
 .detail {
   width: 280px;
@@ -556,12 +650,12 @@ function isActive(cell: MergeSurveyCell): boolean {
 }
 .detail h3 {
   margin: 0 0 var(--gc-gap);
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   word-break: break-all;
 }
 .detail p {
   margin: 0 0 var(--gc-gap);
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   color: var(--el-text-color-secondary);
 }
 .paths {

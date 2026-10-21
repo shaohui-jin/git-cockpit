@@ -53,7 +53,7 @@ onMounted(() => {
   <div class="page logs-page">
     <h2 class="page-title">操作日志</h2>
 
-    <div class="bar gc-glass">
+    <div class="bar gc-card">
       <label>
         工具
         <el-select v-model="logs.toolFilter" clearable placeholder="全部" class="tool-select" @change="logs.load">
@@ -69,11 +69,11 @@ onMounted(() => {
       <span class="tip">只记写入。来源：Web / MCP / CLI / Chat。参数已脱敏。</span>
     </div>
 
-    <div v-if="!logs.loading && logs.logs.length === 0" class="empty gc-glass">
+    <div v-if="!logs.loading && logs.logs.length === 0" class="empty gc-card">
       <strong>还没有操作日志</strong>
       <p>预览确认后的写操作会记在这里。只读预演不记。</p>
     </div>
-    <div v-else class="table gc-glass" v-loading="logs.loading">
+    <div v-else class="table gc-card" v-loading="logs.loading">
       <div class="th">
         <span>时间</span>
         <span>来源</span>
@@ -92,7 +92,7 @@ onMounted(() => {
         </span>
         <span class="mono" :title="row.repoPath ?? ''">{{ row.repoPath ?? '—' }}</span>
         <span class="mono" :title="parseParams(row.params)">{{ parseParams(row.params) || '—' }}</span>
-        <span :class="{ bad: !!row.error }" :title="row.error || row.result">
+        <span class="res" :class="row.error ? 'bad' : 'ok'" :title="row.error || row.result">
           {{ row.error ? `失败 · ${row.error}` : `成功${row.result ? ' · ' + row.result : ''}` }}
         </span>
         <span>{{ row.durationMs }} ms</span>
@@ -121,7 +121,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: var(--gc-gap);
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
 }
 .tool-select {
   width: 200px;
@@ -130,7 +130,7 @@ onMounted(() => {
   width: 120px;
 }
 .tip {
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   color: var(--el-text-color-secondary);
 }
 .table {
@@ -147,20 +147,23 @@ onMounted(() => {
     72px;
   gap: var(--gc-gap);
   padding: 0 var(--gc-pad);
-  min-height: var(--gc-line);
+  min-height: var(--gc-row-lg);
   align-items: center;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
 }
 .th {
   position: sticky;
   top: 0;
   z-index: 1;
-  color: var(--el-text-color-secondary);
+  color: var(--gc-text-3);
   font-weight: 600;
-  background: color-mix(in srgb, var(--el-bg-color) 92%, transparent);
+  background: var(--gc-card);
 }
 .tr {
-  border-top: 1px solid var(--el-border-color-lighter);
+  border-top: 1px solid var(--gc-line-weak);
+}
+.tr:hover {
+  background: var(--gc-btn-hover);
 }
 .tr span,
 .tr .mono {
@@ -175,20 +178,42 @@ onMounted(() => {
   min-width: 0;
 }
 .tool-cell code {
+  flex: none;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: var(--gc-r-tag);
+  font-size: var(--gc-fs-meta);
+  display: inline-flex;
+  align-items: center;
+}
+.tool-cell code.write {
+  background: var(--gc-amber-weak);
+  color: var(--gc-amber);
 }
 .tool-cell em {
   flex: none;
   font-style: normal;
-  color: var(--el-text-color-secondary);
+  height: 18px;
+  padding: 0 6px;
+  border-radius: var(--gc-r-tag);
+  background: var(--gc-amber-weak);
+  color: var(--gc-amber);
+  font-size: var(--gc-fs-meta);
+  display: inline-flex;
+  align-items: center;
 }
 code.high {
-  color: var(--el-color-danger);
+  background: var(--gc-red-weak);
+  color: var(--gc-red);
+}
+.res.ok {
+  color: var(--gc-green);
 }
 .bad {
-  color: var(--el-color-danger);
+  color: var(--gc-red);
 }
 .empty {
   flex: 1;
@@ -206,6 +231,6 @@ code.high {
 }
 .empty p {
   margin: 0;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
 }
 </style>

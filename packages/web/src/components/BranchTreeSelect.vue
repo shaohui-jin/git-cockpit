@@ -89,7 +89,7 @@ function onUpdate(v: string | string[] | null): void {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   line-height: var(--gc-control);
 }
 </style>

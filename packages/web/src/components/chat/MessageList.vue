@@ -114,7 +114,7 @@ watch(mermaidKey, () => {
   padding: var(--gc-gap) var(--gc-pad);
   border-radius: var(--gc-radius);
   white-space: pre-wrap;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   line-height: 1.5;
   background: var(--el-bg-color);
 }

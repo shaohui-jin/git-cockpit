@@ -34,7 +34,7 @@ test('矩阵一格去预演 → 选边落盘 → 回矩阵显示冲突 · 本地
   await expect(page.locator('button.cell.is-conflicts')).toBeVisible();
   await page.locator('button.cell.is-conflicts').click();
   await page.getByRole('button', { name: '去预演' }).click();
-  await expect(page.getByText('存在冲突')).toBeVisible();
+  await expect(page.locator('.stamp').filter({ hasText: '存在冲突' })).toBeVisible();
   await acceptOurs(page);
   await page.getByRole('button', { name: '完成冲突处理' }).click();
   await confirmWrite(page, /worktree add/);

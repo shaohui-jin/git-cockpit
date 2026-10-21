@@ -732,7 +732,7 @@ watch([pairInto, pairFrom], () => {
   gap: var(--gc-gap);
   flex: none;
   padding: var(--gc-gap) var(--gc-pad);
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
 }
 .trail-pos {
   color: var(--el-text-color-secondary);
@@ -773,7 +773,7 @@ watch([pairInto, pairFrom], () => {
   gap: var(--gc-gap);
 }
 .lane small {
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   color: var(--el-text-color-secondary);
 }
 .lane.theirs {
@@ -809,7 +809,7 @@ watch([pairInto, pairFrom], () => {
   border-radius: var(--gc-radius);
   background: var(--el-bg-color);
   border: 1px solid var(--el-border-color-lighter);
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   white-space: nowrap;
 }
 .stamp.warn {
@@ -834,7 +834,7 @@ watch([pairInto, pairFrom], () => {
   display: inline-flex;
   align-items: center;
   gap: var(--gc-gap);
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
 }
 .pad {
   padding: var(--gc-pad);
@@ -873,7 +873,7 @@ watch([pairInto, pairFrom], () => {
 }
 .empty p {
   margin: 0;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
 }
 .grow {
   flex: 1;
@@ -888,7 +888,7 @@ watch([pairInto, pairFrom], () => {
   display: flex;
   align-items: baseline;
   gap: var(--gc-pad);
-  min-height: var(--gc-line);
+  min-height: var(--gc-row-lg);
 }
 .apply-meta dt {
   flex: none;
@@ -904,7 +904,7 @@ watch([pairInto, pairFrom], () => {
 }
 .apply-link {
   margin: var(--gc-gap) 0 0;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
 }
 .apply-actions {
   display: flex;
@@ -914,7 +914,7 @@ watch([pairInto, pairFrom], () => {
 }
 .tip {
   margin: 0;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   color: var(--el-text-color-secondary);
   line-height: 1.5;
 }
@@ -933,7 +933,7 @@ watch([pairInto, pairFrom], () => {
   margin: 0;
 }
 .sha {
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   color: var(--el-text-color-secondary);
 }
 .mb {
@@ -958,7 +958,7 @@ watch([pairInto, pairFrom], () => {
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-word;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   line-height: 1.5;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }

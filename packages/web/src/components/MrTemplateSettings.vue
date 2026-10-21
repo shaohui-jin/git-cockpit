@@ -337,10 +337,10 @@ async function clearTemplate(): Promise<void> {
   flex-wrap: wrap;
   align-items: center;
   gap: var(--gc-gap);
-  min-height: var(--gc-line);
+  min-height: var(--gc-row-lg);
 }
 .tmpl-label {
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   color: var(--el-text-color-regular);
 }
 .tmpl-fill {
@@ -351,7 +351,7 @@ async function clearTemplate(): Promise<void> {
 }
 .muted {
   margin: 0;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   color: var(--el-text-color-secondary);
 }
 .file-hidden {
@@ -385,10 +385,10 @@ async function clearTemplate(): Promise<void> {
   align-items: center;
   justify-content: space-between;
   gap: var(--gc-gap);
-  min-height: var(--gc-line);
+  min-height: var(--gc-row-lg);
   padding: 0 var(--gc-pad);
   border-bottom: 1px solid var(--el-border-color-lighter);
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
 }
 .pane-body {
   flex: 1;
@@ -398,7 +398,7 @@ async function clearTemplate(): Promise<void> {
 }
 .preview-body {
   margin: 0;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   line-height: 1.5;
   white-space: pre-wrap;
   color: var(--el-text-color-regular);
@@ -420,7 +420,7 @@ async function clearTemplate(): Promise<void> {
   display: flex;
   align-items: center;
   gap: var(--gc-gap);
-  min-height: var(--gc-line);
+  min-height: var(--gc-row-lg);
 }
 .tmpl-type {
   width: 120px;

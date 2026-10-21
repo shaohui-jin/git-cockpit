@@ -8,6 +8,7 @@
     "dev": "vite",
     "start": "vite",
     "build": "vite build",
+    "build:keep": "vite build --emptyOutDir false",
     "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit -p tsconfig.json"
   },

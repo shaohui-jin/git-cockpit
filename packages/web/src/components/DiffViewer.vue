@@ -149,7 +149,7 @@ watch(
 
 <style scoped>
 .diff-viewer {
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
 }
 
 .diff-file {
@@ -165,8 +165,8 @@ watch(
   align-items: center;
   gap: var(--gc-gap);
   width: 100%;
-  height: var(--gc-line);
-  line-height: var(--gc-line);
+  height: var(--gc-row-lg);
+  line-height: var(--gc-row-lg);
   padding: 0 var(--gc-pad);
   border: 0;
   box-sizing: border-box;
@@ -175,7 +175,7 @@ watch(
   cursor: pointer;
   text-align: left;
   font: inherit;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
 }
 
 .diff-file-head:hover {
@@ -204,7 +204,7 @@ watch(
   flex: none;
   display: inline-flex;
   gap: var(--gc-gap);
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
 }
 
 .diff-file-stats .add {
@@ -218,7 +218,7 @@ watch(
 .diff-file-hint {
   flex: none;
   color: var(--el-text-color-secondary);
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
 }
 
 .diff-file-head :deep(.d2h-tag) {

@@ -6,9 +6,10 @@ defineProps<{
 </script>
 
 <template>
-  <div class="tool-card" :class="{ ok: success, bad: !success }">
+  <div class="tool-card" :class="success ? 'ok' : 'bad'">
+    <i class="tc-ico"><GcIcon :name="success ? 'check' : 'close'" :size="12" /></i>
     <span class="tool-name mono">{{ tool }}</span>
-    <span class="tool-state">{{ success ? '已返回' : '失败' }}</span>
+    <span class="chip" :class="success ? 'green' : 'red'">{{ success ? '成功' : '失败' }}</span>
   </div>
 </template>
 
@@ -20,22 +21,43 @@ defineProps<{
   margin: 0 auto var(--gc-gap);
   max-width: 90%;
   padding: 6px var(--gc-pad);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: var(--gc-radius);
-  background: var(--el-bg-color);
-  font-size: 12px;
+  border: 1px solid var(--gc-line);
+  border-radius: var(--gc-r);
+  background: var(--gc-card);
+  font-size: var(--gc-fs-body);
 }
-.tool-card.ok {
-  border-color: var(--el-color-success-light-5);
+.tc-ico {
+  display: inline-flex;
+  flex: none;
+  color: var(--gc-green);
 }
-.tool-card.bad {
-  border-color: var(--el-color-danger-light-5);
+.tool-card.bad .tc-ico {
+  color: var(--gc-red);
 }
 .tool-name {
-  color: var(--el-color-primary);
+  color: var(--gc-text-2);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.tool-state {
+.chip {
   margin-left: auto;
-  color: var(--el-text-color-secondary);
+  flex: none;
+  height: 18px;
+  padding: 0 8px;
+  border-radius: var(--gc-r-tag);
+  font-size: var(--gc-fs-meta);
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+}
+.chip.green {
+  background: var(--gc-green-weak);
+  color: var(--gc-green);
+}
+.chip.red {
+  background: var(--gc-red-weak);
+  color: var(--gc-red);
 }
 </style>

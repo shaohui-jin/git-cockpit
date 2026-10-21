@@ -434,15 +434,15 @@ defineExpose({ buildFiles });
   align-items: center;
   gap: var(--gc-gap);
   flex-shrink: 0;
-  min-height: var(--gc-line);
+  min-height: var(--gc-row-lg);
   margin-bottom: var(--gc-gap);
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   color: var(--el-text-color-secondary);
 }
 .nav-pos {
   margin: 0 var(--gc-gap);
   text-align: center;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   font-variant-numeric: tabular-nums;
 }
 .muted {
@@ -470,9 +470,9 @@ defineExpose({ buildFiles });
 .merge-bar {
   display: flex;
   align-items: center;
-  min-height: var(--gc-line);
+  min-height: var(--gc-row-lg);
   padding: 0 var(--gc-pad);
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   box-sizing: border-box;
 }
 .file-list-head,
@@ -572,11 +572,11 @@ defineExpose({ buildFiles });
   position: sticky;
   top: 0;
   z-index: 1;
-  min-height: var(--gc-line);
+  min-height: var(--gc-row-lg);
   padding: 0;
   background: var(--el-fill-color-light);
   border-bottom: 1px solid var(--el-border-color-lighter);
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   color: var(--el-text-color-secondary);
 }
 .merge-heads > div {
@@ -591,7 +591,7 @@ defineExpose({ buildFiles });
   padding: 4px var(--gc-pad);
   border-bottom: 1px solid var(--el-border-color-lighter);
   background: var(--el-fill-color-lighter);
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   color: var(--el-text-color-secondary);
 }
 .blame-side {
@@ -602,7 +602,7 @@ defineExpose({ buildFiles });
 }
 .empty {
   padding: var(--gc-pad);
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   color: var(--el-text-color-secondary);
 }
 .merge-row {
@@ -628,7 +628,7 @@ defineExpose({ buildFiles });
 .code {
   margin: 0;
   padding: 0;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   line-height: var(--gc-merge-code-line);
 }
 .code-line {

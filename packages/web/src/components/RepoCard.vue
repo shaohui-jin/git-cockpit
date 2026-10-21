@@ -191,21 +191,21 @@ onUnmounted(() => {
   flex-direction: column;
   gap: var(--gc-gap);
   padding: var(--gc-pad);
-  border: 1px solid var(--el-border-color-lighter);
+  border: 1px solid var(--gc-line);
   border-radius: var(--gc-radius);
-  border-left-width: 3px;
+  border-left-width: 2px;
   cursor: grab;
-  background: color-mix(in srgb, var(--el-bg-color) 88%, transparent);
+  background: var(--gc-card);
   min-width: 0;
 }
 .repo-card.drag-over {
-  outline: 1px dashed var(--el-color-primary);
+  outline: 1px dashed var(--gc-accent);
 }
 .repo-card:hover {
-  background: var(--el-fill-color-light);
+  background: var(--gc-btn-hover);
 }
 .repo-card.current {
-  background: var(--el-color-primary-light-9);
+  background: var(--gc-accent-weak);
   box-shadow: var(--gc-shadow-menu);
 }
 .repo-card.muted {
@@ -218,16 +218,16 @@ onUnmounted(() => {
   opacity: 0.45;
 }
 .repo-card.stuck {
-  border-left-color: var(--el-color-danger);
+  border-left-color: var(--gc-red);
 }
 .repo-card.dirty {
-  border-left-color: var(--el-color-warning);
+  border-left-color: var(--gc-amber);
 }
 .repo-card.sync {
-  border-left-color: var(--el-color-primary);
+  border-left-color: var(--gc-accent);
 }
 .repo-card.quiet {
-  border-left-color: var(--el-color-success);
+  border-left-color: var(--gc-green);
 }
 .card-top,
 .card-meta {
@@ -248,26 +248,26 @@ onUnmounted(() => {
 .wx {
   flex: none;
   font-style: normal;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   padding: 0 var(--gc-gap);
-  border-radius: 999px;
+  border-radius: var(--gc-r-tag);
   background: var(--el-fill-color-light);
 }
 .wx.stuck {
-  color: var(--el-color-danger);
-  background: var(--el-color-danger-light-9);
+  color: var(--gc-red);
+  background: var(--gc-red-weak);
 }
 .wx.dirty {
-  color: var(--el-color-primary);
-  background: var(--el-color-primary-light-9);
+  color: var(--gc-amber);
+  background: var(--gc-amber-weak);
 }
 .wx.sync {
-  color: var(--el-color-primary);
-  background: color-mix(in srgb, var(--el-color-primary) 16%, transparent);
+  color: var(--gc-accent-text);
+  background: var(--gc-accent-weak);
 }
 .wx.quiet {
-  color: var(--el-color-success);
-  background: var(--el-color-success-light-9);
+  color: var(--gc-green);
+  background: var(--gc-green-weak);
 }
 .more-btn {
   flex: none;

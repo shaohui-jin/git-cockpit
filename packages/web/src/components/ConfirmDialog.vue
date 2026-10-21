@@ -85,6 +85,7 @@ function onCancel(): void {
     :title="`执行操作：${tool}`"
     width="560px"
     :close-on-click-modal="false"
+    class="gc-dryrun-dialog"
     @closed="emit('update:visible', false)"
   >
     <el-alert v-if="risk === 'dangerous'" type="error" :closable="false" show-icon class="risk-alert">
@@ -95,14 +96,15 @@ function onCancel(): void {
     </el-alert>
 
     <div v-if="command" class="cmd-box">
+      <div class="cmd-label"><GcIcon name="dry-run" :size="14" />将执行的命令（dry-run 预览，未实际执行）</div>
       <pre class="cmd-pre mono">{{ command }}</pre>
     </div>
 
     <div v-if="affectedFiles.length" class="files-box">
-      <div class="cmd-label">涉及文件（{{ affectedFiles.length }}）</div>
-      <el-scrollbar max-height="140px">
-        <div v-for="f in affectedFiles" :key="f" class="file-item mono">{{ f }}</div>
-      </el-scrollbar>
+      <div class="cmd-label">影响文件（{{ affectedFiles.length }}）</div>
+      <div class="dryrun-files">
+        <span v-for="f in affectedFiles" :key="f" class="f mono">{{ f }}</span>
+      </div>
     </div>
 
     <div v-if="previewNote" class="note-text">{{ previewNote }}</div>
@@ -137,27 +139,85 @@ function onCancel(): void {
   word-break: break-word;
 }
 .cmd-label {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--gc-fs-body);
+  font-weight: 600;
+  color: var(--gc-text-2);
   margin-bottom: 6px;
 }
 .cmd-pre {
   margin: 0;
   padding: 10px 12px;
-  background: var(--el-fill-color-light);
-  border-radius: 6px;
+  background: var(--gc-overlay);
+  border: 1px solid var(--gc-line);
+  border-radius: var(--gc-r);
   overflow-x: auto;
-  font-size: 12px;
+  font-size: var(--gc-fs-body);
+  color: var(--gc-text-2);
+}
+.dryrun-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.dryrun-files .f {
+  height: 18px;
+  padding: 0 6px;
+  border-radius: var(--gc-r-tag);
+  background: var(--gc-card);
+  border: 1px solid var(--gc-line);
+  font-size: var(--gc-fs-meta);
+  color: var(--gc-text-2);
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .file-item {
-  font-size: 12px;
+  font-size: var(--gc-fs-body);
   padding: 2px 0;
 }
 .note-text {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
+  font-size: var(--gc-fs-body);
+  color: var(--gc-text-3);
 }
 .risk-tag {
   float: left;
+}
+</style>
+
+<!-- el-dialog teleport 到 body，scoped 触达不到根节点；干跑确认语言：琥珀顶缘 + 待确认呼吸左边框（「未确认不安置」） -->
+<style>
+.gc-dryrun-dialog {
+  position: relative;
+  border-radius: var(--gc-r);
+  border-top: 2px solid var(--gc-amber);
+  box-shadow:
+    var(--gc-shadow-menu),
+    0 -6px 18px rgba(242, 201, 76, 0.15);
+}
+.gc-dryrun-dialog::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--gc-amber);
+  border-radius: var(--gc-r) 0 0 var(--gc-r);
+  animation: gc-dryrun-breathe var(--gc-t-pulse) var(--gc-ease) infinite;
+}
+@keyframes gc-dryrun-breathe {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 </style>

@@ -497,7 +497,7 @@ watch(revision, () => {
 }
 .eyebrow {
   margin: 0;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--el-color-primary);
@@ -522,7 +522,7 @@ watch(revision, () => {
 }
 .path {
   margin: 0;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   color: var(--el-text-color-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -535,26 +535,26 @@ watch(revision, () => {
   gap: var(--gc-gap);
 }
 .wx {
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   padding: 0 var(--gc-gap);
-  border-radius: 999px;
+  border-radius: var(--gc-r-tag);
   background: var(--el-fill-color-light);
 }
 .wx.stuck {
-  color: var(--el-color-danger);
-  background: var(--el-color-danger-light-9);
+  color: var(--gc-red);
+  background: var(--gc-red-weak);
 }
 .wx.dirty {
-  color: var(--el-color-primary);
-  background: var(--el-color-primary-light-9);
+  color: var(--gc-amber);
+  background: var(--gc-amber-weak);
 }
 .wx.sync {
-  color: var(--el-color-primary);
-  background: color-mix(in srgb, var(--el-color-primary) 16%, transparent);
+  color: var(--gc-accent-text);
+  background: var(--gc-accent-weak);
 }
 .wx.quiet {
-  color: var(--el-color-success);
-  background: var(--el-color-success-light-9);
+  color: var(--gc-green);
+  background: var(--gc-green-weak);
 }
 .ab b {
   font-size: var(--el-font-size-extra-large);
@@ -562,24 +562,24 @@ watch(revision, () => {
   margin: 0 2px 0 4px;
 }
 .ab b.on:first-of-type {
-  color: var(--el-color-success);
+  color: var(--gc-green);
 }
 .ab b.on:last-of-type {
-  color: var(--el-color-danger);
+  color: var(--gc-red);
 }
 .chip {
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   padding: 0 var(--gc-gap);
-  border-radius: 999px;
+  border-radius: var(--gc-r-tag);
   background: var(--el-fill-color-light);
 }
 .chip.danger {
-  color: var(--el-color-danger);
-  background: var(--el-color-danger-light-9);
+  color: var(--gc-red);
+  background: var(--gc-red-weak);
 }
 .hero-hint {
   margin: 0;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   color: var(--el-text-color-secondary);
 }
 .open-row {
@@ -599,7 +599,6 @@ watch(revision, () => {
   gap: var(--gc-gap);
 }
 .wx-tab {
-  border: 0;
   text-align: left;
   color: inherit;
   padding: var(--gc-pad);
@@ -608,31 +607,37 @@ watch(revision, () => {
   flex-direction: column;
   gap: 2px;
   font: inherit;
-  background: color-mix(in srgb, var(--el-bg-color) 82%, transparent);
+  background: var(--gc-card);
+  border: 1px solid var(--gc-line);
+  border-radius: var(--gc-radius);
+  transition:
+    background var(--gc-t-micro) var(--gc-ease),
+    border-color var(--gc-t-micro) var(--gc-ease);
 }
 .wx-tab strong {
   font-size: var(--el-font-size-extra-large);
   line-height: 1;
 }
 .wx-tab.stuck strong {
-  color: var(--el-color-danger);
+  color: var(--gc-red);
 }
 .wx-tab.dirty strong {
-  color: var(--el-color-primary);
+  color: var(--gc-amber);
 }
 .wx-tab.sync strong {
-  color: var(--el-color-primary);
+  color: var(--gc-accent-text);
 }
 .wx-tab.quiet strong {
-  color: var(--el-color-success);
+  color: var(--gc-green);
 }
 .wx-tab small {
-  color: var(--el-text-color-secondary);
-  font-size: var(--gc-text);
+  color: var(--gc-text-3);
+  font-size: var(--gc-fs-body);
   line-height: 1.35;
 }
 .wx-tab.on {
-  box-shadow: 0 0 0 1px var(--el-color-primary) inset;
+  background: var(--gc-accent-weak);
+  box-shadow: 0 0 0 1px var(--gc-accent) inset;
 }
 .mosaic-block {
   flex: 1;

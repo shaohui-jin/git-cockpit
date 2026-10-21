@@ -340,7 +340,7 @@ onUnmounted(() => {
 .page-lead {
   flex: none;
   margin: 0 0 var(--gc-gap);
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   color: var(--el-text-color-secondary);
 }
 .chat-list {

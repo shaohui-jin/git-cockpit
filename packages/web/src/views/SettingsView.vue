@@ -550,7 +550,7 @@ async function clearLlmKey(): Promise<void> {
 
     <div class="settings-body" :class="{ fill: activeTab === 'template' || activeTab === 'git' }">
       <section v-show="activeTab === 'mr'" class="stack">
-        <div class="gc-glass pad">
+        <div class="gc-card pad">
           <p class="gc-eyebrow">默认远程</p>
           <div class="remote-bar">
             <template v-if="hasRepoRemotes">
@@ -580,7 +580,7 @@ async function clearLlmKey(): Promise<void> {
         <div
           v-for="opt in methodOptions"
           :key="opt.id"
-          class="gc-glass opt"
+          class="gc-card opt"
           :class="{ on: method === opt.id, disabled: settings.saving }"
           role="button"
           tabindex="0"
@@ -702,7 +702,7 @@ async function clearLlmKey(): Promise<void> {
           </div>
         </div>
 
-        <div v-if="showCurrentHostCard && currentHostProfile" class="gc-glass pad">
+        <div v-if="showCurrentHostCard && currentHostProfile" class="gc-card pad">
           <p class="gc-eyebrow">当前远程凭证</p>
           <p class="mr-hint">只显示当前选中远程的域名。其它实例上的 Token 不在这里列出。</p>
           <ul class="host-list">
@@ -725,7 +725,7 @@ async function clearLlmKey(): Promise<void> {
       </section>
 
       <section v-show="activeTab === 'llm'" class="stack">
-        <div class="gc-glass pad">
+        <div class="gc-card pad">
           <p class="gc-eyebrow">聊天模型</p>
           <p class="mr-hint">
             Key 与 MR Token 一样只存在本机设置里，不进 MCP 工具参数，页面不回填明文。浏览器和桌面同一套配置。
@@ -761,7 +761,7 @@ async function clearLlmKey(): Promise<void> {
       </section>
 
       <section v-show="activeTab === 'git'" class="git-split">
-        <aside class="gc-glass pad git-side">
+        <aside class="gc-card pad git-side">
           <p class="gc-eyebrow">默认行为</p>
           <label class="kv">
             dry-run 默认
@@ -790,7 +790,7 @@ async function clearLlmKey(): Promise<void> {
             <el-button :disabled="!gitDirty" @click="syncGitDraft">放弃</el-button>
           </div>
         </aside>
-        <div class="gc-glass pad git-main" v-loading="settings.loading">
+        <div class="gc-card pad git-main" v-loading="settings.loading">
           <p class="hint git-main-hint">
             点芯片启用或禁用。高危左边红条，默认关。打开后执行前仍会自动备份。没有审批队列。
           </p>
@@ -871,7 +871,7 @@ async function clearLlmKey(): Promise<void> {
 }
 .git-pack-h {
   margin: 0 0 var(--gc-gap);
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--el-color-primary);
@@ -895,29 +895,29 @@ async function clearLlmKey(): Promise<void> {
   background: var(--el-fill-color-light);
   color: var(--el-text-color-secondary);
   font: inherit;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
 .git-chip.on {
-  background: color-mix(in srgb, var(--el-color-primary) 22%, transparent);
-  color: var(--el-text-color-primary);
+  background: var(--gc-accent-weak);
+  color: var(--gc-accent-text);
 }
 .git-chip.high {
-  box-shadow: inset 2px 0 0 var(--el-color-danger);
+  box-shadow: inset 2px 0 0 var(--gc-red);
 }
 .chip-ask {
-  font-size: 11px;
+  font-size: var(--gc-fs-meta);
   padding: 0 4px;
-  border-radius: 4px;
+  border-radius: var(--gc-r-tag);
   background: var(--el-fill-color);
   color: var(--el-text-color-secondary);
 }
 .chip-ask.on {
-  background: color-mix(in srgb, var(--el-color-danger) 35%, transparent);
-  color: var(--el-color-danger);
+  background: var(--gc-red-weak);
+  color: var(--gc-red);
 }
 @media (max-width: 900px) {
   .git-split {
@@ -936,7 +936,8 @@ async function clearLlmKey(): Promise<void> {
   width: 100%;
 }
 .opt.on {
-  box-shadow: 0 0 0 1px var(--el-color-primary) inset;
+  background: var(--gc-accent-weak);
+  box-shadow: 0 0 0 1px var(--gc-accent) inset;
 }
 .opt.disabled {
   cursor: default;
@@ -949,33 +950,33 @@ async function clearLlmKey(): Promise<void> {
   gap: var(--gc-gap);
 }
 .opt-head strong {
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
 }
 .ok {
   color: var(--el-color-success);
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
 }
 .bad {
   color: var(--el-color-danger);
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
 }
 .hint {
   margin: var(--gc-gap) 0 0;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   line-height: 1.5;
   color: var(--el-text-color-secondary);
 }
 .field-label {
   margin: var(--gc-pad) 0 var(--gc-gap);
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
 }
 .kv {
   display: grid;
   grid-template-columns: 140px minmax(0, 1fr);
   align-items: center;
   margin-top: var(--gc-gap);
-  min-height: var(--gc-line);
-  font-size: var(--gc-text);
+  min-height: var(--gc-row-lg);
+  font-size: var(--gc-fs-body);
 }
 .row {
   display: flex;
@@ -997,7 +998,7 @@ async function clearLlmKey(): Promise<void> {
 }
 .mr-hint {
   margin: 0;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   line-height: 1.5;
   color: var(--el-text-color-secondary);
 }
@@ -1007,7 +1008,7 @@ async function clearLlmKey(): Promise<void> {
 .remote-bar {
   display: flex;
   align-items: center;
-  min-height: var(--gc-line);
+  min-height: var(--gc-row-lg);
   gap: var(--gc-gap);
   flex-wrap: wrap;
 }
@@ -1023,12 +1024,12 @@ async function clearLlmKey(): Promise<void> {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--el-text-color-secondary);
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
 }
 .mr-platform-row {
   display: flex;
   align-items: center;
-  min-height: var(--gc-line);
+  min-height: var(--gc-row-lg);
   gap: var(--gc-gap);
   flex-wrap: wrap;
   margin-top: var(--gc-gap);
@@ -1051,9 +1052,9 @@ async function clearLlmKey(): Promise<void> {
 .mr-kv {
   display: flex;
   align-items: center;
-  min-height: var(--gc-line);
+  min-height: var(--gc-row-lg);
   gap: var(--gc-gap);
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   color: var(--el-text-color-regular);
 }
 .mr-kv span:first-child {
@@ -1073,13 +1074,13 @@ async function clearLlmKey(): Promise<void> {
 .mr-inline {
   display: flex;
   align-items: center;
-  min-height: var(--gc-line);
+  min-height: var(--gc-row-lg);
   gap: var(--gc-gap);
   flex-wrap: wrap;
 }
 .token-title-status {
   margin: 0;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   line-height: 1.5;
 }
 .token-title-status.ok {
@@ -1099,7 +1100,7 @@ async function clearLlmKey(): Promise<void> {
 .host-row {
   display: flex;
   align-items: center;
-  min-height: var(--gc-line);
+  min-height: var(--gc-row-lg);
   gap: var(--gc-gap);
 }
 </style>

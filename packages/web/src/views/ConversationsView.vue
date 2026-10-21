@@ -175,13 +175,13 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: var(--gc-gap);
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
 }
 .repo-select {
   width: 200px;
 }
 .tip {
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   color: var(--el-text-color-secondary);
 }
 .table {
@@ -196,9 +196,9 @@ onMounted(() => {
   grid-template-columns: minmax(160px, 1.4fr) minmax(120px, 1fr) 168px 56px 148px;
   gap: var(--gc-gap);
   padding: 0 var(--gc-pad);
-  min-height: var(--gc-line);
+  min-height: var(--gc-row-lg);
   align-items: center;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
 }
 .th {
   position: sticky;
@@ -241,6 +241,6 @@ onMounted(() => {
 }
 .empty p {
   margin: 0;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
 }
 </style>

@@ -16,7 +16,7 @@ import { jobLine, notifyJobEnded } from '@/utils/jobNotify';
 
 const ChatView = defineAsyncComponent(() => import('@/views/ChatView.vue'));
 
-type DockItem = { path: string; label: string };
+type DockItem = { path: string; label: string; icon: string };
 
 const repos = useReposStore();
 const settings = useSettingsStore();
@@ -52,15 +52,15 @@ const FRAME_KEY = 'gc-chat-frame';
 const GRIPS: Grip[] = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'];
 
 const workItems: DockItem[] = [
-  { path: '/dashboard', label: '工作台' },
-  { path: '/status', label: '状态' },
-  { path: '/merge', label: '合并' }
+  { path: '/dashboard', label: '工作台', icon: 'gauge' },
+  { path: '/status', label: '状态', icon: 'activity' },
+  { path: '/merge', label: '合并', icon: 'git-merge' }
 ];
 const systemItems: DockItem[] = [
-  { path: '/jobs', label: '任务' },
-  { path: '/logs', label: '日志' },
-  { path: '/conversations', label: '对话记录' },
-  { path: '/settings', label: '设置' }
+  { path: '/jobs', label: '任务', icon: 'layers' },
+  { path: '/logs', label: '日志', icon: 'scroll' },
+  { path: '/conversations', label: '对话记录', icon: 'bubble' },
+  { path: '/settings', label: '设置', icon: 'sliders' }
 ];
 const dockItems = [...workItems, ...systemItems];
 
@@ -80,6 +80,17 @@ const backendVersion = computed(() => repos.serverVersion || pageVersion);
 const backendConnected = computed(() => repos.healthOk === true);
 const desktopVersion = computed(() => desktop.value.version || pageVersion);
 const desktopConnected = computed(() => Boolean(desktop.value.version));
+const backendChecked = ref(false);
+const desktopLoading = ref(false);
+/** 连接三态：ok / connecting（琥珀呼吸）/ failed（红点）——驾驶舱仪表灯 */
+const backendState = computed<'ok' | 'connecting' | 'failed'>(() => {
+  if (!backendChecked.value) return 'connecting';
+  return backendConnected.value ? 'ok' : 'failed';
+});
+const desktopState = computed<'ok' | 'connecting' | 'failed'>(() => {
+  if (desktopConnected.value) return 'ok';
+  return desktopLoading.value ? 'connecting' : 'failed';
+});
 let unsubscribeDesktop: (() => void) | null = null;
 
 function applyDesktopState(state: DesktopUpdateState): void {
@@ -399,14 +410,17 @@ let unsubscribe: (() => void) | null = null;
 
 onMounted(async () => {
   await repos.checkHealth();
+  backendChecked.value = true;
   void repos.refreshServiceUpdate();
   const bridge = getDesktopBridge();
   if (bridge) {
+    desktopLoading.value = true;
     try {
       applyDesktopState(await bridge.getState());
     } catch {
       /* 壳子还没准备好时保持「未知」 */
     }
+    desktopLoading.value = false;
     unsubscribeDesktop = bridge.onState(applyDesktopState);
   }
   await repos.load();
@@ -485,17 +499,18 @@ onUnmounted(() => {
   <div class="app-shell">
     <header class="top">
       <div class="brand">
-        <span class="brand-mark">⌘</span>
-        <span class="brand-name">Git Cockpit</span>
+        <span class="brand-mark"><GcIcon name="logo" /></span>
       </div>
       <div class="top-end">
-        <button v-if="liveJob" type="button" class="pulse" :title="liveJobTitle" @click="goMenu('/jobs')">
-          <i /><span>{{ liveJobTitle }}</span>
-          <em v-if="jobs.runningCount > 1">{{ jobs.runningCount }}</em>
+        <button v-if="liveJob" type="button" class="pulse-count" :title="liveJobTitle" @click="goMenu('/jobs')">
+          <i /><span>{{ jobs.runningCount }} 进行中</span>
         </button>
-        <el-tag size="small" type="success">页面 {{ pageVersion }} 已连接</el-tag>
-        <el-tag size="small" :type="backendConnected ? 'success' : 'danger'">
-          后端 {{ backendVersion }} {{ backendConnected ? '已连接' : '未连接' }}
+        <span class="conn-tag is-ok">
+          <i class="dot" /><span class="lbl">页面已连接</span><span class="val">{{ pageVersion }}</span>
+        </span>
+        <span class="conn-tag" :class="backendState">
+          <i class="dot" /><span class="lbl">后端{{ backendConnected ? '已连接' : '未连接' }}</span
+          ><span class="val">{{ backendVersion }}</span>
           <button
             v-if="repos.serviceUpdateAvailable"
             type="button"
@@ -524,9 +539,10 @@ onUnmounted(() => {
               />
             </svg>
           </button>
-        </el-tag>
-        <el-tag size="small" :type="desktopConnected ? 'success' : 'danger'">
-          桌面 {{ desktopVersion }} {{ desktopConnected ? '已连接' : '未连接' }}
+        </span>
+        <span class="conn-tag" :class="desktopState">
+          <i class="dot" /><span class="lbl">桌面{{ desktopConnected ? '已连接' : '未连接' }}</span
+          ><span class="val">{{ desktopVersion }}</span>
           <button
             v-if="desktop.updateAvailable"
             type="button"
@@ -538,9 +554,12 @@ onUnmounted(() => {
               <path d="M6 1.5 10 6.2H7.6V10.5H4.4V6.2H2L6 1.5Z" fill="currentColor" />
             </svg>
           </button>
-        </el-tag>
+        </span>
       </div>
     </header>
+    <div v-if="liveJob" class="pulsebar" :title="liveJobTitle" @click="goMenu('/jobs')">
+      <i class="fill" /><i class="scan" />
+    </div>
 
     <main class="main-content">
       <router-view v-slot="{ Component }">
@@ -601,7 +620,8 @@ onUnmounted(() => {
         :class="{ on: pageActive(m.path) }"
         @click="goMenu(m.path)"
       >
-        {{ m.label }}
+        <GcIcon :name="m.icon" class="dock-ico" />
+        <span class="dock-label">{{ m.label }}</span>
         <span v-if="m.path === '/jobs' && jobs.runningCount" class="dock-count">{{ jobs.runningCount }}</span>
       </button>
     </nav>
@@ -615,83 +635,156 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--el-bg-color-page);
-  --gc-dock-space: calc(var(--gc-control) + var(--gc-pad) * 2 + var(--gc-gap) * 2);
+  background: var(--gc-page);
 }
 .top {
   flex: none;
   display: flex;
   align-items: center;
   gap: var(--gc-pad);
-  height: var(--gc-line);
+  height: 44px;
   padding: 0 var(--gc-pad);
-  border-bottom: 1px solid var(--el-border-color-light);
-  background: var(--el-bg-color);
+  border-bottom: 1px solid var(--gc-line);
+  background: var(--gc-page);
   z-index: 10;
 }
 .brand {
   display: flex;
   align-items: center;
-  gap: var(--gc-gap);
-  font-size: var(--el-font-size-extra-large);
-  font-weight: 600;
+  flex: none;
 }
 .brand-mark {
-  color: var(--el-color-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--gc-accent);
 }
 .top-end {
   display: flex;
   align-items: center;
-  gap: var(--gc-pad);
+  gap: var(--gc-gap);
   margin-left: auto;
   min-width: 0;
 }
-.pulse {
+
+/* ---------- 连接 tag ×3（正常 teal 点 / 连接中琥珀呼吸 / 失败红点红边） ---------- */
+.conn-tag {
   display: inline-flex;
   align-items: center;
-  gap: var(--gc-gap);
-  min-width: 0;
-  max-width: 280px;
-  height: var(--gc-control);
-  padding: 0 var(--gc-pad);
-  border: 0;
-  border-radius: var(--gc-radius);
-  background: color-mix(in srgb, var(--el-color-success) 16%, transparent);
-  color: var(--el-text-color-regular);
-  font: inherit;
-  font-size: var(--gc-text);
-  cursor: pointer;
-}
-.pulse span {
-  overflow: hidden;
-  text-overflow: ellipsis;
+  gap: 6px;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: var(--gc-r-tag);
+  background: var(--gc-overlay);
+  border: 1px solid var(--gc-line);
+  font-size: var(--gc-fs-meta);
+  font-weight: 500;
+  line-height: var(--gc-lh-tag);
+  color: var(--gc-text-2);
   white-space: nowrap;
 }
-.pulse i {
+.conn-tag .dot {
   flex: none;
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  background: var(--el-color-success);
-  box-shadow: 0 0 8px var(--el-color-success);
+  background: var(--gc-accent);
+  box-shadow: var(--gc-glow-sm);
 }
-.pulse em {
-  flex: none;
-  font-style: normal;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 5px;
-  border-radius: 8px;
-  background: var(--el-color-danger);
-  color: #fff;
-  font-size: 11px;
-  line-height: 16px;
-  text-align: center;
+.conn-tag .val {
+  color: var(--gc-text-3);
+  font-variant-numeric: tabular-nums;
 }
-.top-end :deep(.el-tag__content) {
+.conn-tag.is-connecting .dot {
+  background: var(--gc-amber);
+  box-shadow: none;
+  animation: gc-breath var(--gc-t-breath) var(--gc-ease) infinite;
+}
+.conn-tag.is-failed {
+  border-color: rgba(255, 133, 133, 0.4);
+}
+.conn-tag.is-failed .dot {
+  background: var(--gc-red);
+  box-shadow: none;
+}
+.conn-tag.is-failed .val {
+  color: var(--gc-red);
+}
+@keyframes gc-breath {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ---------- 任务脉冲计数 chip（点击跳任务页） ---------- */
+.pulse-count {
   display: inline-flex;
   align-items: center;
+  gap: 5px;
+  height: 20px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--gc-r-tag);
+  background: var(--gc-accent-weak);
+  color: var(--gc-accent-text);
+  font: inherit;
+  font-size: var(--gc-fs-meta);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
 }
+.pulse-count i {
+  flex: none;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--gc-accent);
+  box-shadow: var(--gc-glow-sm);
+}
+
+/* ---------- 任务脉冲条（2px 通长，纯色扫描段，禁渐变） ---------- */
+.pulsebar {
+  flex: none;
+  position: relative;
+  height: 2px;
+  background: var(--gc-accent-weak);
+  overflow: hidden;
+  cursor: pointer;
+}
+.pulsebar .fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  background: var(--gc-signal-bar);
+  box-shadow: var(--gc-glow-bar);
+}
+.pulsebar .scan {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 72px;
+  background: var(--gc-signal-scan);
+  opacity: 0.9;
+  animation: gc-scan 1800ms linear infinite;
+}
+@keyframes gc-scan {
+  from {
+    transform: translateX(-72px);
+  }
+  to {
+    transform: translateX(calc(100vw + 72px));
+  }
+}
+
+/* tag 内嵌操作钮（升级 / 停服） */
 .tag-up,
 .tag-off {
   display: inline-flex;
@@ -699,7 +792,7 @@ onUnmounted(() => {
   justify-content: center;
   width: 12px;
   height: 12px;
-  margin-left: 4px;
+  margin-left: 2px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -708,11 +801,11 @@ onUnmounted(() => {
 }
 .tag-up {
   border-radius: 50%;
-  background: var(--el-color-warning);
+  background: var(--gc-amber-strong);
   color: #fff;
 }
 .tag-off {
-  color: var(--el-color-danger);
+  color: var(--gc-red);
 }
 .tag-up svg,
 .tag-off svg {
@@ -723,7 +816,6 @@ onUnmounted(() => {
   flex: 1;
   min-height: 0;
   padding: var(--gc-pad);
-  padding-bottom: var(--gc-dock-space);
   width: 100%;
   overflow: hidden;
   display: flex;
@@ -749,11 +841,10 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  background: color-mix(in srgb, var(--el-bg-color-overlay) 94%, transparent);
-  border: 1px solid var(--el-border-color);
+  background: var(--gc-overlay);
+  border: 1px solid var(--gc-line);
   border-radius: var(--gc-radius);
   box-shadow: var(--gc-shadow-menu);
-  backdrop-filter: blur(16px);
 }
 .grip {
   position: absolute;
@@ -830,8 +921,8 @@ onUnmounted(() => {
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: var(--el-color-primary);
-  color: #fff;
+  background: var(--gc-accent);
+  color: var(--gc-accent-ink);
   box-shadow: var(--gc-shadow-menu);
   cursor: grab;
   touch-action: none;
@@ -859,12 +950,12 @@ onUnmounted(() => {
 .chat-ball.confirm {
   box-shadow:
     var(--gc-shadow-menu),
-    0 0 0 2px var(--el-color-warning);
+    0 0 0 2px var(--gc-amber);
 }
 .chat-ball.error {
   box-shadow:
     var(--gc-shadow-menu),
-    0 0 0 2px var(--el-color-danger);
+    0 0 0 2px var(--gc-red);
 }
 .ball-icon {
   position: relative;
@@ -878,8 +969,8 @@ onUnmounted(() => {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--el-color-warning);
-  box-shadow: 0 0 0 2px var(--el-color-primary);
+  background: var(--gc-amber);
+  box-shadow: 0 0 0 2px var(--gc-accent);
 }
 @keyframes ball-spin {
   to {
@@ -890,7 +981,7 @@ onUnmounted(() => {
   flex: none;
   display: flex;
   align-items: center;
-  height: var(--gc-line);
+  height: var(--gc-row-lg);
   padding: 0 var(--gc-pad);
   border-bottom: 1px solid var(--el-border-color-lighter);
   font-weight: 600;
@@ -917,53 +1008,80 @@ onUnmounted(() => {
   background: var(--el-fill-color-light);
   color: inherit;
   font: inherit;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   cursor: pointer;
 }
+/* ---------- Dock（44px 实底通栏，禁玻璃；激活项顶部 2px 指示条） ---------- */
 .dock {
-  position: absolute;
-  z-index: 25;
-  left: 50%;
-  bottom: var(--gc-pad);
-  transform: translateX(-50%);
+  flex: none;
+  height: 44px;
   display: flex;
-  gap: var(--gc-gap);
-  padding: var(--gc-gap);
-  border-radius: var(--gc-radius);
-  background: color-mix(in srgb, var(--el-bg-color) 82%, transparent);
-  border: 1px solid var(--el-border-color);
-  box-shadow: var(--gc-shadow-menu);
-  backdrop-filter: blur(16px);
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 var(--gc-pad);
+  background: var(--gc-page);
+  border-top: 1px solid var(--gc-line);
+  z-index: 25;
 }
 .dock-btn {
   position: relative;
   border: 0;
   background: transparent;
-  color: var(--el-text-color-regular);
-  padding: 0 var(--gc-pad);
-  height: var(--gc-control);
+  color: var(--gc-text-3);
+  width: 64px;
+  height: 36px;
   border-radius: var(--gc-radius);
   cursor: pointer;
   font: inherit;
-  font-size: var(--gc-text);
-  opacity: 0.65;
+  font-size: var(--gc-fs-meta);
+  font-weight: 500;
+  line-height: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  transition:
+    background var(--gc-t-micro) var(--gc-ease),
+    color var(--gc-t-micro) var(--gc-ease);
+}
+.dock-ico {
+  width: 16px;
+  height: 16px;
+}
+.dock-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--gc-text-2);
 }
 .dock-btn.on {
-  opacity: 1;
-  background: color-mix(in srgb, var(--el-color-primary) 22%, transparent);
-  color: var(--el-text-color-primary);
+  background: var(--gc-accent-weak);
+  color: var(--gc-accent-text);
+}
+.dock-btn.on::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 2px;
+  border-radius: 0 0 2px 2px;
+  background: var(--gc-accent);
 }
 .dock-count {
-  margin-left: 4px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 5px;
-  border-radius: 8px;
-  background: var(--el-color-danger);
+  position: absolute;
+  top: 2px;
+  right: 8px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  background: var(--gc-red-strong);
   color: #fff;
-  font-size: 11px;
-  line-height: 16px;
-  display: inline-block;
-  vertical-align: middle;
+  font-size: 10px;
+  line-height: 14px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 </style>

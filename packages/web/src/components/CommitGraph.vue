@@ -443,7 +443,7 @@ watch(searchQuery, () => {
   z-index: 3;
   height: var(--gc-control);
   padding: 0 10px;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   color: var(--el-text-color-regular);
   background: var(--el-bg-color-overlay);
   border: 1px solid var(--el-border-color);
@@ -469,7 +469,7 @@ watch(searchQuery, () => {
   border: none;
   background: transparent;
   color: var(--el-text-color-primary);
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   outline: none;
 }
 .graph-search-meta {

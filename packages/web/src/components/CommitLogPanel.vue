@@ -234,9 +234,9 @@ defineExpose({ refresh: loadLog, loading });
   grid-template-columns: 90px minmax(200px, 1.4fr) 140px 170px;
   gap: var(--gc-gap);
   padding: 0 var(--gc-pad);
-  min-height: var(--gc-line);
+  min-height: var(--gc-row-lg);
   align-items: center;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
 }
 .th {
   position: sticky;
@@ -282,7 +282,7 @@ defineExpose({ refresh: loadLog, loading });
 }
 .empty p {
   margin: 0;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
 }
 .commit-title {
   display: flex;
@@ -290,7 +290,7 @@ defineExpose({ refresh: loadLog, loading });
   gap: var(--gc-gap);
   min-width: 0;
   flex: 1;
-  height: var(--gc-line);
+  height: var(--gc-row-lg);
   padding-right: var(--gc-gap);
 }
 .commit-subject {
@@ -299,22 +299,22 @@ defineExpose({ refresh: loadLog, loading });
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   font-weight: 500;
   color: var(--el-text-color-primary);
 }
 .commit-hash {
   flex: none;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   color: var(--el-color-primary);
 }
 .commit-meta {
   display: flex;
   align-items: center;
   gap: var(--gc-gap);
-  height: var(--gc-line);
+  height: var(--gc-row-lg);
   margin-bottom: var(--gc-gap);
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   color: var(--el-text-color-secondary);
   min-width: 0;
   overflow: hidden;
@@ -347,14 +347,14 @@ defineExpose({ refresh: loadLog, loading });
 }
 .commit-body-toggle {
   display: block;
-  height: var(--gc-line);
+  height: var(--gc-row-lg);
   margin: 0 0 var(--gc-gap);
   padding: 0;
   border: 0;
   background: none;
   color: var(--el-color-primary);
   font: inherit;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
   cursor: pointer;
 }
 .commit-body {
@@ -363,7 +363,7 @@ defineExpose({ refresh: loadLog, loading });
   background: var(--el-fill-color-light);
   border-radius: var(--gc-radius);
   white-space: pre-wrap;
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
 }
 .diff-wrap {
   min-height: 200px;
@@ -376,6 +376,6 @@ defineExpose({ refresh: loadLog, loading });
 }
 .pick-hint {
   color: var(--el-text-color-secondary);
-  font-size: var(--gc-text);
+  font-size: var(--gc-fs-body);
 }
 </style>
