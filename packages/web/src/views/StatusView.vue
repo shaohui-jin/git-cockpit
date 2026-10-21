@@ -1505,11 +1505,11 @@ onUnmounted(() => {
   gap: var(--gc-gap);
   overflow: hidden;
 }
+/* 效率敏感区：实底卡（禁玻璃），靠表面三级 + 边框分层 */
 .glass {
-  --el-card-bg-color: color-mix(in srgb, var(--el-bg-color) 82%, transparent);
-  background: color-mix(in srgb, var(--el-bg-color) 82%, transparent);
-  border: 1px solid var(--el-border-color-lighter);
-  box-shadow: var(--gc-shadow-menu);
+  --el-card-bg-color: var(--gc-card);
+  background: var(--gc-card);
+  border: 1px solid var(--gc-line);
 }
 .page-head {
   display: flex;
@@ -1546,10 +1546,10 @@ onUnmounted(() => {
   flex: none;
 }
 .sync.ahead {
-  color: var(--el-color-success);
+  color: var(--gc-green);
 }
 .sync.behind {
-  color: var(--el-color-warning);
+  color: var(--gc-amber);
 }
 .repo-path {
   font-size: 12px;
@@ -1629,7 +1629,8 @@ onUnmounted(() => {
   background: var(--el-fill-color-light);
 }
 .branch-node.current {
-  background: var(--el-color-primary-light-9);
+  background: var(--gc-accent-weak);
+  box-shadow: inset 2px 0 0 var(--gc-accent);
 }
 .branch-node.remote .node-name {
   color: var(--el-text-color-secondary);
@@ -1645,15 +1646,15 @@ onUnmounted(() => {
 }
 .branch-node.current .node-name {
   font-weight: 600;
-  color: var(--el-color-primary);
+  color: var(--gc-accent-text);
 }
 .node-sync {
   flex: none;
   font-size: 11px;
-  color: var(--el-color-primary);
+  color: var(--gc-accent-text);
 }
 .node-sync.clean {
-  color: var(--el-text-color-disabled);
+  color: var(--gc-text-3);
 }
 
 /* 右：垂直弹性布局 */
@@ -1810,7 +1811,8 @@ onUnmounted(() => {
   cursor: pointer;
 }
 .change-file.on {
-  background: var(--el-color-primary-light-9);
+  background: var(--gc-accent-weak);
+  box-shadow: inset 2px 0 0 var(--gc-accent);
 }
 .dir-name {
   flex: 1;
@@ -1843,28 +1845,32 @@ onUnmounted(() => {
   border-bottom: none;
 }
 .file-status {
-  width: 22px;
-  height: 22px;
+  width: 16px;
+  height: 16px;
   border-radius: 4px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
-  font-weight: 700;
-  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
   flex: none;
 }
 .file-status.add {
-  background: var(--el-color-success);
+  color: var(--gc-green);
+  background: var(--gc-green-weak);
 }
 .file-status.mod {
-  background: var(--el-color-warning);
+  color: var(--gc-amber);
+  background: var(--gc-amber-weak);
 }
 .file-status.new {
-  background: var(--el-color-info);
+  color: var(--gc-accent-text);
+  background: var(--gc-accent-weak);
 }
 .file-status.conflict {
-  background: var(--el-color-danger);
+  color: var(--gc-red);
+  background: var(--gc-red-weak);
 }
 .file-path {
   flex: 1;
@@ -1890,13 +1896,13 @@ onUnmounted(() => {
   color: var(--el-text-color-secondary);
 }
 .monitor-stat .add {
-  color: var(--el-color-success);
+  color: var(--gc-green);
 }
 .monitor-stat .del {
-  color: var(--el-color-danger);
+  color: var(--gc-red);
 }
 .monitor-stat .warn {
-  color: var(--el-color-warning);
+  color: var(--gc-amber);
 }
 .monitor-body {
   flex: 1;
@@ -1942,7 +1948,8 @@ onUnmounted(() => {
   border-bottom: none;
 }
 .stash-row.on {
-  background: var(--el-color-primary-light-9);
+  background: var(--gc-accent-weak);
+  box-shadow: inset 2px 0 0 var(--gc-accent);
   border-radius: var(--gc-radius);
 }
 .stash-main {

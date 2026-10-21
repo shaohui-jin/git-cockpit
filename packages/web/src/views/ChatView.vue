@@ -299,7 +299,7 @@ onUnmounted(() => {
       <el-button link type="primary" @click="leaveTo('/dashboard')">去工作台</el-button>
     </el-alert>
 
-    <div ref="listEl" class="chat-list gc-glass">
+    <div ref="listEl" class="chat-list gc-card">
       <MessageList :lines="chat.lines" :streaming="chat.streaming" />
     </div>
 
@@ -358,17 +358,19 @@ onUnmounted(() => {
 .dock-stack :deep(.confirm-bar) {
   margin-top: 0;
 }
-.dock-stack :deep(.confirm-card) {
+/* 干跑条与 composer 连体：干跑条下缘收直、composer 上缘无边框 */
+.dock-stack :deep(.dryrun) {
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
+  border-bottom-color: transparent;
 }
 .dock-stack.pending .composer {
   margin-top: 0;
   padding: var(--gc-gap);
-  border: 1px solid var(--el-color-warning);
+  border: 1px solid var(--gc-line);
   border-top: 0;
   border-radius: 0 0 var(--gc-radius) var(--gc-radius);
-  background: var(--el-bg-color);
+  background: var(--gc-card);
 }
 .composer {
   flex: none;

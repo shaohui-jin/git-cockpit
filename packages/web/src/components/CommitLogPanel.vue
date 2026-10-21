@@ -97,7 +97,7 @@ defineExpose({ refresh: loadLog, loading });
   <div class="pane">
     <el-alert v-if="loadError" :title="loadError" type="error" :closable="false" show-icon class="mb" />
 
-    <div class="bar gc-glass">
+    <div class="bar gc-card">
       <el-radio-group v-model="mode">
         <el-radio-button value="head">当前分支（{{ currentBranch }}）</el-radio-button>
         <el-radio-button value="all">全部分支</el-radio-button>
@@ -119,11 +119,11 @@ defineExpose({ refresh: loadLog, loading });
       <el-button :loading="loading" @click="loadLog">刷新</el-button>
     </div>
 
-    <div v-if="!loading && commits.length === 0" class="empty gc-glass">
+    <div v-if="!loading && commits.length === 0" class="empty gc-card">
       <strong>暂无提交记录</strong>
       <p>换范围、清路径过滤，或先在工作区提交。</p>
     </div>
-    <div v-else class="table gc-glass" v-loading="loading">
+    <div v-else class="table gc-card" v-loading="loading">
       <div class="th">
         <span>提交</span>
         <span>信息</span>

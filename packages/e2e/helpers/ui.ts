@@ -86,6 +86,6 @@ export async function pickTreeBranches(page: Page, fieldHint: string, names: str
 }
 
 export async function acceptOurs(page: Page): Promise<void> {
-  await page.getByRole('button', { name: '≫' }).click();
-  await expect(page.getByTitle('已采用线上')).toBeVisible();
+  await page.locator('.merge-row .gutter button[aria-label="采用线上"]').first().click();
+  await expect(page.getByTitle('已采用线上').first()).toBeVisible();
 }

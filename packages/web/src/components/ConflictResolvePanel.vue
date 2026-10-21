@@ -262,7 +262,7 @@ defineExpose({ buildFiles });
     <div class="resolve-head">
       <span>
         冲突 {{ allStats.resolved }} / {{ allStats.total }}
-        <span class="muted"> · 绿=新增 蓝=修改（自动进结果） · 红块选 {{ leftLabel }} 或 {{ rightLabel }}</span>
+        <span class="muted"> · 绿=新增 紫=修改（自动进结果） · 红块选 {{ leftLabel }} 或 {{ rightLabel }}</span>
       </span>
     </div>
 
@@ -344,11 +344,15 @@ defineExpose({ buildFiles });
         </div>
         <div ref="scrollRootRef" class="merge">
           <header class="merge-heads">
-            <div>{{ leftLabel }}</div>
+            <div>
+              <span class="side-chip ours">OURS · {{ leftLabel }}</span>
+            </div>
             <div />
             <div>结果</div>
             <div />
-            <div>{{ rightLabel }}</div>
+            <div>
+              <span class="side-chip theirs">THEIRS · {{ rightLabel }}</span>
+            </div>
           </header>
           <div v-if="blameLoading || blameError || blame" class="blame-bar">
             <span v-if="blameLoading" class="muted">正在溯源作者…</span>
@@ -381,16 +385,17 @@ defineExpose({ buildFiles });
               ><span v-for="(line, i) in (h.leftLines.length ? h.leftLines : [''])" :key="'L'+i" class="code-line">{{ line || ' ' }}</span></pre>
             </div>
             <div class="gutter">
-              <el-button
+              <button
                 v-if="h.kind === 'conflict' && h.leftLines.length"
-                size="small"
-                text
-                type="primary"
+                type="button"
+                class="pick-btn ours"
+                :class="{ picked: choseLeft(h) }"
                 :title="choseLeft(h) ? `已采用${leftLabel}` : `采用${leftLabel}`"
+                :aria-label="`采用${leftLabel}`"
                 @click.stop="acceptLeft(h)"
               >
-                {{ choseLeft(h) ? '✓' : '≫' }}
-              </el-button>
+                <GcIcon :name="choseLeft(h) ? 'check' : 'chevron'" :size="12" />
+              </button>
             </div>
             <div class="pane pane-result">
               <pre
@@ -398,16 +403,17 @@ defineExpose({ buildFiles });
               ><span v-for="(line, i) in resultLines(h)" :key="'R'+i" class="code-line" :class="{ pending: h.kind === 'conflict' && h.action === 'pending' }">{{ line || ' ' }}</span></pre>
             </div>
             <div class="gutter">
-              <el-button
+              <button
                 v-if="h.kind === 'conflict' && h.rightLines.length"
-                size="small"
-                text
-                type="primary"
+                type="button"
+                class="pick-btn theirs"
+                :class="{ picked: choseRight(h) }"
                 :title="choseRight(h) ? `已采用${rightLabel}` : `采用${rightLabel}`"
+                :aria-label="`采用${rightLabel}`"
                 @click.stop="acceptRight(h)"
               >
-                {{ choseRight(h) ? '✓' : '≪' }}
-              </el-button>
+                <GcIcon :name="choseRight(h) ? 'check' : 'chevron-left'" :size="12" />
+              </button>
             </div>
             <div class="pane pane-theirs">
               <pre
@@ -452,17 +458,17 @@ defineExpose({ buildFiles });
   display: flex;
   flex: 1;
   min-height: 0;
-  border: 1px solid var(--el-border-color-lighter);
+  border: 1px solid var(--gc-line);
   border-radius: var(--gc-radius);
   overflow: hidden;
-  background: color-mix(in srgb, var(--el-bg-color) 82%, transparent);
+  background: var(--gc-card);
 }
 .file-list {
   width: 220px;
   flex-shrink: 0;
   overflow: auto;
-  background: var(--el-fill-color-lighter);
-  border-right: 1px solid var(--el-border-color-lighter);
+  background: var(--gc-page);
+  border-right: 1px solid var(--gc-line-weak);
 }
 .file-list-head,
 .file-item,
@@ -485,9 +491,9 @@ defineExpose({ buildFiles });
   position: sticky;
   top: 0;
   z-index: 1;
-  background: var(--el-fill-color-lighter);
-  border-bottom: 1px solid var(--el-border-color-lighter);
-  color: var(--el-text-color-secondary);
+  background: var(--gc-page);
+  border-bottom: 1px solid var(--gc-line-weak);
+  color: var(--gc-text-3);
 }
 .file-nav,
 .merge-bar-actions {
@@ -514,14 +520,15 @@ defineExpose({ buildFiles });
   min-width: 0;
 }
 .file-item:hover {
-  background: var(--el-fill-color);
+  background: var(--gc-btn-hover);
 }
 .file-item.active {
-  background: var(--el-color-primary-light-9);
-  color: var(--el-color-primary);
+  background: var(--gc-accent-weak);
+  color: var(--gc-accent-text);
+  box-shadow: inset 2px 0 0 var(--gc-accent);
 }
 .file-item.done .stat {
-  color: var(--el-color-success);
+  color: var(--gc-green);
 }
 .file-item.auto-toggle,
 .file-item.auto {
@@ -542,8 +549,8 @@ defineExpose({ buildFiles });
   color: var(--el-text-color-secondary);
 }
 .file-sides {
-  background: var(--el-color-primary-light-9);
-  border-bottom: 1px solid var(--el-border-color-lighter);
+  background: var(--gc-accent-weak);
+  border-bottom: 1px solid var(--gc-line-weak);
 }
 .merge-wrap {
   flex: 1;
@@ -554,8 +561,8 @@ defineExpose({ buildFiles });
 }
 .merge-bar {
   flex-shrink: 0;
-  border-bottom: 1px solid var(--el-border-color-lighter);
-  background: var(--el-bg-color);
+  border-bottom: 1px solid var(--gc-line-weak);
+  background: var(--gc-card);
 }
 .merge {
   flex: 1;
@@ -574,31 +581,54 @@ defineExpose({ buildFiles });
   z-index: 1;
   min-height: var(--gc-row-lg);
   padding: 0;
-  background: var(--el-fill-color-light);
-  border-bottom: 1px solid var(--el-border-color-lighter);
-  font-size: var(--gc-fs-body);
-  color: var(--el-text-color-secondary);
+  background: var(--gc-page);
+  border-bottom: 1px solid var(--gc-line-weak);
+  font-size: var(--gc-fs-meta);
+  color: var(--gc-text-3);
 }
 .merge-heads > div {
   display: flex;
   align-items: center;
   padding: 0 var(--gc-pad);
 }
+/* OURS / THEIRS 侧标：青 / 紫，与全站语义一致 */
+.side-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: var(--gc-r-tag);
+  font-size: var(--gc-fs-micro);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.side-chip.ours {
+  background: var(--gc-ours-bg);
+  border: 1px solid var(--gc-ours-border);
+  color: var(--gc-ours-text);
+}
+.side-chip.theirs {
+  background: var(--gc-purple-weak);
+  border: 1px solid rgba(163, 113, 247, 0.35);
+  color: var(--gc-purple);
+}
 .blame-bar {
   display: flex;
   flex-wrap: wrap;
   gap: var(--gc-gap);
   padding: 4px var(--gc-pad);
-  border-bottom: 1px solid var(--el-border-color-lighter);
-  background: var(--el-fill-color-lighter);
+  border-bottom: 1px solid var(--gc-line-weak);
+  background: var(--gc-page);
   font-size: var(--gc-fs-body);
-  color: var(--el-text-color-secondary);
+  color: var(--gc-text-3);
 }
 .blame-side {
   min-width: 0;
 }
 .blame-err {
-  color: var(--el-color-warning);
+  color: var(--gc-amber);
 }
 .empty {
   padding: var(--gc-pad);
@@ -606,11 +636,11 @@ defineExpose({ buildFiles });
   color: var(--el-text-color-secondary);
 }
 .merge-row {
-  border-bottom: 1px solid var(--el-border-color-extra-light);
+  border-bottom: 1px solid var(--gc-line-weak);
   cursor: default;
 }
 .merge-row.active {
-  outline: 1px solid var(--el-color-primary-light-5);
+  outline: 1px solid var(--gc-accent);
   outline-offset: -1px;
 }
 .pane {
@@ -621,9 +651,39 @@ defineExpose({ buildFiles });
   display: flex;
   align-items: center;
   justify-content: center;
-  border-left: 1px solid var(--el-border-color-extra-light);
-  border-right: 1px solid var(--el-border-color-extra-light);
-  background: var(--el-fill-color-lighter);
+  border-left: 1px solid var(--gc-line-weak);
+  border-right: 1px solid var(--gc-line-weak);
+  background: var(--gc-page);
+}
+/* 选边按钮：图标化（禁字符），选中后转 check + 侧色 */
+.pick-btn {
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: var(--gc-r-tag);
+  background: transparent;
+  color: var(--gc-text-3);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background var(--gc-t-micro) var(--gc-ease),
+    color var(--gc-t-micro) var(--gc-ease);
+}
+.pick-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--gc-text-2);
+}
+.pick-btn.ours.picked {
+  background: var(--gc-ours-bg);
+  border: 1px solid var(--gc-ours-border);
+  color: var(--gc-ours-text);
+}
+.pick-btn.theirs.picked {
+  background: var(--gc-purple-weak);
+  border: 1px solid rgba(163, 113, 247, 0.35);
+  color: var(--gc-purple);
 }
 .code {
   margin: 0;
@@ -640,7 +700,7 @@ defineExpose({ buildFiles });
   text-overflow: ellipsis;
 }
 .code-line.pending {
-  color: var(--el-text-color-placeholder);
+  color: var(--gc-text-3);
 }
 .merge-row.hunk-add-left .pane-ours .code,
 .merge-row.hunk-add-left .pane-result .code {
@@ -658,14 +718,25 @@ defineExpose({ buildFiles });
 .merge-row.hunk-modify-right .pane-result .code {
   background: var(--gc-merge-mod);
 }
+/* 未决冲突行：整行红弱底 + 左 2px 红边（"未确认不安置"）；已决：左 2px 绿边 */
+.merge-row.hunk-conflict:not(.resolved) {
+  background: rgba(255, 133, 133, 0.06);
+  box-shadow: inset 2px 0 0 var(--gc-red);
+}
 .merge-row.hunk-conflict:not(.resolved) .code {
   background: var(--gc-merge-conflict);
 }
-.merge-row.hunk-conflict:not(.resolved) .pane-ours {
-  box-shadow: inset 2px 0 0 var(--el-color-danger);
+.merge-row.hunk-conflict.resolved {
+  box-shadow: inset 2px 0 0 var(--gc-green);
 }
 .merge-row.hunk-conflict.chose-left .pane-ours .code,
 .merge-row.hunk-conflict.chose-right .pane-theirs .code {
   background: var(--gc-merge-add);
+}
+.merge-row.hunk-conflict.chose-left .pane-ours .code {
+  background: var(--gc-ours-bg);
+}
+.merge-row.hunk-conflict.chose-right .pane-theirs .code {
+  background: var(--gc-purple-weak);
 }
 </style>

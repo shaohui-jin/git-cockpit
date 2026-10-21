@@ -58,6 +58,7 @@ const PATHS: Record<string, string> = {
   abort: '<circle cx="12" cy="12" r="8.2"/><path d="m6.2 6.2 11.6 11.6"/>',
   check: '<path d="m5.2 12.6 4.6 4.6L19 6.8"/>',
   chevron: '<path d="m9.4 6.2 5.8 5.8-5.8 5.8"/>',
+  'chevron-left': '<path d="m14.6 6.2-5.8 5.8 5.8 5.8"/>',
   'chevron-down': '<path d="m6.2 9.4 5.8 5.8 5.8-5.8"/>',
   search: '<circle cx="11" cy="11" r="6.2"/><path d="m15.6 15.6 4.4 4.4"/>',
   copy:

@@ -466,7 +466,7 @@ watch([pairInto, pairFrom], () => {
       </div>
     </div>
 
-    <div v-if="mode === 'pair' && trail && trailCurrent" class="trail gc-glass">
+    <div v-if="mode === 'pair' && trail && trailCurrent" class="trail gc-card">
       <el-button size="small" @click="backToMatrix">← 返回矩阵</el-button>
       <span class="trail-pos mono">{{ trail.index + 1 }} / {{ trail.pairs.length }}</span>
       <span class="trail-pair mono">
@@ -497,7 +497,7 @@ watch([pairInto, pairFrom], () => {
       show-icon
     />
 
-    <div v-if="!canRun" class="empty gc-glass">
+    <div v-if="!canRun" class="empty gc-card">
       <strong>还没选仓库</strong>
       <p>请先在工作台打开仓库再预演。</p>
       <el-button type="primary" @click="router.push('/dashboard')">去工作台</el-button>
@@ -509,14 +509,14 @@ watch([pairInto, pairFrom], () => {
 
     <template v-else>
       <div class="pair-col">
-        <section class="gc-glass river">
+        <section class="gc-card river">
           <div class="lane theirs">
             <small>我的 from</small>
             <BranchTreeSelect v-model="pairFrom" exclude-merge-temp placeholder="选择我的分支" />
           </div>
           <div class="flow">
             <svg viewBox="0 0 200 80" preserveAspectRatio="none" aria-hidden="true">
-              <path d="M0 20 C 80 20, 80 40, 200 40" />
+              <path class="p-from" d="M0 20 C 80 20, 80 40, 200 40" />
               <path d="M0 60 C 80 60, 80 40, 200 40" />
             </svg>
             <span class="stamp" :class="stampClass">{{ stampText }}</span>
@@ -541,7 +541,7 @@ watch([pairInto, pairFrom], () => {
           </p>
         </div>
 
-        <section v-if="showRecorded" class="gc-glass pad next-pane">
+        <section v-if="showRecorded" class="gc-card pad next-pane">
           <p class="gc-eyebrow">已记入本地</p>
           <p class="tip">
             选边已写到临时分支
@@ -554,7 +554,7 @@ watch([pairInto, pairFrom], () => {
           </div>
         </section>
 
-        <section v-if="preview && !applyResult" class="gc-glass pad next-pane fill">
+        <section v-if="preview && !applyResult" class="gc-card pad next-pane fill">
           <div class="result-head">
             <p class="gc-eyebrow">{{ outcomeLabel || '预演结果' }}</p>
             <span class="mono sha"
@@ -625,7 +625,7 @@ watch([pairInto, pairFrom], () => {
           />
         </section>
 
-        <section v-if="applyResult" class="gc-glass pad next-pane fill">
+        <section v-if="applyResult" class="gc-card pad next-pane fill">
           <div class="result-head">
             <p class="gc-eyebrow">已落盘{{ applyResult.pushed ? ' · 已推送' : ' · 仅本地' }}</p>
             <span class="mono sha">{{ applyResult.tempBranch }}</span>
@@ -646,7 +646,7 @@ watch([pairInto, pairFrom], () => {
           </div>
         </section>
 
-        <section v-if="prResult" class="gc-glass pad next-pane">
+        <section v-if="prResult" class="gc-card pad next-pane">
           <div class="result-head">
             <p class="gc-eyebrow">{{ prResult.via === 'browser' ? 'MR 正文 · 浏览器创建页' : '已开单' }}</p>
             <span class="mono sha">{{ prResult.sourceBranch }} → {{ prResult.targetBranch }}</span>
@@ -743,10 +743,10 @@ watch([pairInto, pairFrom], () => {
   gap: 4px;
 }
 .mine {
-  color: var(--el-color-primary);
+  color: var(--gc-purple);
 }
 .online {
-  color: var(--el-color-success);
+  color: var(--gc-accent-text);
 }
 .trail-arrow {
   color: var(--el-text-color-secondary);
@@ -777,10 +777,10 @@ watch([pairInto, pairFrom], () => {
   color: var(--el-text-color-secondary);
 }
 .lane.theirs {
-  border-left: 3px solid var(--el-color-primary);
+  border-left: 2px solid var(--gc-purple);
 }
 .lane.ours {
-  border-left: 3px solid var(--el-color-success);
+  border-left: 2px solid var(--gc-accent);
 }
 .flow {
   position: relative;
@@ -793,9 +793,13 @@ watch([pairInto, pairFrom], () => {
 }
 .flow path {
   fill: none;
-  stroke: var(--el-color-primary);
+  stroke: var(--gc-accent);
   stroke-width: 2;
   opacity: 0.55;
+}
+/* 两路分流：from（紫）汇入 into（青） */
+.flow .p-from {
+  stroke: var(--gc-purple);
 }
 .stamp {
   position: absolute;
@@ -807,21 +811,21 @@ watch([pairInto, pairFrom], () => {
   display: inline-flex;
   align-items: center;
   border-radius: var(--gc-radius);
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-lighter);
+  background: var(--gc-card);
+  border: 1px solid var(--gc-line);
   font-size: var(--gc-fs-body);
   white-space: nowrap;
 }
 .stamp.warn {
-  color: var(--el-color-danger);
-  border-color: color-mix(in srgb, var(--el-color-danger) 40%, transparent);
+  color: var(--gc-red);
+  border-color: rgba(255, 133, 133, 0.4);
 }
 .stamp.ok {
-  color: var(--el-color-success);
-  border-color: color-mix(in srgb, var(--el-color-success) 40%, transparent);
+  color: var(--gc-green);
+  border-color: rgba(86, 217, 122, 0.4);
 }
 .stamp.info {
-  color: var(--el-color-primary);
+  color: var(--gc-accent-text);
 }
 .river-tools {
   flex: none;
