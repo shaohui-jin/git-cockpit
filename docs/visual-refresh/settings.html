@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>设置 · Git Cockpit</title>
+    <script>
+      try {
+        var a = localStorage.getItem('gc-accent');
+        if (a) document.documentElement.dataset.accent = a;
+      } catch (e) {}
+    </script>
+    <link rel="stylesheet" href="assets/tokens.css" />
+    <link rel="stylesheet" href="assets/chrome.css" />
+    <style>
+      .settings-col {
+        width: 100%;
+        max-width: 880px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: var(--gc-s3);
+        padding-bottom: var(--gc-s4);
+      }
+
+      .set-card {
+        display: flex;
+        flex-direction: column;
+        background: var(--gc-card);
+        border: 1px solid var(--gc-line);
+        border-radius: var(--gc-r);
+        overflow: hidden;
+      }
+      .set-card > .card-head {
+        height: 36px;
+        background: var(--gc-page);
+        border-bottom: 1px solid var(--gc-line);
+      }
+      .set-card > .card-head h3 {
+        font-size: var(--gc-fs-title);
+      }
+      .set-card > .card-head .ico {
+        color: var(--gc-text-3);
+      }
+      .set-body {
+        padding: var(--gc-s3);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      /* 表单行：标签 140 + 控件 */
+      .frow {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--gc-s3);
+        min-width: 0;
+      }
+      .frow > label {
+        flex: none;
+        width: 132px;
+        font-size: var(--gc-fs-body);
+        color: var(--gc-text-2);
+        line-height: var(--gc-control);
+        text-align: right;
+      }
+      .frow > .fc {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .fctrl {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+      }
+      .fctrl .input {
+        flex: 1;
+        min-width: 0;
+      }
+      .fhint {
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-3);
+        line-height: 1.5;
+      }
+      .fhint code {
+        font-family: var(--gc-font-mono);
+        font-size: 10px;
+        color: var(--gc-text-2);
+        background: var(--gc-page);
+        border: 1px solid var(--gc-line-weak);
+        border-radius: 3px;
+        padding: 0 4px;
+      }
+
+      .secret {
+        font-family: var(--gc-font-mono);
+        font-size: 11px;
+        letter-spacing: 0.02em;
+      }
+
+      .token-note {
+        display: flex;
+        align-items: flex-start;
+        gap: 6px;
+        margin-left: 144px;
+        padding-top: 9px;
+        border-top: 1px solid var(--gc-line-weak);
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-2);
+        line-height: 1.55;
+      }
+      .token-note .ico {
+        flex: none;
+        margin-top: 2px;
+        color: var(--gc-text-3);
+      }
+
+      /* 测试结果三态 */
+      .test-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        height: 20px;
+        padding: 0 7px;
+        border-radius: var(--gc-r-tag);
+        font-size: var(--gc-fs-micro);
+        font-weight: 500;
+        line-height: 1;
+        white-space: nowrap;
+        flex: none;
+      }
+      .test-tag .ico {
+        width: 10px;
+        height: 10px;
+      }
+      .test-tag.ok {
+        color: var(--gc-accent-text);
+        background: var(--gc-accent-weak);
+        border: 1px solid rgba(20, 200, 184, 0.28);
+      }
+      html[data-accent='white'] .test-tag.ok {
+        border-color: rgba(238, 244, 249, 0.3);
+      }
+      .test-tag.idle {
+        color: var(--gc-text-3);
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--gc-line);
+      }
+      .test-tag.err {
+        color: var(--gc-red);
+        background: var(--gc-red-weak);
+        border: 1px solid rgba(255, 133, 133, 0.28);
+      }
+
+      /* ---------- switch ---------- */
+      .swrow {
+        display: flex;
+        align-items: center;
+        gap: var(--gc-s3);
+        padding: 7px 0;
+        border-bottom: 1px solid var(--gc-line-weak);
+      }
+      .swrow:last-child {
+        border-bottom: 0;
+        padding-bottom: 0;
+      }
+      .swrow .sw-copy {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .swrow .sw-copy b {
+        font-size: var(--gc-fs-body);
+        font-weight: 500;
+        color: var(--gc-text);
+        line-height: 1.35;
+      }
+      .swrow .sw-copy span {
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-3);
+        line-height: 1.45;
+      }
+      .sw {
+        flex: none;
+        position: relative;
+        width: 32px;
+        height: 18px;
+        border-radius: 9px;
+        background: var(--gc-sw-off);
+        transition: background var(--gc-t-micro) var(--gc-ease);
+      }
+      .sw::after {
+        content: '';
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--gc-knob);
+        transition:
+          transform var(--gc-t-micro) var(--gc-ease),
+          background var(--gc-t-micro) var(--gc-ease);
+      }
+      .sw.on {
+        background: var(--gc-accent);
+      }
+      .sw.on::after {
+        transform: translateX(14px);
+        background: var(--gc-accent-ink);
+      }
+      .sw.on.danger {
+        background: var(--gc-red-strong);
+      }
+      .sw.on.danger::after {
+        background: var(--gc-text);
+      }
+      .sw.is-disabled {
+        opacity: 0.42;
+        cursor: not-allowed;
+      }
+
+      /* MR 模板 */
+      .tpl {
+        width: 100%;
+        min-height: 132px;
+        padding: 8px 10px;
+        border-radius: var(--gc-r);
+        border: 1px solid var(--gc-line);
+        background: var(--gc-page);
+        color: var(--gc-text-2);
+        font-family: var(--gc-font-mono);
+        font-size: 11px;
+        line-height: 1.7;
+        resize: vertical;
+        outline: none;
+      }
+      .tpl:focus {
+        border-color: var(--gc-accent);
+        box-shadow: var(--gc-focus);
+      }
+      .tpl-vars {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        align-items: center;
+      }
+      .tpl-vars .vl {
+        font-size: var(--gc-fs-micro);
+        color: var(--gc-text-3);
+      }
+      .var-chip {
+        height: 18px;
+        padding: 0 6px;
+        border-radius: var(--gc-r-tag);
+        background: var(--gc-overlay);
+        border: 1px solid var(--gc-line);
+        color: var(--gc-purple);
+        font-family: var(--gc-font-mono);
+        font-size: 10px;
+        line-height: 16px;
+      }
+
+      .card-foot {
+        display: flex;
+        align-items: center;
+        gap: var(--gc-s2);
+        padding: 9px var(--gc-s3);
+        border-top: 1px solid var(--gc-line);
+        background: var(--gc-page);
+      }
+      .card-foot .spacer {
+        flex: 1;
+      }
+      .card-foot .saved {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-3);
+      }
+      .card-foot .saved .ico {
+        width: 11px;
+        height: 11px;
+        color: var(--gc-green);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <span class="brand-mark"><i class="ico" data-icon="logo"></i></span>
+        <div class="topbar-end">
+          <span class="conn-tag"><span class="dot"></span>前端 <span class="val">0.1.32</span></span>
+          <span class="conn-tag"><span class="dot"></span>后端 <span class="val">0.1.32</span></span>
+          <span class="conn-tag"><span class="dot"></span>桌面 <span class="val">0.1.32</span></span>
+        </div>
+      </header>
+
+      <div class="pulsebar">
+        <div class="fill done" style="width: 100%"></div>
+      </div>
+
+      <main class="page">
+        <div class="page-head" style="width: 100%; max-width: 880px; margin: 0 auto">
+          <h1>设置</h1>
+          <span class="sub">本机保存，不上传</span>
+          <span class="spacer"></span>
+          <span class="chip plain sm mono">~/.git-cockpit/config.json</span>
+        </div>
+
+        <div class="settings-col">
+          <!-- ① 访问密钥 -->
+          <section class="set-card">
+            <div class="card-head">
+              <i class="ico sm" data-icon="key"></i>
+              <h3>访问密钥</h3>
+              <span class="spacer"></span>
+              <span class="chip plain sm">本机回环访问</span>
+            </div>
+            <div class="set-body">
+              <div class="frow">
+                <label for="secret">localSecret</label>
+                <div class="fc">
+                  <div class="fctrl">
+                    <input id="secret" class="input secret" type="text" readonly value="gc_live_9f3a72c4e18b56d0a4f7" />
+                    <button class="btn h24" type="button"><i class="ico sm" data-icon="copy"></i>复制</button>
+                    <button class="btn ghost h24" type="button"><i class="ico sm" data-icon="refresh"></i>重新生成</button>
+                  </div>
+                  <span class="fhint"
+                    >Agent 通过 <code>Authorization: Bearer</code> 携带此密钥调用 MCP 工具。重新生成后需要同步更新 Cursor /
+                    Claude 的 MCP 配置。</span
+                  >
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ② Git 托管凭证 -->
+          <section class="set-card">
+            <div class="card-head">
+              <i class="ico sm" data-icon="remote"></i>
+              <h3>Git 托管凭证</h3>
+              <span class="spacer"></span>
+              <span class="test-tag ok"><i class="ico" data-icon="check"></i>测试通过</span>
+            </div>
+            <div class="set-body">
+              <div class="frow">
+                <label for="mr-token">MR Token</label>
+                <div class="fc">
+                  <div class="fctrl">
+                    <input id="mr-token" class="input secret" type="password" value="glpat-8xK2mQ7vR4nT1sL9" />
+                    <button class="btn h24" type="button"><i class="ico sm" data-icon="eye"></i>显示</button>
+                    <button class="btn h24" type="button"><i class="ico sm" data-icon="play"></i>连接测试</button>
+                  </div>
+                  <span class="fhint"
+                    >用于创建与更新合并请求，需要 <code>api</code> 权限。凭证仅存本机，日志中自动脱敏为
+                    <code>glpat-****</code>。</span
+                  >
+                </div>
+              </div>
+              <div class="frow">
+                <label for="gl-host">托管地址</label>
+                <div class="fc">
+                  <div class="fctrl">
+                    <input id="gl-host" class="input mono" type="text" value="https://gitlab.example.com" />
+                    <span class="test-tag idle">未测试</span>
+                  </div>
+                </div>
+              </div>
+              <div class="token-note">
+                <i class="ico sm" data-icon="info"></i>
+                <span
+                  >此处为全局 Token，用于仪表盘概览与开单。若某个仓库使用独立的仓库级
+                  Token，缺失时只会在任务页提示该仓库失败，不影响其他仓库。</span
+                >
+              </div>
+            </div>
+            <div class="card-foot">
+              <span class="saved"><i class="ico" data-icon="check"></i>上次保存 昨天 16:41</span>
+              <span class="spacer"></span>
+              <button class="btn ghost h24" type="button">清除凭证</button>
+              <button class="btn primary h24" type="button">保存</button>
+            </div>
+          </section>
+
+          <!-- ③ 模型 -->
+          <section class="set-card">
+            <div class="card-head">
+              <i class="ico sm" data-icon="cpu"></i>
+              <h3>模型</h3>
+              <span class="spacer"></span>
+              <span class="test-tag idle"><i class="ico" data-icon="clock"></i>未测试</span>
+            </div>
+            <div class="set-body">
+              <div class="frow">
+                <label for="api-key">API Key</label>
+                <div class="fc">
+                  <div class="fctrl">
+                    <input id="api-key" class="input secret" type="password" value="sk-ant-api03-7f2c9b1e4d8a" />
+                    <button class="btn h24" type="button"><i class="ico sm" data-icon="eye"></i>显示</button>
+                  </div>
+                </div>
+              </div>
+              <div class="frow">
+                <label for="base-url">Base URL</label>
+                <div class="fc">
+                  <div class="fctrl">
+                    <input id="base-url" class="input mono" type="text" value="https://api.anthropic.com" />
+                  </div>
+                  <span class="fhint">留空使用官方地址；自建网关需兼容 <code>/v1/messages</code> 协议。</span>
+                </div>
+              </div>
+              <div class="frow">
+                <label for="model">默认模型</label>
+                <div class="fc">
+                  <div class="fctrl">
+                    <span class="select-wrap" style="flex: 1">
+                      <select id="model" class="select" style="width: 100%">
+                        <option>claude-sonnet-4-5</option>
+                        <option>claude-opus-4-1</option>
+                        <option>claude-haiku-4-5</option>
+                      </select>
+                    </span>
+                    <button class="btn h24" type="button"><i class="ico sm" data-icon="play"></i>测试</button>
+                  </div>
+                  <span class="fhint">对话与工具编排使用该模型；任务执行本身不消耗模型额度。</span>
+                </div>
+              </div>
+            </div>
+            <div class="card-foot">
+              <span class="saved"><i class="ico" data-icon="check"></i>上次保存 2 天前</span>
+              <span class="spacer"></span>
+              <button class="btn primary h24" type="button">保存</button>
+            </div>
+          </section>
+
+          <!-- ④ MR 模板 -->
+          <section class="set-card">
+            <div class="card-head">
+              <i class="ico sm" data-icon="list"></i>
+              <h3>MR 模板</h3>
+              <span class="spacer"></span>
+              <span class="chip plain sm">Markdown</span>
+            </div>
+            <div class="set-body">
+              <textarea class="tpl" spellcheck="false">## 变更说明
+
+{{commits}}
+
+## 影响范围
+
+- 目标分支：{{into}}
+- 来源分支：{{from}}
+- 涉及仓库：{{repo}}
+
+## 自查
+
+- [ ] 本地已验证
+- [ ] 已补充测试
+- [ ] 已更新文档</textarea>
+              <div class="tpl-vars">
+                <span class="vl">可用变量</span>
+                <span class="var-chip">{{into}}</span>
+                <span class="var-chip">{{from}}</span>
+                <span class="var-chip">{{commits}}</span>
+                <span class="var-chip">{{repo}}</span>
+              </div>
+            </div>
+            <div class="card-foot">
+              <span class="saved">变量在创建 MR 时按实际分支与提交填充</span>
+              <span class="spacer"></span>
+              <button class="btn ghost h24" type="button">恢复默认</button>
+              <button class="btn primary h24" type="button">保存</button>
+            </div>
+          </section>
+
+          <!-- ⑤ 安全与审批 -->
+          <section class="set-card">
+            <div class="card-head">
+              <i class="ico sm" data-icon="shield"></i>
+              <h3>安全与审批</h3>
+              <span class="spacer"></span>
+              <span class="chip amber sm">写操作保护</span>
+            </div>
+            <div class="set-body">
+              <div class="swrow">
+                <div class="sw-copy">
+                  <b>强制干跑预览</b>
+                  <span>所有写操作先产出命令预览，人工确认后才执行</span>
+                </div>
+                <span class="sw on" role="switch" aria-checked="true" aria-label="强制干跑预览"></span>
+              </div>
+              <div class="swrow">
+                <div class="sw-copy">
+                  <b>高风险操作人工审批</b>
+                  <span>force push、分支删除、硬重置需要二次确认</span>
+                </div>
+                <span class="sw" role="switch" aria-checked="false" aria-label="高风险操作人工审批"></span>
+              </div>
+              <div class="swrow">
+                <div class="sw-copy">
+                  <b>自动升级服务</b>
+                  <span>检测到新版本时自动停服安装并重启</span>
+                </div>
+                <span class="sw" role="switch" aria-checked="false" aria-label="自动升级服务"></span>
+              </div>
+              <div class="swrow">
+                <div class="sw-copy">
+                  <b>保留审计日志</b>
+                  <span>记录全部工具调用，保留 30 天。关闭将无法追溯写操作</span>
+                </div>
+                <span class="sw on is-disabled" role="switch" aria-checked="true" aria-disabled="true" aria-label="保留审计日志"></span>
+              </div>
+            </div>
+            <div class="card-foot">
+              <span class="saved"><i class="ico" data-icon="info"></i>审计日志为安全基线，不可关闭</span>
+              <span class="spacer"></span>
+              <button class="btn primary h24" type="button">保存</button>
+            </div>
+          </section>
+        </div>
+      </main>
+
+      <nav class="dock">
+        <a class="dock-item" href="dashboard.html"><i class="ico" data-icon="gauge"></i>工作台</a>
+        <a class="dock-item" href="status.html"><i class="ico" data-icon="activity"></i>状态</a>
+        <a class="dock-item" href="merge.html"><i class="ico" data-icon="git-merge"></i>合并</a>
+        <a class="dock-item" href="jobs.html"><i class="ico" data-icon="layers"></i>任务<span class="count">3</span></a>
+        <a class="dock-item" href="logs.html"><i class="ico" data-icon="scroll"></i>日志</a>
+        <a class="dock-item" href="conversations.html"><i class="ico" data-icon="bubble"></i>对话</a>
+        <a class="dock-item is-active" href="settings.html"><i class="ico" data-icon="sliders"></i>设置</a>
+      </nav>
+    </div>
+
+    <script src="assets/icons.js"></script>
+    <script src="assets/switch.js"></script>
+  </body>
+</html>

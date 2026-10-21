@@ -1,0 +1,1086 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>状态 · Git Cockpit</title>
+    <script>
+      try {
+        var a = localStorage.getItem('gc-accent');
+        if (a) document.documentElement.dataset.accent = a;
+      } catch (e) {}
+    </script>
+    <link rel="stylesheet" href="assets/tokens.css" />
+    <link rel="stylesheet" href="assets/chrome.css" />
+    <style>
+      /* 效率敏感区：全实底，禁毛玻璃 */
+      .page.status-page {
+        overflow: hidden;
+        gap: var(--gc-s2);
+      }
+
+      /* ---------- 工具栏 ---------- */
+      .toolbar {
+        flex: none;
+        display: flex;
+        align-items: center;
+        gap: var(--gc-s2);
+        min-width: 0;
+      }
+      .branch-select {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: var(--gc-control);
+        padding: 0 10px;
+        border-radius: var(--gc-r);
+        border: 1px solid var(--gc-line);
+        background: var(--gc-card);
+        color: var(--gc-text);
+        font-family: var(--gc-font-mono);
+        font-size: var(--gc-fs-body);
+        white-space: nowrap;
+      }
+      .branch-select .ico {
+        color: var(--gc-accent-text);
+      }
+      .branch-select .cv {
+        color: var(--gc-text-3);
+        margin-left: 2px;
+      }
+      .toolbar .spacer {
+        flex: 1;
+      }
+      .dirty-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        height: 20px;
+        padding: 0 7px;
+        border-radius: var(--gc-r-tag);
+        background: var(--gc-amber-weak);
+        color: var(--gc-amber);
+        font-size: var(--gc-fs-meta);
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* ---------- 三栏工作区 ---------- */
+      .workbench {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        gap: var(--gc-s2);
+      }
+
+      /* 左：分支树 240 */
+      .branch-panel {
+        flex: none;
+        width: 240px;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        background: var(--gc-card);
+        border: 1px solid var(--gc-line);
+        border-radius: var(--gc-r);
+        overflow: hidden;
+      }
+      .panel-top {
+        flex: none;
+        padding: var(--gc-s2);
+        border-bottom: 1px solid var(--gc-line-weak);
+      }
+      .search-box {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        height: var(--gc-input);
+        padding: 0 8px;
+        border-radius: var(--gc-r);
+        border: 1px solid var(--gc-line);
+        background: var(--gc-page);
+        color: var(--gc-text-3);
+      }
+      .search-box .ico {
+        flex: none;
+        color: var(--gc-text-3);
+      }
+      .search-box input {
+        flex: 1;
+        min-width: 0;
+        border: 0;
+        background: transparent;
+        color: var(--gc-text);
+        font-size: var(--gc-fs-body);
+        outline: none;
+      }
+      .search-box input::placeholder {
+        color: var(--gc-text-disabled);
+      }
+      .tree {
+        flex: 1;
+        min-height: 0;
+        overflow: auto;
+        padding: var(--gc-s1) 0;
+      }
+      .tree-group {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        height: 24px;
+        padding: 0 8px;
+        color: var(--gc-text-3);
+        font-size: var(--gc-fs-micro);
+        font-weight: 500;
+        letter-spacing: var(--gc-track-micro);
+        text-transform: uppercase;
+      }
+      .tree-group .ico {
+        width: 10px;
+        height: 10px;
+      }
+      .tree-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        height: var(--gc-row);
+        padding: 0 8px 0 18px;
+        font-family: var(--gc-font-mono);
+        font-size: var(--gc-fs-body);
+        color: var(--gc-text-2);
+        cursor: default;
+        transition: background var(--gc-t-micro) var(--gc-ease);
+      }
+      .tree-row:hover {
+        background: rgba(255, 255, 255, 0.04);
+      }
+      .tree-row.is-current {
+        background: var(--gc-accent-weak);
+        color: var(--gc-accent-text);
+      }
+      .tree-row.is-current .nm {
+        font-weight: 500;
+      }
+      .tree-row .nm {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .tree-row .ico {
+        width: 12px;
+        height: 12px;
+        flex: none;
+      }
+      .tree-row .ahead {
+        font-size: var(--gc-fs-micro);
+        color: var(--gc-text-3);
+        font-variant-numeric: tabular-nums;
+        flex: none;
+      }
+      .tree-row.is-current .ahead {
+        color: var(--gc-accent-text);
+      }
+      .tree-row .ahead .ico {
+        width: 10px;
+        height: 10px;
+        vertical-align: -1px;
+      }
+      .tree-row.remote .nm {
+        color: var(--gc-text-3);
+      }
+
+      /* 中：更改面板 300 */
+      .changes-panel {
+        flex: none;
+        width: 300px;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        background: var(--gc-card);
+        border: 1px solid var(--gc-line);
+        border-radius: var(--gc-r);
+        overflow: hidden;
+      }
+      .group-head {
+        flex: none;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        height: 28px;
+        padding: 0 8px 0 10px;
+        background: var(--gc-page);
+        border-bottom: 1px solid var(--gc-line-weak);
+      }
+      .group-head b {
+        font-size: var(--gc-fs-meta);
+        font-weight: 500;
+        color: var(--gc-text-2);
+        letter-spacing: 0.01em;
+      }
+      .group-head .cnt {
+        font-family: var(--gc-font-mono);
+        font-size: var(--gc-fs-micro);
+        color: var(--gc-text-3);
+        font-variant-numeric: tabular-nums;
+      }
+      .group-head .spacer {
+        flex: 1;
+      }
+      .change-list {
+        flex: none;
+        max-height: 40%;
+        overflow: auto;
+      }
+      .change-list.grow-list {
+        flex: 1;
+        max-height: none;
+        min-height: 0;
+      }
+      .chg-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        height: var(--gc-row);
+        padding: 0 8px;
+        font-family: var(--gc-font-mono);
+        font-size: var(--gc-fs-meta);
+        cursor: default;
+        transition: background var(--gc-t-micro) var(--gc-ease);
+      }
+      .chg-row:hover {
+        background: rgba(255, 255, 255, 0.04);
+      }
+      .chg-row.is-sel {
+        background: var(--gc-accent-weak);
+      }
+      /* 极地白：弱底对比不足，补左侧指示条保证选中态可辨 */
+      html[data-accent='white'] .chg-row.is-sel {
+        background: var(--gc-accent-weak-strong);
+        box-shadow: inset 2px 0 0 var(--gc-accent);
+      }
+      html[data-accent='white'] .tree-row.is-current {
+        box-shadow: inset 2px 0 0 var(--gc-accent);
+      }
+      .st {
+        flex: none;
+        width: 16px;
+        height: 16px;
+        border-radius: 3px;
+        font-size: 10px;
+        font-weight: 600;
+        line-height: 16px;
+        text-align: center;
+        font-family: var(--gc-font-mono);
+      }
+      .st.a {
+        color: var(--gc-green);
+        background: var(--gc-green-weak);
+      }
+      .st.m {
+        color: var(--gc-amber);
+        background: var(--gc-amber-weak);
+      }
+      .st.d {
+        color: var(--gc-red);
+        background: var(--gc-red-weak);
+      }
+      .chg-path {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: var(--gc-text-2);
+        font-size: 11px;
+      }
+      .chg-diff {
+        flex: none;
+        display: flex;
+        gap: 4px;
+        font-size: 10px;
+        font-variant-numeric: tabular-nums;
+      }
+      .chg-diff .p {
+        color: var(--gc-green);
+      }
+      .chg-diff .n {
+        color: var(--gc-red);
+      }
+
+      /* 右：差异 + 记录 */
+      .right-col {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: var(--gc-s2);
+      }
+      .diff-panel {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        background: var(--gc-card);
+        border: 1px solid var(--gc-line);
+        border-radius: var(--gc-r);
+        overflow: hidden;
+      }
+      .file-head {
+        flex: none;
+        display: flex;
+        align-items: center;
+        gap: var(--gc-s2);
+        height: 30px;
+        padding: 0 10px;
+        background: var(--gc-page);
+        border-bottom: 1px solid var(--gc-line);
+      }
+      .file-head .fp {
+        font-family: var(--gc-font-mono);
+        font-size: var(--gc-fs-body);
+        color: var(--gc-text);
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .file-head .spacer {
+        flex: 1;
+      }
+      .diff-body {
+        flex: 1;
+        min-height: 0;
+        overflow: auto;
+        background: var(--gc-page);
+        font-family: var(--gc-font-mono);
+        font-size: 11px;
+        line-height: 20px;
+      }
+      .hunk {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        height: 20px;
+        padding: 0 8px;
+        background: var(--gc-card);
+        color: var(--gc-text-3);
+        border-top: 1px solid var(--gc-line-weak);
+        border-bottom: 1px solid var(--gc-line-weak);
+      }
+      .hunk .rng {
+        color: var(--gc-purple);
+      }
+      .dline {
+        display: flex;
+        align-items: stretch;
+        min-height: 20px;
+      }
+      .dline .ln {
+        flex: none;
+        width: 28px;
+        text-align: right;
+        padding-right: 6px;
+        color: var(--gc-text-3);
+        font-variant-numeric: tabular-nums;
+        user-select: none;
+        border-right: 1px solid var(--gc-line-weak);
+      }
+      .dline .sign {
+        flex: none;
+        width: 14px;
+        text-align: center;
+        color: var(--gc-text-3);
+        user-select: none;
+      }
+      .dline .code {
+        flex: 1;
+        min-width: 0;
+        padding-right: 10px;
+        white-space: pre;
+        overflow-x: hidden;
+        color: var(--gc-text-2);
+      }
+      .dline.add {
+        background: var(--gc-green-weak);
+        box-shadow: inset 2px 0 0 var(--gc-green-strong);
+      }
+      .dline.add .sign,
+      .dline.add .code {
+        color: var(--gc-green);
+      }
+      .dline.del {
+        background: var(--gc-red-weak);
+        box-shadow: inset 2px 0 0 var(--gc-red-strong);
+      }
+      .dline.del .sign,
+      .dline.del .code {
+        color: var(--gc-red);
+      }
+      .dline.ctx .code {
+        color: var(--gc-text-3);
+      }
+      .kw {
+        color: var(--gc-purple);
+      }
+      .str {
+        color: var(--gc-amber);
+      }
+      .num {
+        color: var(--gc-accent-text);
+      }
+
+      /* 记录面板 */
+      .log-panel {
+        flex: none;
+        height: 172px;
+        display: flex;
+        flex-direction: column;
+        background: var(--gc-card);
+        border: 1px solid var(--gc-line);
+        border-radius: var(--gc-r);
+        overflow: hidden;
+      }
+      .log-list {
+        flex: 1;
+        min-height: 0;
+        overflow: auto;
+      }
+      .commit-row {
+        display: flex;
+        align-items: center;
+        gap: var(--gc-s2);
+        height: var(--gc-row);
+        padding: 0 10px;
+        font-family: var(--gc-font-mono);
+        font-size: var(--gc-fs-meta);
+        border-bottom: 1px solid var(--gc-line-weak);
+      }
+      .commit-row:last-child {
+        border-bottom: 0;
+      }
+      .commit-row .hash {
+        flex: none;
+        color: var(--gc-purple);
+      }
+      .commit-row .msg {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: var(--gc-text-2);
+      }
+      .commit-row .who {
+        flex: none;
+        color: var(--gc-text-3);
+        font-family: var(--gc-font-ui);
+        font-size: var(--gc-fs-meta);
+      }
+      .commit-row .when {
+        flex: none;
+        color: var(--gc-text-3);
+        font-variant-numeric: tabular-nums;
+        width: 64px;
+        text-align: right;
+      }
+      .commit-row .br {
+        flex: none;
+        font-family: var(--gc-font-mono);
+        font-size: var(--gc-fs-micro);
+        color: var(--gc-accent-text);
+        background: var(--gc-accent-weak);
+        border-radius: var(--gc-r-tag);
+        padding: 0 5px;
+        line-height: 15px;
+      }
+
+      /* ---------- 聊天：悬浮球 + 面板 ---------- */
+      .chat-ball {
+        position: fixed;
+        right: 408px;
+        bottom: 56px;
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        background: var(--gc-overlay);
+        border: 1px solid var(--gc-line-strong);
+        color: var(--gc-text-2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 60;
+        box-shadow: var(--gc-shadow-menu);
+      }
+      .chat-ball .ico {
+        width: 22px;
+        height: 22px;
+      }
+      /* confirm 待确认态：琥珀外环 + 徽标点 */
+      .chat-ball.is-confirm {
+        border-color: var(--gc-amber);
+        box-shadow:
+          0 0 0 2px rgba(242, 201, 76, 0.28),
+          var(--gc-shadow-menu);
+      }
+      .chat-ball.is-confirm .ico {
+        color: var(--gc-amber);
+      }
+      .ball-dot {
+        position: absolute;
+        top: 2px;
+        right: 2px;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--gc-amber);
+        border: 2px solid var(--gc-page);
+      }
+
+      .chat-panel {
+        position: fixed;
+        right: 16px;
+        bottom: 56px;
+        width: 380px;
+        height: 508px;
+        display: flex;
+        flex-direction: column;
+        background: var(--gc-overlay);
+        border: 1px solid var(--gc-line-strong);
+        border-radius: var(--gc-r);
+        box-shadow: var(--gc-shadow-menu);
+        overflow: hidden;
+        z-index: 60;
+      }
+      .chat-bar {
+        flex: none;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        height: 32px;
+        padding: 0 8px 0 10px;
+        background: var(--gc-card);
+        border-bottom: 1px solid var(--gc-line);
+        cursor: grab;
+      }
+      .chat-bar .ttl {
+        font-size: var(--gc-fs-meta);
+        font-weight: 500;
+        color: var(--gc-text-2);
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .chat-bar .ttl b {
+        color: var(--gc-text);
+        font-weight: 600;
+      }
+      .chat-bar .spacer {
+        flex: 1;
+      }
+      .chat-body {
+        flex: 1;
+        min-height: 0;
+        overflow: auto;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .msg {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        max-width: 100%;
+      }
+      .msg-user {
+        align-self: flex-end;
+        max-width: 86%;
+      }
+      .msg-user .bubble {
+        background: var(--gc-accent-weak);
+        border: 1px solid rgba(20, 200, 184, 0.24);
+        border-radius: var(--gc-r);
+        padding: 6px 9px;
+        font-size: var(--gc-fs-body);
+        color: var(--gc-text);
+        line-height: 1.5;
+      }
+      html[data-accent='white'] .msg-user .bubble {
+        border-color: rgba(238, 244, 249, 0.22);
+      }
+      .msg-agent {
+        align-self: flex-start;
+        width: 100%;
+      }
+      .agent-card {
+        background: var(--gc-card);
+        border: 1px solid var(--gc-line);
+        border-radius: var(--gc-r);
+        padding: 8px 9px;
+        font-size: var(--gc-fs-body);
+        color: var(--gc-text-2);
+        line-height: 1.55;
+      }
+      .agent-card .who {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        margin-bottom: 5px;
+        color: var(--gc-text-3);
+        font-size: var(--gc-fs-micro);
+      }
+      .agent-card .who .ico {
+        width: 12px;
+        height: 12px;
+        color: var(--gc-accent-text);
+      }
+      .tool-call {
+        margin-top: 7px;
+        border: 1px solid var(--gc-line);
+        border-radius: var(--gc-r);
+        background: var(--gc-page);
+        overflow: hidden;
+      }
+      .tool-call .tc-head {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        height: 24px;
+        padding: 0 7px;
+        background: var(--gc-card);
+        border-bottom: 1px solid var(--gc-line-weak);
+      }
+      .tool-call .tc-head .nm {
+        font-family: var(--gc-font-mono);
+        font-size: 10px;
+        color: var(--gc-text-2);
+      }
+      .tool-call .tc-head .spacer {
+        flex: 1;
+      }
+      .tool-call .tc-body {
+        padding: 6px 7px;
+        font-family: var(--gc-font-mono);
+        font-size: 10px;
+        color: var(--gc-text-3);
+        line-height: 1.6;
+      }
+      .tool-call .tc-body .ok {
+        color: var(--gc-green);
+      }
+      .chat-dryrun {
+        margin: 0;
+      }
+      .chat-input {
+        flex: none;
+        border-top: 1px solid var(--gc-line);
+        padding: 8px;
+        display: flex;
+        align-items: flex-end;
+        gap: 6px;
+        background: var(--gc-card);
+      }
+      .chat-input textarea {
+        flex: 1;
+        min-width: 0;
+        height: 44px;
+        resize: none;
+        border: 1px solid var(--gc-line);
+        border-radius: var(--gc-r);
+        background: var(--gc-page);
+        color: var(--gc-text);
+        font-family: var(--gc-font-ui);
+        font-size: var(--gc-fs-body);
+        line-height: 1.45;
+        padding: 6px 8px;
+        outline: none;
+      }
+      .chat-input textarea::placeholder {
+        color: var(--gc-text-disabled);
+      }
+      .send-btn {
+        flex: none;
+        width: 28px;
+        height: 28px;
+        border-radius: var(--gc-r);
+        background: var(--gc-accent);
+        color: var(--gc-accent-ink);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .send-btn .ico {
+        width: 14px;
+        height: 14px;
+      }
+
+      @media (max-width: 1200px) {
+        .branch-panel {
+          width: 200px;
+        }
+        .changes-panel {
+          width: 260px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <span class="brand-mark"><i class="ico" data-icon="logo"></i></span>
+        <div class="topbar-end">
+          <span class="conn-tag"><span class="dot"></span>前端 <span class="val">0.1.32</span></span>
+          <span class="conn-tag"><span class="dot"></span>后端 <span class="val">0.1.32</span></span>
+          <span class="conn-tag"><span class="dot"></span>桌面 <span class="val">0.1.32</span></span>
+        </div>
+      </header>
+
+      <div class="pulsebar">
+        <div class="fill done" style="width: 100%"></div>
+      </div>
+
+      <main class="page status-page">
+        <div class="toolbar">
+          <button class="branch-select" type="button">
+            <i class="ico sm" data-icon="branch"></i>
+            api-gateway
+            <span class="cv">/</span>
+            feature/payment-retry
+            <i class="ico sm cv" data-icon="chevron-down"></i>
+          </button>
+          <span class="dirty-pill"><i class="ico" data-icon="file" style="width: 11px; height: 11px"></i>8 个改动</span>
+          <span class="spacer"></span>
+          <button class="btn" type="button"><i class="ico sm" data-icon="pull"></i>拉取</button>
+          <button class="btn primary" type="button"><i class="ico sm" data-icon="check"></i>提交</button>
+          <button class="btn ghost" type="button" aria-label="更多"><i class="ico sm" data-icon="more"></i></button>
+        </div>
+
+        <div class="workbench">
+          <!-- 左：分支树 -->
+          <aside class="branch-panel">
+            <div class="panel-top">
+              <div class="search-box">
+                <i class="ico sm" data-icon="search"></i>
+                <input type="text" placeholder="搜索分支" />
+              </div>
+            </div>
+            <div class="tree">
+              <div class="tree-group"><i class="ico" data-icon="chevron-down"></i>本地</div>
+              <div class="tree-row is-current">
+                <i class="ico" data-icon="check"></i>
+                <span class="nm">main</span>
+                <span class="ahead"><i class="ico" data-icon="arrow-up"></i>2</span>
+              </div>
+              <div class="tree-row"><span class="nm" style="padding-left: 18px">develop</span></div>
+              <div class="tree-row">
+                <span class="nm" style="padding-left: 18px">feature/payment-retry</span>
+                <span class="ahead"><i class="ico" data-icon="arrow-up"></i>3</span>
+              </div>
+              <div class="tree-row"><span class="nm" style="padding-left: 18px">release/2.4</span></div>
+              <div class="tree-row"><span class="nm" style="padding-left: 18px">hotfix/login-timeout</span></div>
+              <div class="tree-group" style="margin-top: 4px">
+                <i class="ico" data-icon="chevron-down"></i>远程 · origin/
+              </div>
+              <div class="tree-row remote"><span class="nm">origin/main</span><span class="ahead"><i class="ico" data-icon="arrow-down"></i>1</span></div>
+              <div class="tree-row remote"><span class="nm">origin/develop</span></div>
+              <div class="tree-row remote"><span class="nm">origin/release/2.4</span></div>
+              <div class="tree-row remote"><span class="nm">origin/hotfix/login-timeout</span></div>
+            </div>
+          </aside>
+
+          <!-- 中：更改面板 -->
+          <section class="changes-panel">
+            <div class="group-head">
+              <b>暂存的更改</b>
+              <span class="cnt">3</span>
+              <span class="spacer"></span>
+              <button class="icon-btn" type="button" title="全部取消暂存">
+                <i class="ico sm" data-icon="minus"></i>
+              </button>
+            </div>
+            <div class="change-list">
+              <div class="chg-row">
+                <span class="st a">A</span>
+                <span class="chg-path"><span>src/pay/retry.ts</span></span>
+                <span class="chg-diff"><span class="p">+42</span></span>
+              </div>
+              <div class="chg-row">
+                <span class="st m">M</span>
+                <span class="chg-path"><span>src/pay/timeout.ts</span></span>
+                <span class="chg-diff"><span class="p">+18</span><span class="n">−4</span></span>
+              </div>
+              <div class="chg-row">
+                <span class="st a">A</span>
+                <span class="chg-path"><span>src/pay/retry.spec.ts</span></span>
+                <span class="chg-diff"><span class="p">+96</span></span>
+              </div>
+            </div>
+
+            <div class="group-head">
+              <b>更改</b>
+              <span class="cnt">5</span>
+              <span class="spacer"></span>
+              <button class="icon-btn" type="button" title="全部暂存">
+                <i class="ico sm" data-icon="plus"></i>
+              </button>
+              <button class="icon-btn" type="button" title="刷新">
+                <i class="ico sm" data-icon="refresh"></i>
+              </button>
+            </div>
+            <div class="change-list grow-list">
+              <div class="chg-row is-sel">
+                <span class="st m">M</span>
+                <span class="chg-path"><span>src/api/client.ts</span></span>
+                <span class="chg-diff"><span class="p">+8</span><span class="n">−3</span></span>
+              </div>
+              <div class="chg-row">
+                <span class="st m">M</span>
+                <span class="chg-path"><span>src/api/types.ts</span></span>
+                <span class="chg-diff"><span class="p">+5</span><span class="n">−1</span></span>
+              </div>
+              <div class="chg-row">
+                <span class="st m">M</span>
+                <span class="chg-path"><span>src/config/defaults.ts</span></span>
+                <span class="chg-diff"><span class="p">+2</span><span class="n">−2</span></span>
+              </div>
+              <div class="chg-row">
+                <span class="st d">D</span>
+                <span class="chg-path"><span>src/legacy/retry-old.ts</span></span>
+                <span class="chg-diff"><span class="n">−64</span></span>
+              </div>
+              <div class="chg-row">
+                <span class="st m">M</span>
+                <span class="chg-path"><span>README.md</span></span>
+                <span class="chg-diff"><span class="p">+12</span><span class="n">−0</span></span>
+              </div>
+            </div>
+          </section>
+
+          <!-- 右：差异 + 记录 -->
+          <div class="right-col">
+            <section class="diff-panel">
+              <div class="file-head">
+                <i class="ico sm" data-icon="file" style="color: var(--gc-text-3)"></i>
+                <span class="fp">src/api/client.ts</span>
+                <span class="chip amber sm">MODIFIED</span>
+                <span class="spacer"></span>
+                <span class="chip plain sm mono" style="color: var(--gc-green)">+8</span>
+                <span class="chip plain sm mono" style="color: var(--gc-red)">−3</span>
+                <button class="icon-btn" type="button" title="折叠">
+                  <i class="ico sm" data-icon="chevron-down"></i>
+                </button>
+              </div>
+              <div class="diff-body">
+                <div class="hunk">
+                  <span class="rng">@@ -58,7 +58,12 @@</span>
+                  <span>export async function request()</span>
+                </div>
+                <div class="dline ctx">
+                  <span class="ln">58</span><span class="sign"></span>
+                  <span class="code">  const url = buildUrl(path, query);</span>
+                </div>
+                <div class="dline ctx">
+                  <span class="ln">59</span><span class="sign"></span>
+                  <span class="code">  const ctrl = new AbortController();</span>
+                </div>
+                <div class="dline del">
+                  <span class="ln">60</span><span class="sign">−</span>
+                  <span class="code">  const timer = setTimeout(() =&gt; ctrl.abort(), 30000);</span>
+                </div>
+                <div class="dline add">
+                  <span class="ln"></span><span class="sign">+</span>
+                  <span class="code">  const timeout = options.timeout ?? 30000;</span>
+                </div>
+                <div class="dline add">
+                  <span class="ln"></span><span class="sign">+</span>
+                  <span class="code">  const timer = setTimeout(() =&gt; ctrl.abort(), timeout);</span>
+                </div>
+                <div class="dline ctx">
+                  <span class="ln">61</span><span class="sign"></span>
+                  <span class="code">  try {</span>
+                </div>
+                <div class="dline ctx">
+                  <span class="ln">62</span><span class="sign"></span>
+                  <span class="code">    const res = await fetch(url, {</span>
+                </div>
+                <div class="dline add">
+                  <span class="ln"></span><span class="sign">+</span>
+                  <span class="code">      signal: ctrl.signal,</span>
+                </div>
+                <div class="dline add">
+                  <span class="ln"></span><span class="sign">+</span>
+                  <span class="code">      retry: options.retry ?? 2</span>
+                </div>
+                <div class="dline ctx">
+                  <span class="ln">63</span><span class="sign"></span>
+                  <span class="code">    });</span>
+                </div>
+                <div class="dline ctx">
+                  <span class="ln">64</span><span class="sign"></span>
+                  <span class="code">    if (!res.ok) throw new ApiError(res);</span>
+                </div>
+                <div class="dline ctx">
+                  <span class="ln">65</span><span class="sign"></span>
+                  <span class="code">    return res.json();</span>
+                </div>
+                <div class="dline ctx">
+                  <span class="ln">66</span><span class="sign"></span>
+                  <span class="code">  } finally {</span>
+                </div>
+                <div class="dline del">
+                  <span class="ln">67</span><span class="sign">−</span>
+                  <span class="code">    clearTimeout(timer);</span>
+                </div>
+                <div class="dline add">
+                  <span class="ln"></span><span class="sign">+</span>
+                  <span class="code">    clearTimeout(timer);</span>
+                </div>
+                <div class="dline ctx">
+                  <span class="ln">68</span><span class="sign"></span>
+                  <span class="code">  }</span>
+                </div>
+              </div>
+            </section>
+
+            <section class="log-panel">
+              <div class="card-head">
+                <i class="ico sm" data-icon="commit" style="color: var(--gc-text-3)"></i>
+                <h3>最近提交</h3>
+                <span class="spacer"></span>
+                <button class="icon-btn" type="button" title="查看全部">
+                  <i class="ico sm" data-icon="chevron"></i>
+                </button>
+              </div>
+              <div class="log-list">
+                <div class="commit-row">
+                  <span class="hash">7f3e9b1</span>
+                  <span class="msg">feat: 支付重试超时处理</span>
+                  <span class="who">李娜</span>
+                  <span class="br">HEAD</span>
+                  <span class="when">37 分钟前</span>
+                </div>
+                <div class="commit-row">
+                  <span class="hash">a1b2c3d</span>
+                  <span class="msg">chore: bump fastify to 4.28</span>
+                  <span class="who">张伟</span>
+                  <span class="br">main</span>
+                  <span class="when">2 小时前</span>
+                </div>
+                <div class="commit-row">
+                  <span class="hash">c4e7a09</span>
+                  <span class="msg">fix: 修复鉴权中间件漏传 header</span>
+                  <span class="who">王磊</span>
+                  <span class="br">origin/main</span>
+                  <span class="when">昨天 14:32</span>
+                </div>
+                <div class="commit-row">
+                  <span class="hash">b90f12e</span>
+                  <span class="msg">refactor: 拆出对账任务调度器</span>
+                  <span class="who">陈晨</span>
+                  <span class="br">develop</span>
+                  <span class="when">昨天 09:18</span>
+                </div>
+                <div class="commit-row">
+                  <span class="hash">5d6a8f0</span>
+                  <span class="msg">docs: 补充 MCP 工具清单</span>
+                  <span class="who">张伟</span>
+                  <span class="br">release/2.4</span>
+                  <span class="when">2 天前</span>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+
+      <nav class="dock">
+        <a class="dock-item" href="dashboard.html"><i class="ico" data-icon="gauge"></i>工作台</a>
+        <a class="dock-item is-active" href="status.html"><i class="ico" data-icon="activity"></i>状态</a>
+        <a class="dock-item" href="merge.html"><i class="ico" data-icon="git-merge"></i>合并</a>
+        <a class="dock-item" href="jobs.html"><i class="ico" data-icon="layers"></i>任务<span class="count">3</span></a>
+        <a class="dock-item" href="logs.html"><i class="ico" data-icon="scroll"></i>日志</a>
+        <a class="dock-item" href="conversations.html"><i class="ico" data-icon="bubble"></i>对话</a>
+        <a class="dock-item" href="settings.html"><i class="ico" data-icon="sliders"></i>设置</a>
+      </nav>
+    </div>
+
+    <!-- 悬浮球：confirm 待确认态 -->
+    <button class="chat-ball is-confirm" type="button" aria-label="聊天待确认">
+      <i class="ico" data-icon="bubble"></i>
+      <span class="ball-dot"></span>
+    </button>
+
+    <!-- 聊天面板 -->
+    <aside class="chat-panel" role="dialog" aria-label="助手">
+      <div class="chat-bar">
+        <i class="ico sm" data-icon="agent" style="color: var(--gc-accent-text)"></i>
+        <span class="ttl">助手 · <b>api-gateway</b></span>
+        <span class="spacer"></span>
+        <button class="icon-btn" type="button" title="重置大小">
+          <i class="ico sm" data-icon="refresh"></i>
+        </button>
+        <button class="icon-btn" type="button" title="关闭">
+          <i class="ico sm" data-icon="close"></i>
+        </button>
+      </div>
+
+      <div class="chat-body">
+        <div class="msg msg-user">
+          <div class="bubble">把支付重试的超时改动提交掉</div>
+        </div>
+
+        <div class="msg msg-agent">
+          <div class="agent-card">
+            <div class="who"><i class="ico" data-icon="agent"></i>已检查工作区，暂存了 3 个文件</div>
+            改动集中在 <span class="mono" style="color: var(--gc-text)">src/pay/</span>，超时值改为从 options
+            读取，默认仍是 30 秒。
+            <div class="tool-call">
+              <div class="tc-head">
+                <i class="ico sm" data-icon="terminal" style="color: var(--gc-text-3)"></i>
+                <span class="nm">git_status</span>
+                <span class="spacer"></span>
+                <span class="chip green sm">成功</span>
+              </div>
+              <div class="tc-body">
+                staged: 3 · unstaged: 5<br />
+                branch: feature/payment-retry → origin/main
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="msg msg-agent">
+          <div class="dryrun is-pending chat-dryrun">
+            <div class="dryrun-head">
+              <i class="ico" data-icon="dry-run"></i>
+              <span class="title">写操作干跑预览</span>
+              <span class="chip amber sm">待确认</span>
+            </div>
+            <div class="dryrun-cmd">git commit -m "fix: payment retry timeout"</div>
+            <div class="dryrun-files">
+              <span class="f">src/pay/retry.ts</span>
+              <span class="f">src/pay/timeout.ts</span>
+              <span class="f">src/pay/retry.spec.ts</span>
+            </div>
+            <div class="dryrun-actions">
+              <button class="btn ghost h24" type="button">取消</button>
+              <button class="btn h24" type="button">完整 diff</button>
+              <button class="btn primary h24" type="button">确认执行</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="chat-input">
+        <textarea placeholder="问点什么，或让 Agent 操作仓库…"></textarea>
+        <button class="send-btn" type="button" aria-label="发送"><i class="ico" data-icon="send"></i></button>
+      </div>
+    </aside>
+
+    <script src="assets/icons.js"></script>
+    <script src="assets/switch.js"></script>
+  </body>
+</html>

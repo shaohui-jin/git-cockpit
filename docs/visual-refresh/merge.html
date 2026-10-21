@@ -1,0 +1,651 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>合并 · Git Cockpit</title>
+    <script>
+      try {
+        var a = localStorage.getItem('gc-accent');
+        if (a) document.documentElement.dataset.accent = a;
+      } catch (e) {}
+    </script>
+    <link rel="stylesheet" href="assets/tokens.css" />
+    <link rel="stylesheet" href="assets/chrome.css" />
+    <style>
+      /* 效率敏感区：实底，禁毛玻璃 */
+      .sec-block {
+        flex: none;
+        display: flex;
+        flex-direction: column;
+        background: var(--gc-card);
+        border: 1px solid var(--gc-line);
+        border-radius: var(--gc-r);
+        overflow: hidden;
+      }
+      .sec-block > .card-head {
+        background: var(--gc-page);
+        border-bottom: 1px solid var(--gc-line);
+        height: 34px;
+      }
+      .sec-body {
+        padding: var(--gc-s3);
+        display: flex;
+        flex-direction: column;
+        gap: var(--gc-s3);
+      }
+
+      /* ---------- 预演选择行 ---------- */
+      .sel-row {
+        display: flex;
+        align-items: center;
+        gap: var(--gc-s2);
+        flex-wrap: wrap;
+      }
+      .sel-label {
+        font-size: var(--gc-fs-meta);
+        font-weight: 500;
+        color: var(--gc-text-3);
+        letter-spacing: 0.02em;
+        flex: none;
+      }
+      .sel-arrow {
+        color: var(--gc-text-disabled);
+        flex: none;
+        display: inline-flex;
+      }
+      .sel-row .spacer {
+        flex: 1;
+      }
+      .result-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        height: 22px;
+        padding: 0 8px;
+        border-radius: var(--gc-r-tag);
+        background: var(--gc-red-weak);
+        border: 1px solid rgba(255, 133, 133, 0.3);
+        color: var(--gc-red);
+        font-size: var(--gc-fs-meta);
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+      }
+      .result-chip.ok {
+        background: var(--gc-green-weak);
+        border-color: rgba(86, 217, 122, 0.3);
+        color: var(--gc-green);
+      }
+
+      /* ---------- 预演文件列表 ---------- */
+      .file-list {
+        border: 1px solid var(--gc-line);
+        border-radius: var(--gc-r);
+        overflow: hidden;
+        background: var(--gc-page);
+      }
+      .file-row {
+        display: flex;
+        align-items: center;
+        gap: var(--gc-s2);
+        height: var(--gc-row);
+        padding: 0 10px;
+        border-bottom: 1px solid var(--gc-line-weak);
+        font-family: var(--gc-font-mono);
+        font-size: var(--gc-fs-meta);
+      }
+      .file-row:last-child {
+        border-bottom: 0;
+      }
+      .file-row .fp {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: var(--gc-text-2);
+      }
+      .file-row .stat {
+        flex: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: var(--gc-fs-micro);
+        font-weight: 500;
+        padding: 0 5px;
+        height: 17px;
+        border-radius: var(--gc-r-tag);
+        line-height: 1;
+      }
+      .stat.clean {
+        color: var(--gc-accent-text);
+        background: var(--gc-accent-weak);
+      }
+      .stat.conflict {
+        color: var(--gc-red);
+        background: var(--gc-red-weak);
+      }
+      .stat.unrelated {
+        color: var(--gc-amber);
+        background: var(--gc-amber-weak);
+      }
+      .file-row .num {
+        flex: none;
+        font-size: var(--gc-fs-micro);
+        color: var(--gc-text-3);
+        font-variant-numeric: tabular-nums;
+        width: 64px;
+        text-align: right;
+      }
+      .weblink-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 10px;
+        background: var(--gc-card);
+        border-bottom: 1px solid var(--gc-line-weak);
+        font-size: var(--gc-fs-micro);
+        color: var(--gc-text-3);
+      }
+      .weblink-row .ico {
+        width: 11px;
+        height: 11px;
+      }
+      .weblink-row a {
+        color: var(--gc-accent-text);
+        font-family: var(--gc-font-mono);
+      }
+
+      /* ---------- 冲突区 ---------- */
+      .conflict-toolbar {
+        display: flex;
+        align-items: center;
+        gap: var(--gc-s2);
+      }
+      .conflict-toolbar .spacer {
+        flex: 1;
+      }
+      .conflict-file-head {
+        display: flex;
+        align-items: center;
+        gap: var(--gc-s2);
+        height: 26px;
+        padding: 0 10px;
+        background: var(--gc-page);
+        border-bottom: 1px solid var(--gc-line-weak);
+        font-family: var(--gc-font-mono);
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-2);
+      }
+      .conflict-file-head .spacer {
+        flex: 1;
+      }
+      .conflict-foot {
+        display: flex;
+        align-items: center;
+        gap: var(--gc-s2);
+        padding: 8px 10px;
+        border-top: 1px solid var(--gc-line);
+        background: var(--gc-page);
+      }
+      .conflict-foot .spacer {
+        flex: 1;
+      }
+      .conflict-foot .hint {
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-3);
+      }
+
+      /* ---------- 分支矩阵 ---------- */
+      .matrix-wrap {
+        overflow-x: auto;
+      }
+      .matrix {
+        border-collapse: collapse;
+        width: 100%;
+        min-width: 520px;
+        font-size: var(--gc-fs-meta);
+        font-variant-numeric: tabular-nums;
+      }
+      .matrix th,
+      .matrix td {
+        height: var(--gc-row);
+        padding: 0 8px;
+        border: 1px solid var(--gc-line-weak);
+        text-align: center;
+        white-space: nowrap;
+      }
+      .matrix thead th {
+        background: var(--gc-page);
+        color: var(--gc-text-3);
+        font-weight: 500;
+        font-size: var(--gc-fs-micro);
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+      .matrix tbody th {
+        text-align: left;
+        background: var(--gc-card);
+        color: var(--gc-text-2);
+        font-weight: 400;
+        font-family: var(--gc-font-mono);
+        font-size: var(--gc-fs-meta);
+      }
+      .matrix tbody th .self {
+        color: var(--gc-text-3);
+        font-family: var(--gc-font-ui);
+        font-size: 10px;
+        margin-left: 4px;
+      }
+      .matrix td .cellv {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+        gap: 4px;
+      }
+      .matrix td.clean {
+        background: var(--gc-accent-weak);
+        color: var(--gc-accent-text);
+      }
+      .matrix td.conflict {
+        background: var(--gc-red-weak);
+        color: var(--gc-red);
+      }
+      .matrix td.unrelated {
+        background: var(--gc-amber-weak);
+        color: var(--gc-amber);
+      }
+      .matrix td.self {
+        background: var(--gc-page);
+        color: var(--gc-text-3);
+      }
+      .matrix td .ico {
+        width: 12px;
+        height: 12px;
+      }
+      .matrix-legend {
+        display: flex;
+        align-items: center;
+        gap: var(--gc-s3);
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-3);
+      }
+      .matrix-legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .matrix-legend i {
+        width: 10px;
+        height: 10px;
+        border-radius: 2px;
+      }
+
+      /* ---------- 落盘执行弹层（静态展开态） ---------- */
+      .modal-stage {
+        padding: var(--gc-s4) var(--gc-s3);
+        background: var(--gc-page);
+        border-radius: var(--gc-r);
+        display: flex;
+        justify-content: center;
+      }
+      .modal-card {
+        width: 560px;
+        max-width: 100%;
+        background: var(--gc-overlay);
+        border: 1px solid var(--gc-line-strong);
+        border-radius: var(--gc-r);
+        box-shadow: var(--gc-shadow-menu);
+        overflow: hidden;
+      }
+      .modal-head {
+        display: flex;
+        align-items: center;
+        gap: var(--gc-s2);
+        height: 36px;
+        padding: 0 12px;
+        border-bottom: 1px solid var(--gc-line);
+        background: var(--gc-card);
+      }
+      .modal-head b {
+        font-size: var(--gc-fs-title);
+        font-weight: 600;
+        color: var(--gc-text);
+        line-height: 1;
+      }
+      .modal-head .spacer {
+        flex: 1;
+      }
+      .modal-body {
+        padding: var(--gc-s3);
+        display: flex;
+        flex-direction: column;
+        gap: var(--gc-s2);
+      }
+      .modal-note {
+        display: flex;
+        align-items: flex-start;
+        gap: 6px;
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-3);
+        line-height: 1.5;
+      }
+      .modal-note .ico {
+        width: 12px;
+        height: 12px;
+        margin-top: 2px;
+        color: var(--gc-amber);
+        flex: none;
+      }
+      .modal-foot {
+        display: flex;
+        align-items: center;
+        gap: var(--gc-s2);
+        padding: 10px 12px;
+        border-top: 1px solid var(--gc-line);
+        background: var(--gc-card);
+      }
+      .modal-foot .spacer {
+        flex: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <span class="brand-mark"><i class="ico" data-icon="logo"></i></span>
+        <div class="topbar-end">
+          <span class="conn-tag"><span class="dot"></span>前端 <span class="val">0.1.32</span></span>
+          <span class="conn-tag"><span class="dot"></span>后端 <span class="val">0.1.32</span></span>
+          <span class="conn-tag"><span class="dot"></span>桌面 <span class="val">0.1.32</span></span>
+        </div>
+      </header>
+
+      <div class="pulsebar">
+        <div class="fill done" style="width: 100%"></div>
+      </div>
+
+      <main class="page">
+        <div class="page-head">
+          <h1>合并</h1>
+          <span class="sub">ml-pipeline · release/2.4</span>
+          <span class="spacer"></span>
+          <span class="chip red"><i></i>2 处冲突待处理</span>
+          <button class="btn h24" type="button"><i class="ico sm" data-icon="abort"></i>放弃本次合并</button>
+        </div>
+
+        <!-- ============ 合并预演 ============ -->
+        <section class="sec-block">
+          <div class="card-head">
+            <i class="ico sm" data-icon="eye" style="color: var(--gc-text-3)"></i>
+            <h3>合并预演</h3>
+            <span class="spacer"></span>
+            <span class="chip plain sm">只读 · 不改动工作区</span>
+          </div>
+          <div class="sec-body">
+            <div class="sel-row">
+              <span class="sel-label">from</span>
+              <span class="select-wrap">
+                <select class="select" style="min-width: 200px">
+                  <option>feature/payment-retry</option>
+                  <option>develop</option>
+                  <option>hotfix/login-timeout</option>
+                </select>
+              </span>
+              <span class="sel-arrow"><i class="ico sm" data-icon="chevron"></i></span>
+              <span class="sel-label">into</span>
+              <span class="select-wrap">
+                <select class="select" style="min-width: 160px">
+                  <option>release/2.4</option>
+                  <option>main</option>
+                  <option>develop</option>
+                </select>
+              </span>
+              <button class="btn primary" type="button"><i class="ico sm" data-icon="play"></i>预演</button>
+              <span class="spacer"></span>
+              <span class="result-chip"><i class="ico sm" data-icon="conflict"></i>存在 2 处冲突</span>
+            </div>
+
+            <div class="file-list">
+              <div class="file-row">
+                <span class="stat conflict"><i class="ico" data-icon="conflict" style="width: 10px; height: 10px"></i>冲突</span>
+                <span class="fp">src/pay/retry.ts</span>
+                <span class="num">3 块 · 2 未决</span>
+              </div>
+              <div class="weblink-row">
+                <i class="ico" data-icon="external"></i>
+                远端已存在关联合并请求
+                <a href="#">!128 · release/2.4 ← feature/payment-retry</a>
+              </div>
+              <div class="file-row">
+                <span class="stat conflict"><i class="ico" data-icon="conflict" style="width: 10px; height: 10px"></i>冲突</span>
+                <span class="fp">src/pay/timeout.ts</span>
+                <span class="num">1 块 · 1 未决</span>
+              </div>
+              <div class="file-row">
+                <span class="stat clean"><i class="ico" data-icon="check" style="width: 10px; height: 10px"></i>干净</span>
+                <span class="fp">src/api/client.ts</span>
+                <span class="num">+8 −3</span>
+              </div>
+              <div class="file-row">
+                <span class="stat clean"><i class="ico" data-icon="check" style="width: 10px; height: 10px"></i>干净</span>
+                <span class="fp">src/config/defaults.ts</span>
+                <span class="num">+2 −2</span>
+              </div>
+              <div class="file-row">
+                <span class="stat unrelated"><i class="ico" data-icon="minus" style="width: 10px; height: 10px"></i>不相关</span>
+                <span class="fp">docs/legacy-migration.md</span>
+                <span class="num">仅 into 侧</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 冲突选边 ============ -->
+        <section class="sec-block">
+          <div class="card-head">
+            <i class="ico sm" data-icon="conflict" style="color: var(--gc-red)"></i>
+            <h3>冲突选边</h3>
+            <span class="chip red sm">2 未决</span>
+            <span class="spacer"></span>
+            <span class="conflict-toolbar">
+              <button class="btn ghost h24" type="button"><i class="ico sm" data-icon="abort"></i>全部取 OURS</button>
+              <button class="btn ghost h24" type="button">全部取 THEIRS</button>
+            </span>
+          </div>
+
+          <div class="conflict-file-head">
+            <i class="ico sm" data-icon="file"></i>
+            src/pay/retry.ts
+            <span class="spacer"></span>
+            <span class="chip amber sm">1 / 3 块</span>
+          </div>
+
+          <div class="conflict-list mat-flat-cell">
+            <div class="conflict-hunk">
+              <span>@@ -42,7 +42,9 @@</span>
+              <span class="range">function retryDelay(attempt: number)</span>
+            </div>
+            <div class="conflict-row is-open">
+              <span class="ln">42</span>
+              <div class="side">
+                <span class="side-chip ours">OURS<i class="ico sm check" data-icon="check"></i></span>
+                <span class="code">const MAX = 3;</span>
+              </div>
+              <div class="side">
+                <span class="side-chip theirs">THEIRS<i class="ico sm check" data-icon="check"></i></span>
+                <span class="code">const MAX = 5;</span>
+              </div>
+            </div>
+            <div class="conflict-row is-open">
+              <span class="ln">43</span>
+              <div class="side">
+                <span class="side-chip ours">OURS<i class="ico sm check" data-icon="check"></i></span>
+                <span class="code">return attempt * 1000;</span>
+              </div>
+              <div class="side">
+                <span class="side-chip theirs">THEIRS<i class="ico sm check" data-icon="check"></i></span>
+                <span class="code">return 2 ** attempt * 500;</span>
+              </div>
+            </div>
+            <div class="conflict-row is-resolved">
+              <span class="ln">44</span>
+              <div class="side is-picked">
+                <span class="side-chip ours">OURS<i class="ico sm check" data-icon="check"></i></span>
+                <span class="code">if (attempt &gt;= MAX) throw e;</span>
+              </div>
+              <div class="side">
+                <span class="side-chip theirs">THEIRS<i class="ico sm check" data-icon="check"></i></span>
+                <span class="code">if (attempt &gt; 5) throw e;</span>
+              </div>
+            </div>
+            <div class="conflict-row is-resolved">
+              <span class="ln">45</span>
+              <div class="side">
+                <span class="side-chip ours">OURS<i class="ico sm check" data-icon="check"></i></span>
+                <span class="code">await sleep(delay);</span>
+              </div>
+              <div class="side is-picked">
+                <span class="side-chip theirs">THEIRS<i class="ico sm check" data-icon="check"></i></span>
+                <span class="code">await sleep(delay, signal);</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="conflict-foot">
+            <span class="hint">点击行内 OURS / THEIRS 选边，或使用上方批量操作</span>
+            <span class="spacer"></span>
+            <button class="btn h24" type="button">保存当前文件</button>
+            <button class="btn primary h24" type="button"><i class="ico sm" data-icon="check"></i>标记已解决</button>
+          </div>
+        </section>
+
+        <!-- ============ 分支矩阵 ============ -->
+        <section class="sec-block">
+          <div class="card-head">
+            <i class="ico sm" data-icon="layers" style="color: var(--gc-text-3)"></i>
+            <h3>分支矩阵</h3>
+            <span class="spacer"></span>
+            <span class="matrix-legend">
+              <span><i style="background: var(--gc-accent-weak)"></i>干净</span>
+              <span><i style="background: var(--gc-red-weak)"></i>冲突</span>
+              <span><i style="background: var(--gc-amber-weak)"></i>无关</span>
+            </span>
+          </div>
+          <div class="sec-body">
+            <div class="matrix-wrap">
+              <table class="matrix">
+                <thead>
+                  <tr>
+                    <th style="text-align: left; width: 220px">from ＼ into</th>
+                    <th>main</th>
+                    <th>develop</th>
+                    <th>release/2.4</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th>main</th>
+                    <td class="self"><span class="cellv"><i class="ico" data-icon="minus"></i></span></td>
+                    <td class="clean"><span class="cellv"><i class="ico" data-icon="check"></i></span></td>
+                    <td class="clean"><span class="cellv"><i class="ico" data-icon="check"></i></span></td>
+                  </tr>
+                  <tr>
+                    <th>develop</th>
+                    <td class="clean"><span class="cellv"><i class="ico" data-icon="check"></i></span></td>
+                    <td class="self"><span class="cellv"><i class="ico" data-icon="minus"></i></span></td>
+                    <td class="conflict"><span class="cellv"><i class="ico" data-icon="close"></i></span></td>
+                  </tr>
+                  <tr>
+                    <th>feature/payment-retry</th>
+                    <td class="conflict"><span class="cellv"><i class="ico" data-icon="close"></i></span></td>
+                    <td class="clean"><span class="cellv"><i class="ico" data-icon="check"></i></span></td>
+                    <td class="conflict"><span class="cellv"><i class="ico" data-icon="close"></i></span></td>
+                  </tr>
+                  <tr>
+                    <th>release/2.4</th>
+                    <td class="clean"><span class="cellv"><i class="ico" data-icon="check"></i></span></td>
+                    <td class="unrelated"><span class="cellv"><i class="ico" data-icon="minus"></i></span></td>
+                    <td class="self"><span class="cellv"><i class="ico" data-icon="minus"></i></span></td>
+                  </tr>
+                  <tr>
+                    <th>hotfix/login-timeout</th>
+                    <td class="unrelated"><span class="cellv"><i class="ico" data-icon="minus"></i></span></td>
+                    <td class="unrelated"><span class="cellv"><i class="ico" data-icon="minus"></i></span></td>
+                    <td class="clean"><span class="cellv"><i class="ico" data-icon="check"></i></span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <span class="t3" style="font-size: 11px"
+              >矩阵为只读预演缓存，点击单元格可跳到对应 from/into 的预演结果。行高 28px，符号与底色双编码，不依赖颜色单一通道。</span
+            >
+          </div>
+        </section>
+
+        <!-- ============ 落盘执行（弹层变体，静态展开） ============ -->
+        <section class="sec-block">
+          <div class="card-head">
+            <i class="ico sm" data-icon="dry-run" style="color: var(--gc-amber)"></i>
+            <h3>落盘执行</h3>
+            <span class="spacer"></span>
+            <span class="chip plain sm">弹层变体 · 静态展开态</span>
+          </div>
+          <div class="modal-stage">
+            <div class="modal-card">
+              <div class="modal-head">
+                <i class="ico sm" data-icon="git-merge" style="color: var(--gc-purple)"></i>
+                <b>执行合并落盘</b>
+                <span class="spacer"></span>
+                <button class="icon-btn" type="button" aria-label="关闭"><i class="ico sm" data-icon="close"></i></button>
+              </div>
+              <div class="modal-body">
+                <div class="dryrun is-pending">
+                  <div class="dryrun-head">
+                    <i class="ico" data-icon="dry-run"></i>
+                    <span class="title">写操作干跑预览</span>
+                    <span class="chip amber sm">待确认</span>
+                  </div>
+                  <div class="dryrun-cmd">
+                    git merge --no-ff feature/payment-retry -m "merge: 支付重试超时处理 → release/2.4"
+                  </div>
+                  <div class="dryrun-files">
+                    <span class="f">src/pay/retry.ts</span>
+                    <span class="f">src/pay/timeout.ts</span>
+                    <span class="f">src/api/client.ts</span>
+                    <span class="f">src/config/defaults.ts</span>
+                  </div>
+                </div>
+                <div class="modal-note">
+                  <i class="ico" data-icon="alert"></i>
+                  将在 release/2.4 上创建合并提交。冲突已在选边面板全部解决，执行后不可通过撤销恢复原分支指针。
+                </div>
+              </div>
+              <div class="modal-foot">
+                <span class="spacer"></span>
+                <button class="btn h24" type="button">取消</button>
+                <button class="btn h24" type="button">完整 diff</button>
+                <button class="btn primary h24" type="button">确认执行</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <nav class="dock">
+        <a class="dock-item" href="dashboard.html"><i class="ico" data-icon="gauge"></i>工作台</a>
+        <a class="dock-item" href="status.html"><i class="ico" data-icon="activity"></i>状态</a>
+        <a class="dock-item is-active" href="merge.html"><i class="ico" data-icon="git-merge"></i>合并</a>
+        <a class="dock-item" href="jobs.html"><i class="ico" data-icon="layers"></i>任务<span class="count">3</span></a>
+        <a class="dock-item" href="logs.html"><i class="ico" data-icon="scroll"></i>日志</a>
+        <a class="dock-item" href="conversations.html"><i class="ico" data-icon="bubble"></i>对话</a>
+        <a class="dock-item" href="settings.html"><i class="ico" data-icon="sliders"></i>设置</a>
+      </nav>
+    </div>
+
+    <script src="assets/icons.js"></script>
+    <script src="assets/switch.js"></script>
+  </body>
+</html>

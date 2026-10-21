@@ -1,0 +1,1221 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Git Cockpit · 设计系统与页面索引</title>
+    <script>
+      try {
+        var a = localStorage.getItem('gc-accent');
+        if (a) document.documentElement.dataset.accent = a;
+      } catch (e) {}
+    </script>
+    <link rel="stylesheet" href="assets/tokens.css" />
+    <link rel="stylesheet" href="assets/chrome.css" />
+    <style>
+      body {
+        overflow: auto;
+      }
+
+      .hub {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 40px 24px 72px;
+        display: flex;
+        flex-direction: column;
+        gap: 32px;
+      }
+
+      /* ---------- 品牌区 ---------- */
+      .hub-head {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding-bottom: 24px;
+        border-bottom: 1px solid var(--gc-line);
+      }
+      .hub-logo {
+        flex: none;
+        width: 48px;
+        height: 48px;
+        color: var(--gc-accent);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .hub-logo svg {
+        width: 48px;
+        height: 48px;
+        display: block;
+      }
+      .hub-brand h1 {
+        font-size: 20px;
+        font-weight: 600;
+        line-height: 1.25;
+        color: var(--gc-text);
+        letter-spacing: -0.02em;
+      }
+      .hub-brand p {
+        font-size: var(--gc-fs-body);
+        color: var(--gc-text-3);
+        line-height: var(--gc-lh-body);
+        margin-top: 2px;
+      }
+      .hub-ver {
+        font-family: var(--gc-font-mono);
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-3);
+        padding: 2px 6px;
+        border: 1px solid var(--gc-line);
+        border-radius: var(--gc-r-tag);
+        margin-left: 4px;
+        align-self: flex-start;
+        margin-top: 3px;
+      }
+      .hub-head .spacer {
+        flex: 1;
+      }
+
+      /* ---------- 显眼主色分段控件 ---------- */
+      .accent-seg {
+        flex: none;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px;
+        border-radius: var(--gc-r);
+        background: var(--gc-card);
+        border: 1px solid var(--gc-line);
+      }
+      .accent-seg .seg-lbl {
+        font-size: var(--gc-fs-micro);
+        font-weight: 500;
+        letter-spacing: var(--gc-track-micro);
+        text-transform: uppercase;
+        color: var(--gc-text-3);
+        padding: 0 8px 0 6px;
+      }
+      .accent-seg button {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        height: 30px;
+        padding: 0 12px;
+        border-radius: var(--gc-r-tag);
+        border: 1px solid transparent;
+        color: var(--gc-text-3);
+        font-size: var(--gc-fs-body);
+        font-weight: 500;
+        transition:
+          background var(--gc-t-micro) var(--gc-ease),
+          color var(--gc-t-micro) var(--gc-ease);
+      }
+      .accent-seg button:hover {
+        color: var(--gc-text);
+        background: rgba(255, 255, 255, 0.04);
+      }
+      .accent-seg button .sw {
+        width: 12px;
+        height: 12px;
+        border-radius: 3px;
+        border: 1px solid var(--gc-line-strong);
+        flex: none;
+      }
+      .accent-seg button[data-seg='teal'] .sw {
+        background: #14c8b8;
+      }
+      .accent-seg button[data-seg='white'] .sw {
+        background: #eef4f9;
+      }
+      .accent-seg button.is-on {
+        background: var(--gc-overlay);
+        border-color: var(--gc-line-strong);
+        color: var(--gc-text);
+      }
+
+      /* ---------- 分区 ---------- */
+      .sec {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .sec-head {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+      }
+      .sec-head h2 {
+        font-size: var(--gc-fs-title);
+        font-weight: 600;
+        color: var(--gc-text);
+        line-height: 1.2;
+      }
+      .sec-head .num {
+        font-family: var(--gc-font-mono);
+        font-size: var(--gc-fs-micro);
+        color: var(--gc-accent-text);
+        letter-spacing: 0.06em;
+      }
+      .sec-head .note {
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-3);
+      }
+
+      .grid-2 {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .grid-3 {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .grid-4 {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .panel {
+        background: var(--gc-card);
+        border: 1px solid var(--gc-line);
+        border-radius: var(--gc-r);
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        min-width: 0;
+      }
+      .panel-label {
+        font-size: var(--gc-fs-micro);
+        font-weight: 500;
+        letter-spacing: var(--gc-track-micro);
+        text-transform: uppercase;
+        color: var(--gc-text-3);
+        line-height: 1;
+      }
+
+      /* ---------- 表面阶梯 ---------- */
+      .swatches {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+      }
+      .swatch {
+        border: 1px solid var(--gc-line);
+        border-radius: var(--gc-r);
+        overflow: hidden;
+      }
+      .swatch .chip-color {
+        height: 44px;
+      }
+      .swatch .meta {
+        padding: 6px 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        border-top: 1px solid var(--gc-line);
+        background: var(--gc-card);
+      }
+      .swatch .meta b {
+        font-size: var(--gc-fs-meta);
+        font-weight: 500;
+        color: var(--gc-text-2);
+        line-height: 1.3;
+      }
+      .swatch .meta span {
+        font-family: var(--gc-font-mono);
+        font-size: var(--gc-fs-micro);
+        color: var(--gc-text-3);
+      }
+
+      /* ---------- 主色并排 ---------- */
+      .accent-pair {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+      .accent-card {
+        border: 1px solid var(--gc-line);
+        border-radius: var(--gc-r);
+        overflow: hidden;
+        background: var(--gc-page);
+      }
+      .accent-card.is-live {
+        border-color: var(--gc-accent);
+        box-shadow: 0 0 0 1px var(--gc-accent-weak);
+      }
+      .accent-card .band {
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 10px;
+      }
+      .accent-card[data-a='teal'] .band {
+        background: #14c8b8;
+        color: #04211f;
+      }
+      .accent-card[data-a='white'] .band {
+        background: #eef4f9;
+        color: #0e1218;
+      }
+      .accent-card .band b {
+        font-size: var(--gc-fs-meta);
+        font-weight: 600;
+        line-height: 1;
+      }
+      .accent-card .band span {
+        font-family: var(--gc-font-mono);
+        font-size: var(--gc-fs-micro);
+        opacity: 0.75;
+      }
+      .accent-card .vars {
+        padding: 8px 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+      .accent-card .vars div {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        font-family: var(--gc-font-mono);
+        font-size: var(--gc-fs-micro);
+        color: var(--gc-text-3);
+      }
+      .accent-card .vars i {
+        width: 10px;
+        height: 10px;
+        border-radius: 2px;
+        flex: none;
+      }
+      .accent-card .vars em {
+        font-style: normal;
+        color: var(--gc-text-2);
+      }
+      .live-badge {
+        font-size: var(--gc-fs-micro);
+        font-weight: 500;
+        color: var(--gc-accent-text);
+        background: var(--gc-accent-weak);
+        border: 1px solid rgba(20, 200, 184, 0.28);
+        border-radius: var(--gc-r-tag);
+        padding: 1px 5px;
+        line-height: 1.4;
+      }
+      html[data-accent='white'] .live-badge {
+        border-color: rgba(238, 244, 249, 0.3);
+      }
+
+      /* ---------- 语义色 ---------- */
+      .sem-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .sem-row {
+        display: grid;
+        grid-template-columns: 14px 64px 1fr 1fr;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 8px;
+        border-radius: var(--gc-r-tag);
+        font-size: var(--gc-fs-meta);
+      }
+      .sem-row .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+      }
+      .sem-row .nm {
+        color: var(--gc-text-2);
+        font-weight: 500;
+      }
+      .sem-row code {
+        font-family: var(--gc-font-mono);
+        font-size: var(--gc-fs-micro);
+        color: var(--gc-text-3);
+      }
+
+      /* ---------- 字阶 ---------- */
+      .type-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .type-row {
+        display: grid;
+        grid-template-columns: 92px 1fr;
+        align-items: baseline;
+        gap: 10px;
+        padding-bottom: 7px;
+        border-bottom: 1px solid var(--gc-line-weak);
+      }
+      .type-row:last-child {
+        border-bottom: 0;
+        padding-bottom: 0;
+      }
+      .type-row .spec {
+        font-family: var(--gc-font-mono);
+        font-size: var(--gc-fs-micro);
+        color: var(--gc-text-3);
+        white-space: nowrap;
+      }
+      .type-row .demo {
+        color: var(--gc-text);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      /* ---------- 圆角 / 间距 / 阴影 ---------- */
+      .demo-line {
+        display: flex;
+        align-items: flex-end;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .r-box {
+        width: 44px;
+        height: 32px;
+        background: var(--gc-overlay);
+        border: 1px solid var(--gc-line-strong);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--gc-font-mono);
+        font-size: var(--gc-fs-micro);
+        color: var(--gc-text-3);
+      }
+      .sp-box {
+        height: 16px;
+        background: var(--gc-accent-weak);
+        border: 1px solid rgba(20, 200, 184, 0.3);
+      }
+      .sp-item {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        align-items: flex-start;
+      }
+      .sp-item span {
+        font-family: var(--gc-font-mono);
+        font-size: var(--gc-fs-micro);
+        color: var(--gc-text-3);
+      }
+      .shadow-box {
+        flex: 1;
+        min-width: 96px;
+        height: 44px;
+        background: var(--gc-overlay);
+        border-radius: var(--gc-r);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: var(--gc-fs-micro);
+        color: var(--gc-text-3);
+      }
+      .glow-box {
+        flex: 1;
+        min-width: 96px;
+        height: 44px;
+        background: var(--gc-card);
+        border: 1px solid var(--gc-line);
+        border-radius: var(--gc-r);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: var(--gc-fs-micro);
+        color: var(--gc-text-3);
+      }
+
+      /* ---------- 组件画廊 ---------- */
+      .gallery {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .gal-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .gal-cap {
+        font-family: var(--gc-font-mono);
+        font-size: var(--gc-fs-micro);
+        color: var(--gc-text-3);
+        min-width: 72px;
+        flex: none;
+      }
+      .pulse-demo {
+        flex: 1;
+        min-width: 140px;
+        height: 2px;
+        position: relative;
+        background: var(--gc-accent-weak);
+        overflow: hidden;
+      }
+      .pulse-demo .f {
+        position: absolute;
+        inset: 0 auto 0 0;
+        background: var(--gc-signal-bar);
+      }
+      .pulse-demo .s {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        width: 40px;
+        background: var(--gc-signal-scan);
+        opacity: 0.9;
+        animation: gc-scan-bar 1800ms linear infinite;
+      }
+      .dock-preview {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        height: 44px;
+        padding: 0 10px;
+        background: var(--gc-page);
+        border: 1px solid var(--gc-line);
+        border-radius: var(--gc-r);
+      }
+      .dock-preview .dock-item {
+        pointer-events: none;
+      }
+
+      /* ---------- 入口卡 ---------- */
+      .entry-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .entry {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 12px;
+        background: var(--gc-card);
+        border: 1px solid var(--gc-line);
+        border-radius: var(--gc-r);
+        transition:
+          border-color var(--gc-t-micro) var(--gc-ease),
+          background var(--gc-t-micro) var(--gc-ease);
+      }
+      .entry:hover {
+        border-color: var(--gc-line-strong);
+        background: var(--gc-overlay);
+      }
+      .entry-top {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .entry-top .ico {
+        color: var(--gc-accent-text);
+      }
+      .entry-top b {
+        font-size: var(--gc-fs-title);
+        font-weight: 600;
+        color: var(--gc-text);
+        line-height: 1;
+      }
+      .entry p {
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-3);
+        line-height: 1.45;
+        min-height: 32px;
+      }
+      .entry-foot {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: auto;
+      }
+      .entry .arrow {
+        margin-left: auto;
+        color: var(--gc-text-3);
+      }
+      .entry:hover .arrow {
+        color: var(--gc-accent-text);
+      }
+
+      /* ---------- Anti-Slop ---------- */
+      .slop-list {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 4px 16px;
+      }
+      .slop-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 7px;
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-2);
+        line-height: 1.5;
+        padding: 3px 0;
+      }
+      .slop-item .tick {
+        flex: none;
+        width: 13px;
+        height: 13px;
+        margin-top: 2px;
+        border-radius: 3px;
+        background: var(--gc-green-weak);
+        border: 1px solid rgba(86, 217, 122, 0.35);
+        color: var(--gc-green);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .slop-item .tick svg {
+        width: 9px;
+        height: 9px;
+      }
+
+      /* ---------- 已定 / 待定 ---------- */
+      .state-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .state-card {
+        padding: 12px;
+        border-radius: var(--gc-r);
+        border: 1px solid var(--gc-line);
+        background: var(--gc-card);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .state-card.done {
+        border-left: 2px solid var(--gc-green);
+      }
+      .state-card.todo {
+        border-left: 2px solid var(--gc-amber);
+      }
+      .state-card h4 {
+        font-size: var(--gc-fs-body);
+        font-weight: 600;
+        color: var(--gc-text);
+        line-height: 1;
+      }
+      .state-card li {
+        display: flex;
+        gap: 7px;
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-2);
+        line-height: 1.5;
+      }
+      .state-card li::before {
+        content: '';
+        flex: none;
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        background: var(--gc-text-disabled);
+        margin-top: 7px;
+      }
+
+      .foot {
+        font-size: var(--gc-fs-micro);
+        color: var(--gc-text-3);
+        font-family: var(--gc-font-mono);
+        padding-top: 16px;
+        border-top: 1px solid var(--gc-line-weak);
+      }
+
+      @media (max-width: 1000px) {
+        .entry-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .grid-4 {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+      @media (max-width: 760px) {
+        .hub-head {
+          flex-wrap: wrap;
+        }
+        .grid-2,
+        .grid-3,
+        .swatches,
+        .accent-pair,
+        .slop-list,
+        .state-grid {
+          grid-template-columns: 1fr;
+        }
+        .entry-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body data-no-float-switch>
+    <div class="hub">
+      <!-- ============ 品牌区 ============ -->
+      <header class="hub-head">
+        <div class="hub-logo"><i class="ico xl" data-icon="logo"></i></div>
+        <div class="hub-brand">
+          <h1>Git Cockpit</h1>
+          <p>基于 MCP 的 Git 可视化操作台</p>
+        </div>
+        <span class="hub-ver">v0.1.32</span>
+        <span class="spacer"></span>
+
+        <div class="accent-seg" role="group" aria-label="主色方案">
+          <span class="seg-lbl">主色</span>
+          <button type="button" data-seg="teal">
+            <span class="sw"></span>teal 青绿
+          </button>
+          <button type="button" data-seg="white">
+            <span class="sw"></span>极地白
+          </button>
+        </div>
+      </header>
+
+      <!-- ============ 设计系统速览 ============ -->
+      <section class="sec">
+        <div class="sec-head">
+          <span class="num">01</span>
+          <h2>设计系统速览</h2>
+          <span class="note">令牌全部落在 assets/tokens.css，改一处全站同步</span>
+        </div>
+
+        <div class="grid-2">
+          <!-- 表面阶梯 -->
+          <div class="panel">
+            <span class="panel-label">表面阶梯 · 深蓝黑三分层</span>
+            <div class="swatches">
+              <div class="swatch">
+                <div class="chip-color" style="background: #0e1218"></div>
+                <div class="meta"><b>页面底</b><span>#0e1218</span></div>
+              </div>
+              <div class="swatch">
+                <div class="chip-color" style="background: #161b24"></div>
+                <div class="meta"><b>卡片 / 表格</b><span>#161b24</span></div>
+              </div>
+              <div class="swatch">
+                <div class="chip-color" style="background: #1d2434"></div>
+                <div class="meta"><b>弹层 / hover</b><span>#1d2434</span></div>
+              </div>
+              <div class="swatch">
+                <div class="chip-color" style="background: #2c3444"></div>
+                <div class="meta"><b>默认边框</b><span>#2c3444</span></div>
+              </div>
+            </div>
+            <div class="gal-row">
+              <span class="gal-cap">文字四级</span>
+              <span style="color: var(--gc-text)">主文字 #e8edf4</span>
+              <span style="color: var(--gc-text-2)">次文字 #a4b0c2</span>
+              <span style="color: var(--gc-text-3)">辅助 #7c8698</span>
+              <span class="disabled">禁用 #565f73</span>
+            </div>
+          </div>
+
+          <!-- 双主色并排 -->
+          <div class="panel">
+            <span class="panel-label">签名主色 · 两套并排（高亮为当前生效）</span>
+            <div class="accent-pair">
+              <div class="accent-card" data-a="teal">
+                <div class="band"><b>teal 青绿</b><span>#14c8b8</span></div>
+                <div class="vars">
+                  <div><span>hover</span><em>#2fe0cf</em><i style="background: #2fe0cf"></i></div>
+                  <div><span>active</span><em>#0fa79a</em><i style="background: #0fa79a"></i></div>
+                  <div><span>text</span><em>#6ff0e0</em><i style="background: #6ff0e0"></i></div>
+                  <div><span>ink</span><em>#04211f</em><i style="background: #04211f"></i></div>
+                </div>
+              </div>
+              <div class="accent-card" data-a="white">
+                <div class="band"><b>极地白</b><span>#eef4f9</span></div>
+                <div class="vars">
+                  <div><span>hover</span><em>#ffffff</em><i style="background: #ffffff"></i></div>
+                  <div><span>active</span><em>#c7d3de</em><i style="background: #c7d3de"></i></div>
+                  <div><span>text</span><em>#ffffff</em><i style="background: #ffffff"></i></div>
+                  <div><span>ink</span><em>#0e1218</em><i style="background: #0e1218"></i></div>
+                </div>
+              </div>
+            </div>
+            <div class="gal-row">
+              <span class="live-badge" id="live-badge">当前：teal 青绿</span>
+              <span class="gal-cap" style="min-width: 0">语义色 / 表面 / 边框 两套共用</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <!-- 语义色 -->
+          <div class="panel">
+            <span class="panel-label">语义色 · 暗底提亮档</span>
+            <div class="sem-list">
+              <div class="sem-row" style="background: rgba(86, 217, 122, 0.1)">
+                <span class="dot" style="background: #56d97a"></span>
+                <span class="nm">绿 · 分支/新增/通过</span>
+                <code>字 #56d97a</code><code>结构 #14c47a</code>
+              </div>
+              <div class="sem-row" style="background: rgba(255, 133, 133, 0.1)">
+                <span class="dot" style="background: #ff8585"></span>
+                <span class="nm">红 · 冲突/删除/失败</span>
+                <code>字 #ff8585</code><code>结构 #e5484d</code>
+              </div>
+              <div class="sem-row" style="background: rgba(180, 142, 252, 0.12)">
+                <span class="dot" style="background: #cbb2ff"></span>
+                <span class="nm">紫 · 合并/THEIRS</span>
+                <code>字 #cbb2ff</code><code>结构 #a371f7</code>
+              </div>
+              <div class="sem-row" style="background: rgba(242, 201, 76, 0.12)">
+                <span class="dot" style="background: #f2c94c"></span>
+                <span class="nm">琥珀 · rebase/警告/待确认</span>
+                <code>字 #f2c94c</code><code>结构 #d9a404</code>
+              </div>
+            </div>
+          </div>
+
+          <!-- 字阶 -->
+          <div class="panel">
+            <span class="panel-label">字阶 · 正文 12 / 表头 12-500 / 标题 13-600</span>
+            <div class="type-list">
+              <div class="type-row">
+                <span class="spec">20 / 600 · 空状态</span>
+                <span class="demo" style="font-size: 20px; font-weight: 600; line-height: 1.3">还没有打开仓库</span>
+              </div>
+              <div class="type-row">
+                <span class="spec">16 / 600 · 页标题</span>
+                <span class="demo" style="font-size: 16px; font-weight: 600; line-height: 22px">工作台</span>
+              </div>
+              <div class="type-row">
+                <span class="spec">13 / 600 · 卡片标题</span>
+                <span class="demo" style="font-size: 13px; font-weight: 600">api-gateway</span>
+              </div>
+              <div class="type-row">
+                <span class="spec">12 / 400 · 正文</span>
+                <span class="demo">当前分支落后 origin/main 共 12 个提交</span>
+              </div>
+              <div class="type-row">
+                <span class="spec">11 / 500 · tag/meta</span>
+                <span class="demo" style="font-size: 11px; font-weight: 500; color: var(--gc-text-3)"
+                  >页面 0.1.32 已连接</span
+                >
+              </div>
+              <div class="type-row">
+                <span class="spec">10 / 500 · 微标签</span>
+                <span class="demo micro">DRY-RUN PREVIEW</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <!-- 圆角 / 间距 -->
+          <div class="panel">
+            <span class="panel-label">圆角 ≤10px · 间距 4 韵律</span>
+            <div class="demo-line">
+              <div class="r-box" style="border-radius: 4px">4 tag</div>
+              <div class="r-box" style="border-radius: 6px">6 控件</div>
+              <div class="r-box" style="border-radius: 10px">10 玻璃</div>
+            </div>
+            <div class="demo-line" style="margin-top: 6px">
+              <div class="sp-item"><div class="sp-box" style="width: 4px"></div><span>4</span></div>
+              <div class="sp-item"><div class="sp-box" style="width: 8px"></div><span>8</span></div>
+              <div class="sp-item"><div class="sp-box" style="width: 12px"></div><span>12</span></div>
+              <div class="sp-item"><div class="sp-box" style="width: 16px"></div><span>16</span></div>
+              <span class="gal-cap" style="min-width: 0; margin-left: 6px"
+                >控件 28 · 输入 28 · 表格行 28 · 内联钮 22–24</span
+              >
+            </div>
+          </div>
+
+          <!-- 阴影 / 发光 -->
+          <div class="panel">
+            <span class="panel-label">阴影与发光 · 发光仅授予三信号</span>
+            <div class="demo-line">
+              <div class="shadow-box" style="box-shadow: var(--gc-shadow-menu)">menu</div>
+              <div class="shadow-box" style="box-shadow: var(--gc-shadow-pop)">popover</div>
+              <div class="shadow-box" style="border: 1px solid var(--gc-line)">卡片 · 无阴影</div>
+            </div>
+            <div class="demo-line" style="margin-top: 6px">
+              <div class="glow-box" style="box-shadow: var(--gc-focus)">focus ring</div>
+              <div class="glow-box" style="box-shadow: var(--gc-glow-sm)">信号 glow</div>
+              <div class="glow-box" style="box-shadow: var(--gc-glow)">呼吸 glow</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 标志性组件 ============ -->
+      <section class="sec">
+        <div class="sec-head">
+          <span class="num">02</span>
+          <h2>标志性组件</h2>
+          <span class="note">连接 tag / 任务脉冲 / 干跑确认条 / 冲突选边 / dock</span>
+        </div>
+
+        <div class="grid-2">
+          <!-- 连接 tag -->
+          <div class="panel">
+            <span class="panel-label">连接 tag · 三态</span>
+            <div class="gal-row">
+              <span class="conn-tag"><span class="dot"></span>前端 <span class="val">0.1.32</span></span>
+              <span class="conn-tag is-connecting"
+                ><span class="dot"></span>后端 <span class="val">连接中</span></span
+              >
+              <span class="conn-tag is-failed"
+                ><span class="dot"></span>桌面 <span class="val">未连接</span></span
+              >
+            </div>
+            <div class="gal-row">
+              <span class="gal-cap">规格</span>
+              <span class="t3" style="font-size: 11px"
+                >h20 / px8 / r4 · 6px 点 + 11px 标签 · 正常 accent 点带 6px glow，连接中琥珀呼吸
+                1600ms，失败红点稳亮且边框染红 40%</span
+              >
+            </div>
+          </div>
+
+          <!-- 脉冲条 -->
+          <div class="panel">
+            <span class="panel-label">任务脉冲条 · 运行 / 完成 / 失败</span>
+            <div class="gal-row">
+              <span class="gal-cap">运行中</span>
+              <div class="pulse-demo">
+                <div class="f" style="width: 68%"></div>
+                <div class="s"></div>
+              </div>
+              <span class="pulse-count"><i></i>3 进行中</span>
+            </div>
+            <div class="gal-row">
+              <span class="gal-cap">完成</span>
+              <div class="pulse-demo">
+                <div class="f" style="width: 100%; background: var(--gc-signal-done)"></div>
+              </div>
+            </div>
+            <div class="gal-row">
+              <span class="gal-cap">失败</span>
+              <div class="pulse-demo">
+                <div class="f" style="width: 42%; background: var(--gc-red-strong)"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 干跑确认条 -->
+        <div class="panel">
+          <span class="panel-label">干跑确认条 · 标志性组件（待确认 / 已确认）</span>
+          <div class="grid-2">
+            <div class="dryrun is-pending">
+              <div class="dryrun-head">
+                <i class="ico" data-icon="dry-run"></i>
+                <span class="title">写操作干跑预览</span>
+                <span class="chip amber sm">待确认</span>
+              </div>
+              <div class="dryrun-cmd">git merge --no-ff feature/payment-retry</div>
+              <div class="dryrun-files">
+                <span class="f">src/pay/retry.ts</span>
+                <span class="f">src/pay/timeout.ts</span>
+                <span class="f">src/api/client.ts</span>
+              </div>
+              <div class="dryrun-actions">
+                <button class="btn ghost h24" type="button">取消</button>
+                <button class="btn h24" type="button">完整 diff</button>
+                <button class="btn primary h24" type="button">确认执行</button>
+              </div>
+            </div>
+            <div class="dryrun is-confirmed">
+              <div class="dryrun-head">
+                <i class="ico" data-icon="dry-run"></i>
+                <span class="title">写操作干跑预览</span>
+                <span class="chip accent sm">已确认</span>
+              </div>
+              <div class="dryrun-cmd">git commit -m "fix: payment retry timeout"</div>
+              <div class="dryrun-files">
+                <span class="f">src/pay/retry.ts</span>
+                <span class="f">src/pay/timeout.ts</span>
+              </div>
+              <div class="dryrun-actions">
+                <span class="t3" style="font-size: 11px; margin-right: auto">2 分钟前由 Agent 确认</span>
+                <button class="btn h24" type="button">查看结果</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 冲突选边 -->
+        <div class="panel">
+          <span class="panel-label">冲突选边行 · 未决 / 已决 OURS / 已决 THEIRS</span>
+          <div class="conflict-list">
+            <div class="conflict-hunk">
+              <span>@@ -42,7 +42,9 @@</span>
+              <span class="range">function retryDelay(attempt)</span>
+            </div>
+            <div class="conflict-row is-open">
+              <span class="ln">42</span>
+              <div class="side">
+                <span class="side-chip ours"
+                  >OURS<i class="ico sm check" data-icon="check"></i
+                ></span>
+                <span class="code">const MAX = 3;</span>
+              </div>
+              <div class="side">
+                <span class="side-chip theirs"
+                  >THEIRS<i class="ico sm check" data-icon="check"></i
+                ></span>
+                <span class="code">const MAX = 5;</span>
+              </div>
+            </div>
+            <div class="conflict-row is-open">
+              <span class="ln">43</span>
+              <div class="side">
+                <span class="side-chip ours"
+                  >OURS<i class="ico sm check" data-icon="check"></i
+                ></span>
+                <span class="code">return attempt * 1000;</span>
+              </div>
+              <div class="side">
+                <span class="side-chip theirs"
+                  >THEIRS<i class="ico sm check" data-icon="check"></i
+                ></span>
+                <span class="code">return 2 ** attempt * 500;</span>
+              </div>
+            </div>
+            <div class="conflict-row is-resolved">
+              <span class="ln">44</span>
+              <div class="side is-picked">
+                <span class="side-chip ours"
+                  >OURS<i class="ico sm check" data-icon="check"></i
+                ></span>
+                <span class="code">if (attempt &gt;= MAX) throw e;</span>
+              </div>
+              <div class="side">
+                <span class="side-chip theirs"
+                  >THEIRS<i class="ico sm check" data-icon="check"></i
+                ></span>
+                <span class="code">if (attempt &gt; 5) throw e;</span>
+              </div>
+            </div>
+            <div class="conflict-row is-resolved">
+              <span class="ln">45</span>
+              <div class="side">
+                <span class="side-chip ours"
+                  >OURS<i class="ico sm check" data-icon="check"></i
+                ></span>
+                <span class="code">await sleep(delay);</span>
+              </div>
+              <div class="side is-picked">
+                <span class="side-chip theirs"
+                  >THEIRS<i class="ico sm check" data-icon="check"></i
+                ></span>
+                <span class="code">await sleep(delay, signal);</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- dock -->
+        <div class="panel">
+          <span class="panel-label">Dock · 7 页导航（active 随页）</span>
+          <div class="dock-preview">
+            <button class="dock-item is-active" type="button">
+              <i class="ico" data-icon="gauge"></i>工作台
+            </button>
+            <button class="dock-item" type="button"><i class="ico" data-icon="activity"></i>状态</button>
+            <button class="dock-item" type="button"><i class="ico" data-icon="git-merge"></i>合并</button>
+            <button class="dock-item" type="button">
+              <i class="ico" data-icon="layers"></i>任务<span class="count">3</span>
+            </button>
+            <button class="dock-item" type="button"><i class="ico" data-icon="scroll"></i>日志</button>
+            <button class="dock-item" type="button"><i class="ico" data-icon="bubble"></i>对话</button>
+            <button class="dock-item" type="button"><i class="ico" data-icon="sliders"></i>设置</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 8 页入口 ============ -->
+      <section class="sec">
+        <div class="sec-head">
+          <span class="num">03</span>
+          <h2>页面索引</h2>
+          <span class="note">8 屏全高保真 · 同一套令牌与 chrome</span>
+        </div>
+        <div class="entry-grid">
+          <a class="entry" href="dashboard.html">
+            <div class="entry-top"><i class="ico" data-icon="gauge"></i><b>工作台</b></div>
+            <p>六仓状态一览、需要关注汇总、12 周提交热力</p>
+            <div class="entry-foot">
+              <span class="chip accent sm">状态展示区</span>
+              <i class="ico sm arrow" data-icon="chevron"></i>
+            </div>
+          </a>
+          <a class="entry" href="status.html">
+            <div class="entry-top"><i class="ico" data-icon="activity"></i><b>状态</b></div>
+            <p>分支树 / 更改面板 / 差异监视器三栏联动</p>
+            <div class="entry-foot">
+              <span class="chip sm">效率敏感区</span>
+              <i class="ico sm arrow" data-icon="chevron"></i>
+            </div>
+          </a>
+          <a class="entry" href="merge.html">
+            <div class="entry-top"><i class="ico" data-icon="git-merge"></i><b>合并</b></div>
+            <p>合并预演、冲突选边、分支矩阵、落盘执行</p>
+            <div class="entry-foot">
+              <span class="chip sm">效率敏感区</span>
+              <i class="ico sm arrow" data-icon="chevron"></i>
+            </div>
+          </a>
+          <a class="entry" href="jobs.html">
+            <div class="entry-top"><i class="ico" data-icon="layers"></i><b>任务</b></div>
+            <p>进行中 / 队列 / 最近完成，进度与日志尾行</p>
+            <div class="entry-foot">
+              <span class="chip accent sm">状态展示区</span>
+              <i class="ico sm arrow" data-icon="chevron"></i>
+            </div>
+          </a>
+          <a class="entry" href="logs.html">
+            <div class="entry-top"><i class="ico" data-icon="scroll"></i><b>日志</b></div>
+            <p>工具调用审计表，按读写与结果过滤</p>
+            <div class="entry-foot">
+              <span class="chip sm">效率敏感区</span>
+              <i class="ico sm arrow" data-icon="chevron"></i>
+            </div>
+          </a>
+          <a class="entry" href="conversations.html">
+            <div class="entry-top"><i class="ico" data-icon="bubble"></i><b>对话记录</b></div>
+            <p>会话列表 + 消息流 + 工具调用卡与干跑确认</p>
+            <div class="entry-foot">
+              <span class="chip accent sm">状态展示区</span>
+              <i class="ico sm arrow" data-icon="chevron"></i>
+            </div>
+          </a>
+          <a class="entry" href="settings.html">
+            <div class="entry-top"><i class="ico" data-icon="sliders"></i><b>设置</b></div>
+            <p>访问密钥、托管凭证、模型、MR 模板、审批</p>
+            <div class="entry-foot">
+              <span class="chip accent sm">状态展示区</span>
+              <i class="ico sm arrow" data-icon="chevron"></i>
+            </div>
+          </a>
+          <a class="entry" href="prototype.html">
+            <div class="entry-top"><i class="ico" data-icon="diff"></i><b>方案对比留档</b></div>
+            <p>首轮三方向令牌对比页（历史参考，非本次交付）</p>
+            <div class="entry-foot">
+              <span class="chip plain sm">留档</span>
+              <i class="ico sm arrow" data-icon="chevron"></i>
+            </div>
+          </a>
+        </div>
+      </section>
+
+      <!-- ============ Anti-Slop ============ -->
+      <section class="sec">
+        <div class="sec-head">
+          <span class="num">04</span>
+          <h2>Anti-Slop 自查</h2>
+          <span class="note">十条逐项已过</span>
+        </div>
+        <div class="panel">
+          <div class="slop-list">
+            <div class="slop-item">
+              <span class="tick"><i class="ico" data-icon="check"></i></span>禁一切渐变 —— 扫描段用纯色平移
+            </div>
+            <div class="slop-item">
+              <span class="tick"><i class="ico" data-icon="check"></i></span>禁 &gt;10px 圆角与全圆胶囊钮
+            </div>
+            <div class="slop-item">
+              <span class="tick"><i class="ico" data-icon="check"></i></span>禁毛玻璃出状态展示区
+            </div>
+            <div class="slop-item">
+              <span class="tick"><i class="ico" data-icon="check"></i></span>禁彩色投影，发光仅三信号且 ≤.35
+            </div>
+            <div class="slop-item">
+              <span class="tick"><i class="ico" data-icon="check"></i></span>禁 emoji 与第三方图标库
+            </div>
+            <div class="slop-item">
+              <span class="tick"><i class="ico" data-icon="check"></i></span>禁装饰插画 / hero 大标题 / 营销留白
+            </div>
+            <div class="slop-item">
+              <span class="tick"><i class="ico" data-icon="check"></i></span>禁 &gt;700 字重与 &gt;16px 正文
+            </div>
+            <div class="slop-item">
+              <span class="tick"><i class="ico" data-icon="check"></i></span>本期禁浅色主题（切换器仅评审工具）
+            </div>
+            <div class="slop-item">
+              <span class="tick"><i class="ico" data-icon="check"></i></span>禁页面级滑动转场（仅 180ms fade）
+            </div>
+            <div class="slop-item">
+              <span class="tick"><i class="ico" data-icon="check"></i></span>禁顶栏 / dock 毛玻璃
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 已定 / 待定 ============ -->
+      <section class="sec">
+        <div class="sec-head">
+          <span class="num">05</span>
+          <h2>已定与待定</h2>
+        </div>
+        <div class="state-grid">
+          <div class="state-card done">
+            <h4>已定</h4>
+            <ul>
+              <li>视觉语言：驾驶舱 / 精密密度 / 冷光暗色 / 语义色即导航 / 人机同台</li>
+              <li>设计令牌：表面三分层、四级文字、4 组语义色、字阶与 4 韵律间距</li>
+              <li>标志性组件：干跑确认条、冲突选边行、连接 tag、任务脉冲条、dock</li>
+              <li>双主色并排评审，teal 为主推</li>
+              <li>Anti-Slop 十条作为交付门禁</li>
+            </ul>
+          </div>
+          <div class="state-card todo">
+            <h4>待定</h4>
+            <ul>
+              <li>主色终选：teal 青绿 / 极地白（本页切换后逐页对比）</li>
+              <li>极地白下高亮态的可辨性是否达标（依赖 glow 与弱底，属该方案已知取舍）</li>
+              <li>生产落地方式与排期：本期仅原型，未触碰 packages/</li>
+              <li>聊天面板在窄屏下的收起策略</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <div class="foot">
+        Git Cockpit · 全站视觉改版原型 · 静态高保真 · 数据为仿真 · 切换主色后逐页浏览以完成终选
+      </div>
+    </div>
+
+    <script src="assets/icons.js"></script>
+    <script src="assets/switch.js"></script>
+    <script>
+      /* 显眼分段控件 ↔ 全局主色状态同步 */
+      (function () {
+        var segs = document.querySelectorAll('.accent-seg button');
+        var cards = document.querySelectorAll('.accent-card');
+        var badge = document.getElementById('live-badge');
+
+        function paint(accent) {
+          for (var i = 0; i < segs.length; i++) {
+            segs[i].classList.toggle('is-on', segs[i].dataset.seg === accent);
+          }
+          for (var j = 0; j < cards.length; j++) {
+            cards[j].classList.toggle('is-live', cards[j].dataset.a === accent);
+          }
+          if (badge) {
+            badge.textContent = accent === 'white' ? '当前：极地白' : '当前：teal 青绿';
+          }
+        }
+
+        for (var i = 0; i < segs.length; i++) {
+          segs[i].addEventListener('click', function () {
+            window.GCAccent.apply(this.dataset.seg);
+          });
+        }
+        document.addEventListener('gc:accent', function (e) {
+          paint(e.detail.accent);
+        });
+        paint(window.GCAccent.read());
+      })();
+    </script>
+  </body>
+</html>
