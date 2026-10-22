@@ -321,16 +321,22 @@ async function clearTemplate(): Promise<void> {
 .tmpl {
   flex: 1;
   min-height: 0;
-  height: 100%;
   display: flex;
   flex-direction: column;
   gap: var(--gc-gap);
+  background: var(--gc-card);
+  border: 1px solid var(--gc-line);
+  border-radius: var(--gc-radius);
+  overflow: hidden;
 }
 .tmpl-head {
   flex: none;
   display: flex;
   flex-direction: column;
   gap: var(--gc-gap);
+  padding: var(--gc-gap) var(--gc-pad);
+  background: var(--gc-page);
+  border-bottom: 1px solid var(--gc-line);
 }
 .tmpl-head-row {
   display: flex;
@@ -363,21 +369,24 @@ async function clearTemplate(): Promise<void> {
   align-items: flex-start;
   gap: var(--gc-gap);
 }
+/* 结构 / 预览上下堆叠（对齐设计稿单列，不用左右分栏） */
 .tmpl-split {
   flex: 1;
   min-height: 0;
   display: flex;
+  flex-direction: column;
   gap: var(--gc-gap);
+  padding: var(--gc-pad);
+  overflow: auto;
 }
 .pane {
-  flex: 1;
+  flex: none;
   min-width: 0;
-  min-height: 0;
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--el-border-color-lighter);
+  border: 1px solid var(--gc-line);
   border-radius: var(--gc-radius);
-  background: var(--el-bg-color);
+  background: var(--gc-page);
 }
 .pane-head {
   flex: none;

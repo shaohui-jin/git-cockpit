@@ -7,15 +7,17 @@ import MessageList from '@/components/chat/MessageList.vue';
 import type { ChatLine } from '@/components/chat/types';
 import { repoLeaf, sameRepoPath, useChatStore } from '@/stores/chat';
 import { useReposStore } from '@/stores/repos';
+import { relTime } from '@/utils/time';
 
 const chat = useChatStore();
 const repos = useReposStore();
 const rows = ref<ChatConversationSummary[]>([]);
 const loading = ref(false);
 const repoFilter = ref('');
-const detailOpen = ref(false);
+const searchText = ref('');
 const detailId = ref('');
 const detailTitle = ref('');
+const detailRepo = ref('');
 const detailLines = ref<ChatLine[]>([]);
 
 const repoOptions = computed(() => {
@@ -30,14 +32,15 @@ const repoOptions = computed(() => {
 });
 
 const visible = computed(() => {
-  if (!repoFilter.value) return rows.value;
-  return rows.value.filter((row) => sameRepoPath(row.repoPath, repoFilter.value));
+  const kw = searchText.value.trim().toLowerCase();
+  return rows.value.filter((row) => {
+    if (repoFilter.value && !sameRepoPath(row.repoPath, repoFilter.value)) return false;
+    if (!kw) return true;
+    return titleOf(row).toLowerCase().includes(kw) || repoLeaf(row.repoPath).toLowerCase().includes(kw);
+  });
 });
 
-function formatTime(iso: string): string {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
-}
+const detailOpen = computed(() => Boolean(detailId.value));
 
 function titleOf(row: ChatConversationSummary): string {
   return row.title.trim() || '新对话';
@@ -70,19 +73,34 @@ async function openDetail(row: ChatConversationSummary): Promise<void> {
     const res = await api.getChatConversation(row.id);
     detailId.value = res.conversation.id;
     detailTitle.value = titleOf(res.conversation);
+    detailRepo.value = res.conversation.repoPath;
     detailLines.value = toLines(res.messages);
-    detailOpen.value = true;
   } catch (err) {
     ElMessage.error(err instanceof Error ? err.message : String(err));
   }
 }
 
-async function continueOne(row: ChatConversationSummary): Promise<void> {
-  const err = await chat.openConversation(row.id);
+async function continueActive(): Promise<void> {
+  if (!detailId.value) return;
+  const err = await chat.openConversation(detailId.value);
   if (err) ElMessage.error(err);
 }
 
-async function removeOne(row: ChatConversationSummary): Promise<void> {
+async function copyAll(): Promise<void> {
+  if (!detailLines.value.length) return;
+  const text = detailLines.value.map((l) => `${l.role === 'user' ? '我' : 'Agent'}：${l.text}`).join('\n');
+  try {
+    await navigator.clipboard.writeText(text);
+    ElMessage.success('已复制全部消息');
+  } catch {
+    ElMessage.warning('浏览器拒绝了剪贴板访问');
+  }
+}
+
+async function removeActive(): Promise<void> {
+  if (!detailId.value) return;
+  const row = rows.value.find((item) => item.id === detailId.value);
+  if (!row) return;
   try {
     await ElMessageBox.confirm(`删除「${titleOf(row)}」？正在查看这一组时，聊天面板会换成空白新对话。`, '删除对话', {
       confirmButtonText: '删除',
@@ -99,7 +117,8 @@ async function removeOne(row: ChatConversationSummary): Promise<void> {
     return;
   }
   rows.value = rows.value.filter((item) => item.id !== row.id);
-  if (detailId.value === row.id) detailOpen.value = false;
+  detailId.value = '';
+  detailLines.value = [];
 }
 
 onMounted(() => {
@@ -109,49 +128,76 @@ onMounted(() => {
 
 <template>
   <div class="page conv-page">
-    <h2 class="page-title">对话记录</h2>
-
-    <div class="bar gc-card">
-      <label>
-        仓库
-        <el-select v-model="repoFilter" clearable placeholder="全部" class="repo-select">
-          <el-option v-for="opt in repoOptions" :key="opt.path" :label="opt.label" :value="opt.path" />
-        </el-select>
-      </label>
+    <div class="page-head">
+      <h1>对话记录</h1>
+      <span class="sub">与 Agent 的每一次协作都留有上下文</span>
+      <span class="spacer" />
       <el-button :loading="loading" @click="load">刷新</el-button>
-      <span class="tip">一组对话一行。最近 200 组。Git 写入另记在操作日志。</span>
     </div>
 
-    <div v-if="!loading && visible.length === 0" class="empty gc-card">
-      <strong>还没有对话记录</strong>
-      <p>在聊天面板里发送后会出现在这里，本地预览也会记下来。</p>
-    </div>
-    <div v-else class="table gc-card" v-loading="loading">
-      <div class="th">
-        <span>标题</span>
-        <span>仓库</span>
-        <span>更新时间</span>
-        <span>条数</span>
-        <span>操作</span>
-      </div>
-      <div v-for="row in visible" :key="row.id" class="tr">
-        <span :title="titleOf(row)">{{ titleOf(row) }}</span>
-        <span class="mono" :title="row.repoPath">{{ repoLeaf(row.repoPath) }}</span>
-        <span>{{ formatTime(row.updatedAt) }}</span>
-        <span>{{ row.messageCount }}</span>
-        <span class="ops">
-          <el-button link type="primary" @click="openDetail(row)">查看</el-button>
-          <el-button link type="primary" @click="continueOne(row)">继续</el-button>
-          <el-button link type="danger" @click="removeOne(row)">删除</el-button>
-        </span>
-      </div>
-    </div>
+    <div class="conv-wrap">
+      <!-- 左：会话列表 -->
+      <aside class="conv-list" v-loading="loading">
+        <div class="conv-list-top">
+          <div class="conv-search">
+            <GcIcon name="search" :size="12" />
+            <input v-model="searchText" type="text" placeholder="搜索会话 / 仓库" />
+          </div>
+          <el-select v-model="repoFilter" clearable placeholder="全部仓库" class="conv-repo">
+            <el-option v-for="opt in repoOptions" :key="opt.path" :label="opt.label" :value="opt.path" />
+          </el-select>
+        </div>
+        <div class="conv-items">
+          <p v-if="!loading && visible.length === 0" class="conv-miss">没有匹配的对话</p>
+          <button
+            v-for="row in visible"
+            :key="row.id"
+            type="button"
+            class="conv-item"
+            :class="{ 'is-active': row.id === detailId }"
+            @click="openDetail(row)"
+          >
+            <span class="ct">
+              <b>{{ titleOf(row) }}</b>
+              <span class="when">{{ relTime(row.updatedAt) }}</span>
+            </span>
+            <span class="cmeta">
+              <span class="mono">{{ repoLeaf(row.repoPath) }}</span>
+              <span class="sp" />
+              <span>{{ row.messageCount }} 条</span>
+            </span>
+          </button>
+        </div>
+      </aside>
 
-    <el-dialog v-model="detailOpen" :title="detailTitle" width="720px" :close-on-click-modal="false">
-      <div class="detail">
-        <MessageList :lines="detailLines" :streaming="false" />
-      </div>
-    </el-dialog>
+      <!-- 右：详情 -->
+      <section v-if="detailOpen" class="conv-detail">
+        <header class="detail-head">
+          <GcIcon name="bubble" :size="14" class="head-ico" />
+          <b class="dt">{{ detailTitle }}</b>
+          <span class="repo mono" :title="detailRepo">{{ repoLeaf(detailRepo) }}</span>
+          <span class="spacer" />
+          <span class="chip plain">{{ detailLines.length }} 条消息</span>
+          <el-button size="small" type="primary" @click="continueActive">继续对话</el-button>
+          <el-button size="small" @click="copyAll">复制全部</el-button>
+          <el-button size="small" type="danger" plain @click="removeActive">删除</el-button>
+        </header>
+        <div class="msgs">
+          <MessageList :lines="detailLines" :streaming="false" />
+        </div>
+        <footer class="detail-foot">
+          <GcIcon name="lock" :size="12" class="foot-ico" />
+          <span class="note">对话只读留档 · 写操作需回到状态页或聊天面板确认</span>
+        </footer>
+      </section>
+      <section v-else class="conv-detail is-empty">
+        <div class="empty-inner">
+          <GcIcon name="bubble" :size="20" />
+          <strong>选一组对话查看上下文</strong>
+          <p>在聊天面板里发送后会出现在这里，本地预览也会记下来。</p>
+        </div>
+      </section>
+    </div>
   </div>
 </template>
 
@@ -160,89 +206,264 @@ onMounted(() => {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--gc-pad);
+  gap: var(--gc-gap);
   overflow: hidden;
 }
-.bar {
+.page-head {
   flex: none;
   display: flex;
   align-items: center;
-  gap: var(--gc-pad);
-  padding: var(--gc-gap) var(--gc-pad);
-  flex-wrap: wrap;
-}
-.bar label {
-  display: flex;
-  align-items: center;
   gap: var(--gc-gap);
-  font-size: var(--gc-fs-body);
+  min-width: 0;
 }
-.repo-select {
-  width: 200px;
+.page-head h1 {
+  margin: 0;
+  font-size: var(--gc-fs-page);
+  font-weight: 600;
+  line-height: var(--gc-lh-page);
+  color: var(--gc-text);
+  letter-spacing: -0.01em;
 }
-.tip {
+.page-head .sub {
   font-size: var(--gc-fs-body);
   color: var(--gc-text-3);
 }
-.table {
+.page-head .spacer {
+  flex: 1;
+}
+
+/* ---------- 双栏骨架（对齐设计稿 conv-wrap） ---------- */
+.conv-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: var(--gc-gap);
+}
+
+/* 左：会话列表 288px */
+.conv-list {
+  flex: none;
+  width: 288px;
+  display: flex;
+  flex-direction: column;
+  background: var(--gc-card);
+  border: 1px solid var(--gc-line);
+  border-radius: var(--gc-radius);
+  overflow: hidden;
+}
+.conv-list-top {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--gc-gap);
+  border-bottom: 1px solid var(--gc-line);
+}
+.conv-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--gc-btn-inline);
+  padding: 0 8px;
+  border-radius: var(--gc-r);
+  border: 1px solid var(--gc-line);
+  background: var(--gc-page);
+  color: var(--gc-text-3);
+}
+.conv-search:focus-within {
+  border-color: var(--gc-accent);
+}
+.conv-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--gc-text);
+  font: inherit;
+  font-size: var(--gc-fs-body);
+}
+.conv-search input::placeholder {
+  color: var(--gc-text-placeholder);
+}
+.conv-items {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 0;
 }
-.th,
-.tr {
-  display: grid;
-  grid-template-columns: minmax(160px, 1.4fr) minmax(120px, 1fr) 168px 56px 148px;
-  gap: var(--gc-gap);
-  padding: 0 var(--gc-pad);
-  min-height: var(--gc-row-lg);
-  align-items: center;
+.conv-miss {
+  margin: 0;
+  padding: var(--gc-pad);
   font-size: var(--gc-fs-body);
-}
-.th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
   color: var(--gc-text-3);
-  font-weight: 600;
-  background: var(--gc-card);
+  text-align: center;
 }
-.tr {
-  border-top: 1px solid var(--gc-line-weak);
+.conv-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  padding: 8px 10px 8px 11px;
+  border: 0;
+  border-bottom: 1px solid var(--gc-line-weak);
+  border-left: 2px solid transparent;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  transition: background var(--gc-t-micro) var(--gc-ease);
 }
-.tr:hover {
-  background: var(--gc-btn-hover);
+.conv-item:hover {
+  background: rgba(255, 255, 255, 0.05);
 }
-.tr > span {
+.conv-item.is-active {
+  background: var(--gc-accent-weak);
+  border-left-color: var(--gc-accent);
+}
+.conv-item .ct {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.conv-item .ct b {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--gc-fs-body);
+  font-weight: 500;
+  color: var(--gc-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.ops {
+.conv-item.is-active .ct b {
+  color: var(--gc-accent-text);
+}
+.conv-item .when {
+  flex: none;
+  font-size: var(--gc-fs-micro);
+  color: var(--gc-text-3);
+  font-variant-numeric: tabular-nums;
+}
+.conv-item .cmeta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--gc-fs-meta);
+  color: var(--gc-text-3);
+  min-width: 0;
+}
+.conv-item .cmeta .mono {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.conv-item .sp {
+  flex: none;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--gc-text-placeholder);
+}
+
+/* 右：详情 */
+.conv-detail {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--gc-card);
+  border: 1px solid var(--gc-line);
+  border-radius: var(--gc-radius);
+  overflow: hidden;
+}
+.detail-head {
+  flex: none;
   display: flex;
   align-items: center;
   gap: var(--gc-gap);
+  min-height: 40px;
+  padding: var(--gc-gap) var(--gc-pad);
+  border-bottom: 1px solid var(--gc-line);
+  background: var(--gc-page);
 }
-.detail {
-  max-height: 60vh;
-  overflow: auto;
+.detail-head .head-ico {
+  flex: none;
+  color: var(--gc-accent-text);
 }
-.empty {
+.detail-head .dt {
+  flex: none;
+  max-width: 40%;
+  font-size: var(--gc-fs-body);
+  font-weight: 600;
+  color: var(--gc-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.detail-head .repo {
   flex: 1;
-  display: grid;
-  place-content: center;
-  text-align: center;
+  min-width: 0;
+  font-size: var(--gc-fs-meta);
+  color: var(--gc-text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.detail-head .spacer {
+  flex: 1;
+}
+.detail-head .chip {
+  flex: none;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: var(--gc-r-tag);
+  background: var(--el-fill-color);
+  color: var(--gc-text-3);
+  font-size: var(--gc-fs-meta);
+  display: inline-flex;
+  align-items: center;
+}
+.msgs {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
   padding: var(--gc-pad);
-  gap: var(--gc-gap);
+}
+.detail-foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--gc-row-lg);
+  padding: 0 var(--gc-pad);
+  border-top: 1px solid var(--gc-line);
+  font-size: var(--gc-fs-meta);
   color: var(--gc-text-3);
 }
-.empty strong {
+.detail-foot .foot-ico {
+  flex: none;
+}
+.conv-detail.is-empty {
+  align-items: center;
+  justify-content: center;
+}
+.empty-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--gc-gap);
+  color: var(--gc-text-3);
+  text-align: center;
+  padding: var(--gc-pad);
+}
+.empty-inner strong {
   font-size: var(--el-font-size-extra-large);
   color: var(--gc-text);
   font-weight: 600;
 }
-.empty p {
+.empty-inner p {
   margin: 0;
   font-size: var(--gc-fs-body);
 }

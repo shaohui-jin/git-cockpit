@@ -532,48 +532,60 @@ async function clearLlmKey(): Promise<void> {
 
 <template>
   <div class="page settings-page">
-    <h2 class="page-title">设置</h2>
-    <p v-if="repos.serverVersion" class="page-version">服务 {{ repos.serverVersion }}</p>
     <el-alert v-if="settings.error" :title="settings.error" type="error" :closable="false" show-icon class="mb" />
 
-    <div class="gc-chip-tabs">
-      <button
-        v-for="t in settingTabs"
-        :key="t.id"
-        type="button"
-        :class="{ on: activeTab === t.id }"
-        @click="activeTab = t.id"
-      >
-        {{ t.label }}
-      </button>
-    </div>
+    <div class="settings-scope">
+      <div class="page-head">
+        <h1>设置</h1>
+        <span class="sub">本机保存，不上传</span>
+        <span class="spacer" />
+        <span v-if="repos.serverVersion" class="chip plain mono">服务 {{ repos.serverVersion }}</span>
+      </div>
 
-    <div class="settings-body" :class="{ fill: activeTab === 'template' || activeTab === 'git' }">
+      <div class="gc-chip-tabs">
+        <button
+          v-for="t in settingTabs"
+          :key="t.id"
+          type="button"
+          :class="{ on: activeTab === t.id }"
+          @click="activeTab = t.id"
+        >
+          {{ t.label }}
+        </button>
+      </div>
+
+      <div class="settings-col" :class="{ fill: activeTab === 'template' || activeTab === 'git' }">
       <section v-show="activeTab === 'mr'" class="stack">
-        <div class="gc-card pad">
-          <p class="gc-eyebrow">默认远程</p>
-          <div class="remote-bar">
-            <template v-if="hasRepoRemotes">
-              <el-select
-                v-model="selectedRemote"
-                class="remote-select"
-                :disabled="settings.saving"
-                @change="onRemoteChange"
-              >
-                <el-option v-for="r in remotes" :key="r.name" :label="r.name" :value="r.name" />
-              </el-select>
-              <span class="mono muted remote-url" :title="selectedRemoteUrl">{{ selectedRemoteUrl || '—' }}</span>
-              <el-tag size="small" effect="plain">{{ platformLabel(platform) }}</el-tag>
-            </template>
-            <span v-else class="mr-hint">{{
-              repos.currentId ? '当前仓库没有 remote' : '未选择仓库，请先在工作台打开仓库'
-            }}</span>
-          </div>
-          <p class="mr-hint">用于 fetch、MR 短名剥前缀、CLI 未传远程时的默认值。切换后立即保存。</p>
-          <div v-if="hasRepoRemotes && platform === 'unknown'" class="mr-platform-row">
-            <span class="mr-hint">未能自动识别远程平台，请手动选择。</span>
-            <el-button :disabled="!current?.host || settings.saving" @click="pickPlatform('github')">GitHub</el-button>
-            <el-button :disabled="!current?.host || settings.saving" @click="pickPlatform('gitlab')">GitLab</el-button>
+        <div class="set-card">
+          <header class="card-head">
+            <GcIcon name="remote" :size="14" />
+            <h3>默认远程</h3>
+            <span class="spacer" />
+            <el-tag v-if="hasRepoRemotes" size="small" effect="plain">{{ platformLabel(platform) }}</el-tag>
+          </header>
+          <div class="set-body">
+            <div class="remote-bar">
+              <template v-if="hasRepoRemotes">
+                <el-select
+                  v-model="selectedRemote"
+                  class="remote-select"
+                  :disabled="settings.saving"
+                  @change="onRemoteChange"
+                >
+                  <el-option v-for="r in remotes" :key="r.name" :label="r.name" :value="r.name" />
+                </el-select>
+                <span class="mono muted remote-url" :title="selectedRemoteUrl">{{ selectedRemoteUrl || '—' }}</span>
+              </template>
+              <span v-else class="mr-hint">{{
+                repos.currentId ? '当前仓库没有 remote' : '未选择仓库，请先在工作台打开仓库'
+              }}</span>
+            </div>
+            <p class="fhint">用于 fetch、MR 短名剥前缀、CLI 未传远程时的默认值。切换后立即保存。</p>
+            <div v-if="hasRepoRemotes && platform === 'unknown'" class="mr-platform-row">
+              <span class="mr-hint">未能自动识别远程平台，请手动选择。</span>
+              <el-button :disabled="!current?.host || settings.saving" @click="pickPlatform('github')">GitHub</el-button>
+              <el-button :disabled="!current?.host || settings.saving" @click="pickPlatform('gitlab')">GitLab</el-button>
+            </div>
           </div>
         </div>
 
@@ -702,21 +714,25 @@ async function clearLlmKey(): Promise<void> {
           </div>
         </div>
 
-        <div v-if="showCurrentHostCard && currentHostProfile" class="gc-card pad">
-          <p class="gc-eyebrow">当前远程凭证</p>
-          <p class="mr-hint">只显示当前选中远程的域名。其它实例上的 Token 不在这里列出。</p>
-          <ul class="host-list">
-            <li class="host-row">
-              <span class="mono">{{ currentHostProfile.host }}</span>
-              <el-tag size="small" effect="plain">{{
-                currentHostProfile.platform === 'github' ? 'GitHub' : 'GitLab'
-              }}</el-tag>
-              <el-tag size="small" :type="currentHostProfile.tokenSet ? 'success' : 'info'" effect="plain">
-                {{ currentHostProfile.tokenSet ? currentHostProfile.tokenPreview || '已配置 Token' : '无 Token' }}
-              </el-tag>
-              <el-button link type="danger" @click="removeHost(currentHostProfile.host)">清除</el-button>
-            </li>
-          </ul>
+        <div v-if="showCurrentHostCard && currentHostProfile" class="set-card">
+          <header class="card-head">
+            <GcIcon name="key" :size="14" />
+            <h3>当前远程凭证</h3>
+            <span class="spacer" />
+            <span class="chip plain">{{ currentHostProfile.platform === 'github' ? 'GitHub' : 'GitLab' }}</span>
+          </header>
+          <div class="set-body">
+            <p class="fhint">只显示当前选中远程的域名。其它实例上的 Token 不在这里列出。</p>
+            <ul class="host-list">
+              <li class="host-row">
+                <span class="mono">{{ currentHostProfile.host }}</span>
+                <el-tag size="small" :type="currentHostProfile.tokenSet ? 'success' : 'info'" effect="plain">
+                  {{ currentHostProfile.tokenSet ? currentHostProfile.tokenPreview || '已配置 Token' : '无 Token' }}
+                </el-tag>
+                <el-button link type="danger" @click="removeHost(currentHostProfile.host)">清除</el-button>
+              </li>
+            </ul>
+          </div>
         </div>
       </section>
 
@@ -725,95 +741,140 @@ async function clearLlmKey(): Promise<void> {
       </section>
 
       <section v-show="activeTab === 'llm'" class="stack">
-        <div class="gc-card pad">
-          <p class="gc-eyebrow">聊天模型</p>
-          <p class="mr-hint">
-            Key 与 MR Token 一样只存在本机设置里，不进 MCP 工具参数，页面不回填明文。浏览器和桌面同一套配置。
-          </p>
-          <label class="kv">
-            供应商
-            <el-select model-value="openai" disabled>
-              <el-option label="OpenAI 兼容" value="openai" />
-            </el-select>
-          </label>
-          <label class="kv">
-            模型名
-            <el-input v-model="llmModel" placeholder="gpt-4.1" />
-          </label>
-          <label class="kv">
-            Base URL
-            <el-input v-model="llmBaseUrl" placeholder="空 = https://api.openai.com/v1 ；兼容网关填到 /v1" />
-          </label>
-          <label class="kv">
-            API Key
-            <el-input
-              v-model="llmKeyInput"
-              type="password"
-              show-password
-              :placeholder="settings.llm?.tokenSet ? `已保存 ${settings.llm.tokenPreview}，输入新 Key 覆盖` : 'sk-…'"
-            />
-          </label>
-          <div class="row">
-            <el-button type="primary" :loading="settings.saving" @click="saveLlm">保存</el-button>
-            <el-button :disabled="!settings.llm?.tokenSet || settings.saving" @click="clearLlmKey">清除 Key</el-button>
+        <div class="set-card">
+          <header class="card-head">
+            <GcIcon name="cpu" :size="14" />
+            <h3>聊天模型</h3>
+            <span class="spacer" />
+            <span class="chip plain">OpenAI 兼容</span>
+          </header>
+          <div class="set-body">
+            <p class="fhint">
+              Key 与 MR Token 一样只存在本机设置里，不进 MCP 工具参数，页面不回填明文。浏览器和桌面同一套配置。
+            </p>
+            <div class="frow">
+              <label>模型名</label>
+              <div class="fc">
+                <div class="fctrl">
+                  <el-input v-model="llmModel" placeholder="gpt-4.1" />
+                </div>
+              </div>
+            </div>
+            <div class="frow">
+              <label>Base URL</label>
+              <div class="fc">
+                <div class="fctrl">
+                  <el-input v-model="llmBaseUrl" placeholder="空 = https://api.openai.com/v1 ；兼容网关填到 /v1" />
+                </div>
+                <span class="fhint">留空使用官方地址；自建网关需兼容 /v1/chat/completions 协议。</span>
+              </div>
+            </div>
+            <div class="frow">
+              <label>API Key</label>
+              <div class="fc">
+                <div class="fctrl">
+                  <el-input
+                    v-model="llmKeyInput"
+                    type="password"
+                    show-password
+                    autocomplete="new-password"
+                    :placeholder="settings.llm?.tokenSet ? `已保存 ${settings.llm.tokenPreview}，输入新 Key 覆盖` : 'sk-…'"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
+          <footer class="card-foot">
+            <span class="saved">任务执行本身不消耗模型额度</span>
+            <span class="spacer" />
+            <el-button :disabled="!settings.llm?.tokenSet || settings.saving" @click="clearLlmKey">清除 Key</el-button>
+            <el-button type="primary" :loading="settings.saving" @click="saveLlm">保存</el-button>
+          </footer>
         </div>
       </section>
 
       <section v-show="activeTab === 'git'" class="git-split">
-        <aside class="gc-card pad git-side">
-          <p class="gc-eyebrow">默认行为</p>
-          <label class="kv">
-            dry-run 默认
-            <el-switch v-model="gitDraft.dryRunDefault" />
-          </label>
-          <p class="hint">开启后写操作（MCP / CLI）默认只生成预览，不真正执行。</p>
-          <p class="field-label">允许打开的仓库</p>
-          <el-input
-            v-model="gitDraft.allowedReposText"
-            type="textarea"
-            :rows="6"
-            placeholder="一行一个本地路径。留空 = 不限制"
-          />
-          <p class="hint">
-            非空时，打开路径必须等于其中一条或位于其下。空名单不限制路径，MCP 带的 repoPath 同样不限制。
-          </p>
-          <div class="row">
-            <el-button @click="copyAccessSecret">复制本机访问密钥</el-button>
+        <aside class="set-card git-side">
+          <header class="card-head">
+            <GcIcon name="shield" :size="14" />
+            <h3>默认行为</h3>
+          </header>
+          <div class="set-body">
+            <div class="frow">
+              <label>dry-run 默认</label>
+              <div class="fc">
+                <div class="fctrl">
+                  <el-switch v-model="gitDraft.dryRunDefault" />
+                </div>
+                <span class="fhint">开启后写操作（MCP / CLI）默认只生成预览，不真正执行。</span>
+              </div>
+            </div>
+            <div class="frow">
+              <label>允许打开的仓库</label>
+              <div class="fc">
+                <div class="fctrl">
+                  <el-input
+                    v-model="gitDraft.allowedReposText"
+                    type="textarea"
+                    :rows="6"
+                    placeholder="一行一个本地路径。留空 = 不限制"
+                  />
+                </div>
+                <span class="fhint">
+                  非空时，打开路径必须等于其中一条或位于其下。空名单不限制路径，MCP 带的 repoPath 同样不限制。
+                </span>
+              </div>
+            </div>
+            <div class="frow">
+              <label>本机访问密钥</label>
+              <div class="fc">
+                <div class="fctrl">
+                  <el-button @click="copyAccessSecret">复制本机访问密钥</el-button>
+                </div>
+                <span class="fhint">
+                  HTTP 的 /api 与 /mcp 要带请求头 X-Git-Cockpit-Secret。探活不校验。能读到 config.json
+                  的本机进程不受这道头限制。
+                </span>
+              </div>
+            </div>
           </div>
-          <p class="hint">
-            HTTP 的 /api 与 /mcp 要带请求头 X-Git-Cockpit-Secret。探活不校验。能读到 config.json
-            的本机进程不受这道头限制。
-          </p>
-          <div v-if="loaded" class="row">
-            <el-button type="primary" :loading="settings.saving" :disabled="!gitDirty" @click="saveGit">保存</el-button>
+          <footer class="card-foot">
+            <span class="spacer" />
             <el-button :disabled="!gitDirty" @click="syncGitDraft">放弃</el-button>
-          </div>
+            <el-button type="primary" :loading="settings.saving" :disabled="!gitDirty" @click="saveGit">保存</el-button>
+          </footer>
         </aside>
-        <div class="gc-card pad git-main" v-loading="settings.loading">
-          <p class="hint git-main-hint">
-            点芯片启用或禁用。高危左边红条，默认关。打开后执行前仍会自动备份。没有审批队列。
-          </p>
-          <div v-for="g in gitToolGroups" :key="g.name" class="git-pack">
-            <p class="git-pack-h">
-              {{ g.name }} <span>{{ g.items.length }}</span>
-            </p>
-            <div class="git-wall">
-              <button
-                v-for="t in g.items"
-                :key="t.name"
-                type="button"
-                class="git-chip"
-                :class="{ on: toolEnabled(t), high: t.riskLevel === 'dangerous' }"
-                :title="t.description"
-                @click="toggleChip(t)"
-              >
-                {{ toolChipLabel(t.name) }}
-              </button>
+        <div class="set-card git-main" v-loading="settings.loading">
+          <header class="card-head">
+            <GcIcon name="list" :size="14" />
+            <h3>工具开关</h3>
+            <span class="spacer" />
+            <span class="chip plain">高危左边红条，默认关</span>
+          </header>
+          <div class="set-body">
+            <p class="fhint">点芯片启用或禁用。打开后执行前仍会自动备份。没有审批队列。</p>
+            <div v-for="g in gitToolGroups" :key="g.name" class="git-pack">
+              <p class="git-pack-h">
+                {{ g.name }} <span>{{ g.items.length }}</span>
+              </p>
+              <div class="git-wall">
+                <button
+                  v-for="t in g.items"
+                  :key="t.name"
+                  type="button"
+                  class="git-chip"
+                  :class="{ on: toolEnabled(t), high: t.riskLevel === 'dangerous' }"
+                  :title="t.description"
+                  @click="toggleChip(t)"
+                >
+                  {{ toolChipLabel(t.name) }}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </section>
+      </div>
     </div>
   </div>
 </template>
@@ -825,46 +886,190 @@ async function clearLlmKey(): Promise<void> {
   flex-direction: column;
   overflow: hidden;
 }
-.page-title,
-.page-version,
+.page-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--gc-gap);
+  min-width: 0;
+}
+.page-head h1 {
+  margin: 0;
+  font-size: var(--gc-fs-page);
+  font-weight: 600;
+  line-height: var(--gc-lh-page);
+  color: var(--gc-text);
+  letter-spacing: -0.01em;
+}
+.page-head .sub {
+  font-size: var(--gc-fs-body);
+  color: var(--gc-text-3);
+}
+.page-head .spacer {
+  flex: 1;
+}
+.page-head .chip {
+  height: 20px;
+  padding: 0 8px;
+  border-radius: var(--gc-r-tag);
+  background: var(--el-fill-color);
+  color: var(--gc-text-3);
+  font-size: var(--gc-fs-meta);
+  display: inline-flex;
+  align-items: center;
+}
 .settings-page > .el-alert,
 .gc-chip-tabs {
   flex: none;
 }
-.settings-body {
+/* 设置主体：页头 + tab + 内容同宽居中（对齐设计稿 880px 单列） */
+.settings-scope {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: 880px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gc-gap);
+  padding-bottom: var(--gc-pad);
+}
+.settings-col {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: var(--gc-pad);
-}
-.settings-body.fill {
-  overflow: hidden;
   display: flex;
   flex-direction: column;
+  gap: var(--gc-pad);
+}
+.settings-col.fill {
+  overflow: hidden;
+}
+/* set-card 框架：card-head（36px page 底）+ set-body + card-foot */
+.set-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--gc-card);
+  border: 1px solid var(--gc-line);
+  border-radius: var(--gc-radius);
+  overflow: hidden;
+  flex: none;
+}
+.settings-col.fill .set-card.git-main {
+  flex: 1;
+  min-height: 0;
+}
+.card-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 var(--gc-pad);
+  background: var(--gc-page);
+  border-bottom: 1px solid var(--gc-line);
+  color: var(--gc-text-2);
+}
+.card-head h3 {
+  margin: 0;
+  font-size: var(--gc-fs-body);
+  font-weight: 600;
+  color: var(--gc-text);
+}
+.card-head .spacer {
+  flex: 1;
+}
+.card-head .chip {
+  height: 20px;
+  padding: 0 8px;
+  border-radius: var(--gc-r-tag);
+  background: var(--el-fill-color);
+  color: var(--gc-text-3);
+  font-size: var(--gc-fs-meta);
+  display: inline-flex;
+  align-items: center;
+}
+.set-body {
+  padding: var(--gc-pad);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+/* 表单行：标签 140 + 控件 */
+.frow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--gc-pad);
+  min-width: 0;
+}
+.frow > label {
+  flex: none;
+  width: 140px;
+  padding-top: 6px;
+  font-size: var(--gc-fs-body);
+  color: var(--gc-text-3);
+  text-align: right;
+}
+.frow > .fc {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.fctrl {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.fctrl .el-input,
+.fctrl .el-select {
+  flex: 1;
+  min-width: 0;
+}
+.fhint {
+  font-size: var(--gc-fs-meta);
+  color: var(--gc-text-3);
+  line-height: 1.5;
+  margin: 0;
+}
+.card-foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--gc-gap);
+  min-height: 40px;
+  padding: var(--gc-gap) var(--gc-pad);
+  border-top: 1px solid var(--gc-line);
+  background: var(--gc-page);
+  font-size: var(--gc-fs-meta);
+  color: var(--gc-text-3);
+}
+.card-foot .spacer {
+  flex: 1;
 }
 .stack {
   display: flex;
   flex-direction: column;
   gap: var(--gc-gap);
-  max-width: 720px;
   padding-bottom: var(--gc-pad);
 }
+/* git tab：上下堆叠（对齐设计稿单列卡片，不用左右分栏） */
 .git-split {
   flex: 1;
   min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: var(--gc-gap);
 }
 .git-side {
-  align-self: start;
+  flex: none;
 }
 .git-main {
+  flex: 1;
   min-width: 0;
   overflow: auto;
-}
-.git-main-hint {
-  margin-top: 0;
 }
 .git-pack + .git-pack {
   margin-top: var(--gc-pad);
@@ -968,14 +1173,6 @@ async function clearLlmKey(): Promise<void> {
 }
 .field-label {
   margin: var(--gc-pad) 0 var(--gc-gap);
-  font-size: var(--gc-fs-body);
-}
-.kv {
-  display: grid;
-  grid-template-columns: 140px minmax(0, 1fr);
-  align-items: center;
-  margin-top: var(--gc-gap);
-  min-height: var(--gc-row-lg);
   font-size: var(--gc-fs-body);
 }
 .row {

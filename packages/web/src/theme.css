@@ -117,7 +117,6 @@
   /* ---- 圆角 ---- */
   --gc-r-tag: 4px;
   --gc-r: 6px;
-  --gc-r-glass: 10px;
 
   /* ---- 阴影 ---- */
   --gc-shadow-menu: 0 12px 32px rgba(2, 6, 12, 0.6), 0 2px 8px rgba(2, 6, 12, 0.5);

@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { useJobsStore } from '@/stores/jobs';
 import * as api from '@/api/client';
 import CloneDialog from '@/components/CloneDialog.vue';
 import { jobLine, kindLabel, notifyJobStarted, statusLabel } from '@/utils/jobNotify';
+import { repoLeaf } from '@/stores/chat';
+import { relTime } from '@/utils/time';
 import { getDesktopBridge } from '@/desktopBridge';
 import type { CloneJobSummary, JobStatus } from '@/api/types';
 
@@ -25,6 +27,7 @@ const cloneUrl = ref('');
 const cloneDest = ref('');
 const cloning = ref(false);
 const logEl = ref<HTMLElement | null>(null);
+const nowTick = ref(Date.now());
 
 const counts = computed(() => ({
   all: jobs.jobs.length,
@@ -42,8 +45,25 @@ const visibleJobs = computed(() => {
   });
 });
 
+/* 分组卡片流：进行中 / 失败 / 成功 */
+const groups = [
+  { key: 'running' as const, label: '进行中', icon: 'activity' },
+  { key: 'error' as const, label: '失败', icon: 'alert' },
+  { key: 'ok' as const, label: '成功', icon: 'check' }
+];
+const groupJobs = (key: JobStatus): CloneJobSummary[] => visibleJobs.value.filter((j) => j.status === key);
+
 const activeJob = computed(() => jobs.jobs.find((j) => j.id === activeJobId.value) ?? null);
 const jobLogText = computed(() => (activeJob.value?.logs ?? []).join('\n').replace(/\r\n/g, '\n').replace(/\r/g, '\n'));
+
+function jobPercent(j: CloneJobSummary): number | null {
+  if (!j.progress || !j.progress.total) return null;
+  return Math.max(0, Math.min(100, Math.round((j.progress.current / j.progress.total) * 100)));
+}
+
+function installReady(j: CloneJobSummary): boolean {
+  return j.kind === 'desktop-download' && j.status === 'ok' && j.payload?.installReady === true;
+}
 
 function tailOf(j: CloneJobSummary): string {
   if (j.error) return j.error;
@@ -56,23 +76,25 @@ function tailOf(j: CloneJobSummary): string {
   return '';
 }
 
-function jobPercent(j: CloneJobSummary): number | null {
-  if (!j.progress || !j.progress.total) return null;
-  return Math.max(0, Math.min(100, Math.round((j.progress.current / j.progress.total) * 100)));
+function kindIcon(kind: string): string {
+  if (kind === 'clone') return 'pull';
+  if (kind === 'survey') return 'layers';
+  if (kind === 'fetch') return 'refresh';
+  if (kind === 'desktop-download') return 'arrow-down';
+  return 'commit';
 }
 
-function installReady(j: CloneJobSummary): boolean {
-  return j.kind === 'desktop-download' && j.status === 'ok' && j.payload?.installReady === true;
+function repoLeafOf(j: CloneJobSummary): string {
+  return j.repoPath ? repoLeaf(j.repoPath) : '本机';
 }
 
-function formatTime(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  const diff = Date.now() - d.getTime();
-  if (diff < 60_000) return '刚刚';
-  if (diff < 3600_000) return `${Math.floor(diff / 60_000)} 分钟前`;
-  if (diff < 24 * 3600_000) return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-  return d.toLocaleString(undefined, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+/** 耗时 mm:ss（运行中实时走秒） */
+function durOf(j: CloneJobSummary): string {
+  const start = new Date(j.startedAt).getTime();
+  if (Number.isNaN(start)) return '—';
+  const end = j.finishedAt ? new Date(j.finishedAt).getTime() : nowTick.value;
+  const s = Math.max(0, Math.floor((end - start) / 1000));
+  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 }
 
 async function openJob(id: string): Promise<void> {
@@ -92,15 +114,13 @@ async function openJob(id: string): Promise<void> {
   }
 }
 
+function closeDrawer(): void {
+  activeJobId.value = null;
+  if (route.query.id) void router.replace({ path: '/jobs' });
+}
+
 function setFilter(next: Filter): void {
-  filter.value = next;
-  if (activeJob.value && (next === 'all' || activeJob.value.status === next)) return;
-  const first = visibleJobs.value[0];
-  if (first) void openJob(first.id);
-  else {
-    activeJobId.value = null;
-    if (route.query.id) void router.replace({ path: '/jobs' });
-  }
+  filter.value = filter.value === next && next !== 'all' ? 'all' : next;
 }
 
 async function cancelJob(id: string): Promise<void> {
@@ -125,10 +145,10 @@ async function cancelJob(id: string): Promise<void> {
   }
 }
 
-function retryClone(job: { url?: string; destDir?: string }): void {
+function retryClone(job: CloneJobSummary): void {
   cloneRetrying.value = true;
-  cloneUrl.value = (job.url ?? '').trim();
-  cloneDest.value = (job.destDir ?? '').trim();
+  cloneUrl.value = job.url ?? '';
+  cloneDest.value = job.destDir ?? '';
   cloneVisible.value = true;
 }
 
@@ -146,13 +166,7 @@ async function startClone(): Promise<void> {
     cloneUrl.value = '';
     cloneDest.value = '';
     await jobs.load();
-    notifyJobStarted({
-      id: job.id,
-      kind: 'clone',
-      title: `${url} → ${dest}`,
-      router
-    });
-    await openJob(job.id);
+    notifyJobStarted({ id: job.id, kind: 'clone', title: `${url} → ${dest}`, router });
   } catch (err) {
     ElMessage.error(err instanceof Error ? err.message : String(err));
   } finally {
@@ -170,121 +184,135 @@ async function installDownloaded(): Promise<void> {
   if (!result.ok && result.error) ElMessage.error(result.error);
 }
 
-async function scrollLog(): Promise<void> {
-  await nextTick();
-  if (logEl.value) logEl.value.scrollTop = logEl.value.scrollHeight;
+function scrollLog(): void {
+  void nextTick(() => {
+    const el = logEl.value;
+    if (el) el.scrollTop = el.scrollHeight;
+  });
 }
 
-watch(jobLogText, () => void scrollLog());
-watch(
-  () => route.query.id,
-  (id) => {
-    if (typeof id === 'string' && id && id !== activeJobId.value) void openJob(id);
-  }
-);
+watch(jobLogText, () => scrollLog());
 
-onMounted(async () => {
-  await jobs.load();
-  const id = route.query.id;
-  if (typeof id === 'string' && id) {
-    await openJob(id);
-    return;
-  }
-  const first = visibleJobs.value[0];
-  if (first) await openJob(first.id);
+let timer: number | undefined;
+onMounted(() => {
+  void jobs.load();
+  if (route.query.id) void openJob(String(route.query.id));
+  timer = window.setInterval(() => {
+    if (jobs.jobs.some((j) => j.status === 'running')) nowTick.value = Date.now();
+  }, 1000);
+});
+onUnmounted(() => {
+  if (timer) window.clearInterval(timer);
 });
 </script>
 
 <template>
   <div class="page jobs-page">
-    <h2 class="page-title">任务</h2>
+    <div class="page-head">
+      <h1>任务</h1>
+      <span class="sub">写操作排队执行，进度实时推送</span>
+      <span v-if="counts.running" class="pulse-count"><i />{{ counts.running }} 进行中</span>
+      <span class="spacer" />
+      <el-button :loading="jobs.loading" @click="jobs.load">刷新</el-button>
+    </div>
 
-    <div v-if="!jobs.loading && !jobs.jobs.length" class="empty gc-card">
+    <div class="chips">
+      <button type="button" class="chip" :class="{ on: filter === 'all' }" @click="setFilter('all')">
+        全部 {{ counts.all }}
+      </button>
+      <button type="button" class="chip" :class="{ on: filter === 'running' }" @click="setFilter('running')">
+        进行中 {{ counts.running }}
+      </button>
+      <button type="button" class="chip" :class="{ on: filter === 'error' }" @click="setFilter('error')">
+        失败 {{ counts.error }}
+      </button>
+      <button type="button" class="chip" :class="{ on: filter === 'ok' }" @click="setFilter('ok')">
+        成功 {{ counts.ok }}
+      </button>
+    </div>
+
+    <div v-if="!jobs.loading && visibleJobs.length === 0" class="empty gc-card">
       <strong>还没有后台任务</strong>
       <p>克隆、矩阵扫描、抓取远程会排在这里。去工作台克隆一个仓。</p>
     </div>
 
-    <div v-else class="split" v-loading="jobs.loading && !jobs.jobs.length">
-      <aside class="gc-card list">
-        <div class="chips">
-          <button type="button" class="chip" :class="{ on: filter === 'all' }" @click="setFilter('all')">
-            全部 {{ counts.all }}
-          </button>
-          <button type="button" class="chip" :class="{ on: filter === 'running' }" @click="setFilter('running')">
-            进行中 {{ counts.running }}
-          </button>
-          <button type="button" class="chip" :class="{ on: filter === 'error' }" @click="setFilter('error')">
-            失败 {{ counts.error }}
-          </button>
-          <button type="button" class="chip" :class="{ on: filter === 'ok' }" @click="setFilter('ok')">
-            成功 {{ counts.ok }}
-          </button>
-          <el-button text type="primary" :loading="jobs.loading" @click="jobs.load()">刷新</el-button>
-        </div>
-        <p v-if="!visibleJobs.length" class="miss">没有这类任务</p>
+    <template v-for="g in groups" :key="g.key">
+      <section v-if="groupJobs(g.key).length" class="job-group">
+        <header class="card-head">
+          <GcIcon :name="g.icon" :size="14" />
+          <h3>{{ g.label }}</h3>
+          <span class="cnt">{{ groupJobs(g.key).length }}</span>
+          <span class="spacer" />
+          <span v-if="g.key === 'running'" class="chip plain">并发上限 2</span>
+        </header>
         <button
-          v-for="j in visibleJobs"
+          v-for="j in groupJobs(g.key)"
           :key="j.id"
           type="button"
-          class="row"
-          :class="[j.status, { on: j.id === activeJobId }]"
+          class="job"
+          :class="{ on: j.id === activeJobId }"
           @click="openJob(j.id)"
         >
-          <div class="top">
+          <span class="job-top">
+            <span class="job-ico" :class="j.status"><GcIcon :name="kindIcon(j.kind)" :size="14" /></span>
+            <span class="job-main">
+              <span class="job-title" :title="jobLine(j)">{{ jobLine(j) }}</span>
+              <span class="job-sub">{{ kindLabel(j.kind) }} · {{ repoLeafOf(j) }} · {{ relTime(j.startedAt) }}</span>
+            </span>
+            <span v-if="j.kind === 'desktop-download' && jobPercent(j) != null" class="job-prog">
+              <span class="bar" :class="j.status">
+                <i class="fill" :style="{ width: (jobPercent(j) ?? 0) + '%' }" />
+                <i v-if="j.status === 'running'" class="scan" />
+              </span>
+              <span class="pct">{{ jobPercent(j) }}%</span>
+            </span>
             <span class="st" :class="j.status">{{ statusLabel(j.status) }}</span>
-            <span>{{ kindLabel(j.kind) }}</span>
-            <em>{{ formatTime(j.startedAt) }}</em>
-          </div>
-          <div class="title mono" :title="jobLine(j)">{{ jobLine(j) }}</div>
-          <div class="tail" :class="{ err: !!j.error }">{{ tailOf(j) }}</div>
+            <span class="job-dur">{{ durOf(j) }}</span>
+          </span>
+          <span v-if="tailOf(j)" class="job-log" :title="tailOf(j)">{{ tailOf(j) }}</span>
         </button>
-      </aside>
-
-      <section class="gc-card log" v-loading="jobDetailLoading">
-        <template v-if="activeJob">
-          <header>
-            <span class="st" :class="activeJob.status">{{ statusLabel(activeJob.status) }}</span>
-            <span>{{ kindLabel(activeJob.kind) }} · {{ formatTime(activeJob.startedAt) }}</span>
-            <span class="grow" />
-            <el-button
-              v-if="activeJob.kind === 'desktop-download'"
-              type="primary"
-              plain
-              :disabled="!installReady(activeJob)"
-              @click="installDownloaded"
-              >安装</el-button
-            >
-            <el-button
-              v-if="activeJob.status === 'running'"
-              type="danger"
-              plain
-              :loading="cancellingId === activeJob.id"
-              @click="cancelJob(activeJob.id)"
-              >取消</el-button
-            >
-            <el-button
-              v-if="activeJob.status === 'error' && activeJob.kind === 'clone'"
-              type="primary"
-              plain
-              @click="retryClone(activeJob)"
-              >修改并重试</el-button
-            >
-          </header>
-          <p class="meta mono">{{ jobLine(activeJob) }}</p>
-          <p v-if="activeJob.error" class="banner-err">{{ activeJob.error }}</p>
-          <div v-if="activeJob.kind === 'desktop-download'" class="dl">
-            <div class="bar" :class="activeJob.status">
-              <i class="fill" :style="{ width: (jobPercent(activeJob) ?? 0) + '%' }" />
-              <i v-if="activeJob.status === 'running'" class="scan" />
-            </div>
-            <p v-if="activeJob.status === 'running'">正在下载桌面安装包。</p>
-            <p v-else-if="installReady(activeJob)">下载完成。安装会退出并重启应用。</p>
-          </div>
-          <pre v-else ref="logEl">{{ jobLogText || '（等待输出）' }}</pre>
-        </template>
-        <p v-else class="miss">点左侧任务看日志</p>
       </section>
-    </div>
+    </template>
+
+    <!-- 日志抽屉：点任务卡右侧滑出，保留原日志面板全部能力 -->
+    <div v-if="activeJob" class="drawer-mask" @click="closeDrawer" />
+    <aside v-if="activeJob" class="log-drawer" v-loading="jobDetailLoading">
+      <header class="drawer-head">
+        <span class="st" :class="activeJob.status">{{ statusLabel(activeJob.status) }}</span>
+        <span class="drawer-title">{{ kindLabel(activeJob.kind) }} · {{ relTime(activeJob.startedAt) }}</span>
+        <span class="spacer" />
+        <el-button v-if="activeJob.status === 'running'" size="small" :loading="cancellingId === activeJob.id" @click="cancelJob(activeJob.id)">取消</el-button>
+        <el-button
+          v-if="activeJob.status === 'error' && activeJob.kind === 'clone'"
+          size="small"
+          type="primary"
+          plain
+          @click="retryClone(activeJob)"
+          >修改并重试</el-button
+        >
+        <el-button
+          v-if="activeJob.kind === 'desktop-download'"
+          size="small"
+          type="primary"
+          plain
+          :disabled="!installReady(activeJob)"
+          @click="installDownloaded"
+          >安装</el-button
+        >
+        <el-button size="small" text @click="closeDrawer">关闭</el-button>
+      </header>
+      <p class="meta mono">{{ jobLine(activeJob) }}</p>
+      <p v-if="activeJob.error" class="banner-err">{{ activeJob.error }}</p>
+      <div v-if="activeJob.kind === 'desktop-download'" class="dl">
+        <div class="bar" :class="activeJob.status">
+          <i class="fill" :style="{ width: (jobPercent(activeJob) ?? 0) + '%' }" />
+          <i v-if="activeJob.status === 'running'" class="scan" />
+        </div>
+        <p v-if="activeJob.status === 'running'">正在下载桌面安装包。</p>
+        <p v-else-if="installReady(activeJob)">下载完成。安装会退出并重启应用。</p>
+      </div>
+      <pre ref="logEl" class="log-pre">{{ jobLogText || '（等待输出）' }}</pre>
+    </aside>
 
     <CloneDialog
       v-model:visible="cloneVisible"
@@ -302,34 +330,55 @@ onMounted(async () => {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--gc-gap);
-  overflow: hidden;
-}
-.split {
-  flex: 1;
-  min-height: 0;
-  display: flex;
   gap: var(--gc-pad);
-}
-.list {
-  width: 340px;
-  flex: none;
   overflow: auto;
-  padding: var(--gc-pad);
-  display: flex;
-  flex-direction: column;
-  gap: var(--gc-gap);
 }
-.log {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  padding: var(--gc-pad);
+.page-head {
+  flex: none;
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: var(--gc-gap);
+  min-width: 0;
+}
+.page-head h1 {
+  margin: 0;
+  font-size: var(--gc-fs-page);
+  font-weight: 600;
+  line-height: var(--gc-lh-page);
+  color: var(--gc-text);
+  letter-spacing: -0.01em;
+}
+.page-head .sub {
+  font-size: var(--gc-fs-body);
+  color: var(--gc-text-3);
+}
+.page-head .spacer {
+  flex: 1;
+}
+.pulse-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: var(--gc-r-tag);
+  background: var(--gc-accent-weak);
+  color: var(--gc-accent-text);
+  font-size: var(--gc-fs-meta);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.pulse-count i {
+  flex: none;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--gc-accent);
+  box-shadow: var(--gc-glow-sm);
 }
 .chips {
+  flex: none;
   display: flex;
   flex-wrap: wrap;
   gap: var(--gc-gap);
@@ -337,46 +386,191 @@ onMounted(async () => {
 }
 .chips .chip {
   border: 0;
-  border-radius: var(--gc-radius);
+  border-radius: var(--gc-r-tag);
   padding: 0 var(--gc-pad);
-  height: var(--gc-control);
-  background: var(--el-fill-color-light);
-  color: inherit;
+  height: var(--gc-btn-inline);
+  background: var(--el-fill-color);
+  color: var(--gc-text-3);
   font: inherit;
-  font-size: var(--gc-fs-body);
+  font-size: var(--gc-fs-meta);
   cursor: pointer;
 }
 .chips .chip.on {
   background: var(--gc-accent-weak);
   color: var(--gc-accent-text);
 }
-.row {
-  display: block;
-  width: 100%;
-  text-align: left;
-  border: 0;
-  border-radius: var(--gc-radius);
-  padding: var(--gc-gap) var(--gc-pad);
+.chips .chip.plain {
   background: transparent;
-  color: inherit;
-  cursor: pointer;
-  font: inherit;
+  border: 1px solid var(--gc-line);
+  cursor: default;
 }
-.row.on {
-  background: var(--gc-accent-weak);
-}
-.top {
-  display: flex;
+.empty {
+  flex: none;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  padding: var(--gc-pad);
   gap: var(--gc-gap);
-  align-items: center;
-  font-size: var(--gc-fs-body);
-}
-.top em {
-  margin-left: auto;
-  font-style: normal;
   color: var(--gc-text-3);
 }
-/* 状态 chip：进行中琥珀 / 成功绿 / 失败红 / 排队中性 */
+.empty strong {
+  font-size: var(--el-font-size-extra-large);
+  color: var(--gc-text);
+  font-weight: 600;
+}
+.empty p {
+  margin: 0;
+  font-size: var(--gc-fs-body);
+}
+
+/* ---- 分组卡片流（对齐设计稿 job-group / job） ---- */
+.job-group {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  background: var(--gc-card);
+  border: 1px solid var(--gc-line);
+  border-radius: var(--gc-radius);
+  overflow: hidden;
+}
+.job-group > .card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 var(--gc-pad);
+  background: var(--gc-page);
+  border-bottom: 1px solid var(--gc-line);
+}
+.job-group > .card-head h3 {
+  margin: 0;
+  font-size: var(--gc-fs-body);
+  font-weight: 600;
+  color: var(--gc-text);
+}
+.job-group > .card-head .cnt {
+  font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  font-size: var(--gc-fs-micro);
+  color: var(--gc-text-3);
+  font-variant-numeric: tabular-nums;
+}
+.job-group > .card-head .spacer {
+  flex: 1;
+}
+.job {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  padding: 9px var(--gc-pad);
+  border: 0;
+  border-bottom: 1px solid var(--gc-line-weak);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  transition: background var(--gc-t-micro) var(--gc-ease);
+}
+.job:last-child {
+  border-bottom: 0;
+}
+.job:hover {
+  background: var(--gc-btn-hover);
+}
+.job.on {
+  background: var(--gc-accent-weak);
+}
+.job-top {
+  display: flex;
+  align-items: center;
+  gap: var(--gc-gap);
+  min-width: 0;
+}
+.job-ico {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--gc-r-tag);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--el-fill-color);
+  color: var(--gc-text-3);
+}
+.job-ico.running {
+  background: var(--gc-amber-weak);
+  color: var(--gc-amber);
+}
+.job-ico.ok {
+  background: var(--gc-green-weak);
+  color: var(--gc-green);
+}
+.job-ico.error {
+  background: var(--gc-red-weak);
+  color: var(--gc-red);
+}
+.job-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.job-title {
+  font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  font-size: var(--gc-fs-body);
+  color: var(--gc-text);
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.job-sub {
+  font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  font-size: var(--gc-fs-micro);
+  color: var(--gc-text-3);
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.job-prog {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 190px;
+}
+.job-prog .bar {
+  flex: 1;
+}
+.job-prog .pct {
+  flex: none;
+  width: 32px;
+  text-align: right;
+  font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  font-size: var(--gc-fs-micro);
+  color: var(--gc-text-3);
+  font-variant-numeric: tabular-nums;
+}
+.job-dur {
+  flex: none;
+  font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  font-size: var(--gc-fs-micro);
+  color: var(--gc-text-3);
+  font-variant-numeric: tabular-nums;
+}
+.job-log {
+  font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  font-size: var(--gc-fs-meta);
+  color: var(--gc-text-3);
+  line-height: 1.4;
+  padding-left: 32px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .st {
   flex: none;
   height: 18px;
@@ -399,28 +593,8 @@ onMounted(async () => {
   background: var(--gc-red-weak);
   color: var(--gc-red);
 }
-.st.queued {
-  background: var(--el-fill-color);
-  color: var(--gc-text-3);
-}
-.title,
-.tail {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.title {
-  font-size: var(--gc-fs-body);
-  margin: 2px 0;
-}
-.tail {
-  font-size: var(--gc-fs-body);
-  color: var(--gc-text-3);
-}
-.tail.err {
-  color: var(--gc-red);
-}
-/* 双段进度条：4px 轨道 + 信号填充 + 运行中纯色扫描段（禁渐变） */
+
+/* 双段进度条：4px 轨道 + 信号填充 + 扫描段 */
 .bar {
   position: relative;
   height: 4px;
@@ -460,32 +634,51 @@ onMounted(async () => {
     left: 100%;
   }
 }
-header {
-  display: flex;
-  gap: var(--gc-gap);
-  align-items: center;
-  font-size: var(--gc-fs-body);
-  flex: none;
+
+/* ---- 日志抽屉（右侧滑出） ---- */
+.drawer-mask {
+  position: fixed;
+  inset: 44px 0 0;
+  z-index: 24;
+  background: rgba(2, 6, 12, 0.45);
 }
-.grow {
+.log-drawer {
+  position: fixed;
+  top: 44px;
+  right: 0;
+  bottom: 0;
+  z-index: 26;
+  width: min(560px, 92vw);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gc-gap);
+  padding: var(--gc-pad);
+  background: var(--gc-page);
+  border-left: 1px solid var(--gc-line);
+  box-shadow: var(--gc-shadow-menu);
+}
+.drawer-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--gc-gap);
+  font-size: var(--gc-fs-body);
+  min-width: 0;
+}
+.drawer-title {
+  color: var(--gc-text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.drawer-head .spacer {
   flex: 1;
 }
 .meta {
   margin: 0;
   font-size: var(--gc-fs-body);
-  color: var(--el-text-color-secondary);
+  color: var(--gc-text-3);
   word-break: break-all;
-}
-.dl {
-  flex: none;
-  display: flex;
-  flex-direction: column;
-  gap: var(--gc-gap);
-}
-.dl p {
-  margin: 0;
-  font-size: var(--gc-fs-body);
-  color: var(--el-text-color-secondary);
 }
 .banner-err {
   margin: 0;
@@ -496,41 +689,29 @@ header {
   font-size: var(--gc-fs-body);
   line-height: 1.45;
 }
-pre {
+.dl {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gc-gap);
+}
+.dl p {
+  margin: 0;
+  font-size: var(--gc-fs-body);
+  color: var(--gc-text-3);
+}
+.log-pre {
   margin: 0;
   flex: 1;
   min-height: 0;
   overflow: auto;
   padding: var(--gc-pad);
   border-radius: var(--gc-radius);
-  background: var(--gc-page);
+  background: var(--gc-card);
+  border: 1px solid var(--gc-line);
   font-size: var(--gc-fs-body);
   line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-all;
-}
-.miss {
-  margin: 0;
-  font-size: var(--gc-fs-body);
-  color: var(--el-text-color-secondary);
-  padding: var(--gc-pad);
-}
-.empty {
-  flex: 1;
-  display: grid;
-  place-content: center;
-  text-align: center;
-  padding: var(--gc-pad);
-  gap: var(--gc-gap);
-  color: var(--el-text-color-secondary);
-}
-.empty strong {
-  font-size: var(--el-font-size-extra-large);
-  color: var(--el-text-color-primary);
-  font-weight: 600;
-}
-.empty p {
-  margin: 0;
-  font-size: var(--gc-fs-body);
 }
 </style>

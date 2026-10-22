@@ -822,7 +822,7 @@ onUnmounted(() => {
       <el-card
         v-if="contentMode === 'workspace'"
         shadow="never"
-        class="branch-panel glass gc-card-fill gc-card-fill--tight"
+        class="branch-panel gc-card gc-card-fill gc-card-fill--tight"
       >
         <template #header>
           <div class="panel-head">
@@ -873,7 +873,7 @@ onUnmounted(() => {
 
       <!-- 右：工作区 / 分支图 / 提交 -->
       <div class="status-content">
-        <div v-if="contentMode === 'graph'" class="graph-pane glass">
+        <div v-if="contentMode === 'graph'" class="graph-pane gc-card">
           <div class="lineage-bar">
             <span class="field-label">合入目标</span>
             <BranchTreeSelect v-model="lineageInto" remote-first placeholder="选择线上目标" />
@@ -913,7 +913,7 @@ onUnmounted(() => {
 
         <template v-else>
           <!-- 工具栏 -->
-          <el-card shadow="never" class="toolbar-card glass">
+          <el-card shadow="never" class="toolbar-card gc-card">
             <div class="toolbar">
               <div class="toolbar-group gc-gap-btns">
                 <el-button type="primary" @click="commitVisible = true">提交 Commit</el-button>
@@ -991,7 +991,7 @@ onUnmounted(() => {
 
           <div class="workspace-body">
             <!-- 更改文件 -->
-            <el-card shadow="never" class="changes-card glass gc-card-fill gc-card-fill--flush">
+            <el-card shadow="never" class="changes-card gc-card gc-card-fill gc-card-fill--flush">
               <template #header>
                 <div class="card-head">
                   <span class="card-title">更改 Changes</span>
@@ -1076,7 +1076,7 @@ onUnmounted(() => {
             </el-card>
 
             <div class="right-stack">
-              <el-card shadow="never" class="monitor-card glass gc-card-fill gc-card-fill--flush">
+              <el-card shadow="never" class="monitor-card gc-card gc-card-fill gc-card-fill--flush">
                 <template #header>
                   <div class="card-head">
                     <span class="card-title">差异监视器</span>
@@ -1097,7 +1097,7 @@ onUnmounted(() => {
                 </div>
               </el-card>
 
-              <el-card shadow="never" class="history-card glass gc-card-fill gc-card-fill--flush">
+              <el-card shadow="never" class="history-card gc-card gc-card-fill gc-card-fill--flush">
                 <template #header>
                   <div class="card-head">
                     <span class="card-title">记录 Records</span>
@@ -1506,11 +1506,6 @@ onUnmounted(() => {
   overflow: hidden;
 }
 /* 效率敏感区：实底卡（禁玻璃），靠表面三级 + 边框分层 */
-.glass {
-  --el-card-bg-color: var(--gc-card);
-  background: var(--gc-card);
-  border: 1px solid var(--gc-line);
-}
 .page-head {
   display: flex;
   align-items: center;

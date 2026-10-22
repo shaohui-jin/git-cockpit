@@ -11,6 +11,17 @@
 - **e2e 暴露面：2 页高**（工作台 overview.spec、合并 matrix/merge-pair.spec）、**2 页中**（任务 clone.spec、状态 open-commit.spec）、**4 页零/低**
 - 对话记录页 e2e 零覆盖 → **天然试点页**
 
+## 执行状态（2026-10-22 晚更新）
+
+- [x] **P0 对话记录**：双栏重建完成（288px 会话列表 + 内嵌详情；新增搜索框、复制全部；dialog 改内嵌）。e2e 零覆盖，无契约风险。
+- [x] **P1 日志**：工具栏加搜索框（工具/仓库/参数/结果全字段过滤），行结构不变。
+- [x] **P1 设置**：set-card 框架落地（page-head + card-head/set-body/card-foot + frow/fctrl 表单行），保留 tab 信息架构与全部交互；删除死规则 `.kv`。
+- [x] **P2 工作台**：page-head + 常驻打开栏（原两处 open-row 合一）+ **attention 三联智能横幅**（真实数据推导：冲突/进行中操作→红、脏工作区→琥珀、落后→青，各取最严重一仓，可点击跳转）+ 空态简化 + 卡片加仓库图标与 SVG 更多按钮。
+- [x] **P2 任务**：左右分栏 → **分组卡片流**（进行中/失败/成功三组 job-group，job 卡含类型图标/主副标题/双段进度条/状态 chip/实时耗时/日志尾行）；**日志 pane 迁入右侧抽屉**（点卡滑出，原能力全保留：取消/修改重试/安装/自动滚动）；clone.spec 行定位随布局更新（`aside.list .row` → `.job`）。
+- [ ] **P3 合并 / 状态**（深水区，未开始）：合并表单 sec-block 卡片化 + 结果区 file-row 加 stat/conflict 列；状态页 toolbar 化 + 分支树分组。
+- **附带收官**：glass 零残留——`gc-glass` 类/规则/令牌、ReposView 本地 `.glass`、StatusView 本地 `.glass` 与 6 处类名、`--gc-r-glass` 令牌全部清除，表面统一走 `gc-card`。
+- **门禁**：stylelint / vue-tsc / build / **e2e 5/5**（P0-P2 改后复跑确认；中途 2 个 merge spec 在落盘阶段的环境抖动重跑即过，非回归）。
+
 ## 二、逐页量化对照
 
 ### 1. 对话记录 ConversationsView —— 大差异 · 风险零 · 1.5h ★试点

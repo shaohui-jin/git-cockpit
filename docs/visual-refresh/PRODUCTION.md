@@ -96,3 +96,29 @@
 | theme.css !important | 73 → 47 |
 
 改动未代为提交（用户 3 个 WIP 未提交，按计划边界分组在工作区）。生产 diff 视觉需 dev server 目视复核（重点：状态页 diff 增删行/hunk 头、合并页冲突行、矩阵格子、任务进度条）。
+
+### 布局级改造 P0-P2（2026-10-22 晚，门禁 5/5）
+
+用户指出「只换了配色和规则、布局没按设计稿改」——属实，布局按稿重建被前期阶段有意排在风险控制外。本次按 LAYOUT-GAPS.md 量化清单推进 P0-P2：
+
+- **P0 对话记录**（ConversationsView 整页重写）：表格+弹窗 → 双栏（288px conv-list + conv-detail）。新增搜索框（标题/仓库过滤）、复制全部；详情从 dialog 改内嵌；空态引导。数据层零改动。
+- **P1 日志**（LogsView）：工具栏加 log-search 搜索框，过滤覆盖 tool/repo/params/result/error。
+- **P1 设置**（SettingsView）：set-card 框架（card-head 36px/set-body/card-foot + frow/fctrl 表单行 + fhint）；页头 page-head + 配置 chip；LLM/Git/远程凭证三组卡片化；删死规则 .kv。tab 信息架构与全部交互保留（.el-switch/.field-switch 类名不动）。
+- **P2 工作台**（ReposView）：page-head + 常驻打开栏（原两处 open-row 合一，空态只留引导）+ attention 三联智能横幅（conflictCount/operation/dirtyCount/behind 真实推导，各取最严重一仓，点击跳转合并/状态）+ RepoCard 加仓库图标与 SVG 更多按钮。
+- **P2 任务**（JobsView 整页重写）：split 分栏 → job-group 分组卡片流（进行中/失败/成功；job 卡 = 类型图标 + 主副标题 + 4px 双段进度条 + 状态 chip + 实时耗时 mm:ss + 日志尾行）；**日志 pane 迁入右侧抽屉**（点卡滑出，取消/修改并重试/安装/自动滚动全保留）；clone.spec 行定位随之更新（aside.list .row → .job）。
+- **glass 零残留收官**：gc-glass 类/规则/3 令牌、ReposView/StatusView 本地 .glass 规则与 8 处类名、--gc-r-glass 全部清除，表面统一 gc-card。
+- **踩坑**：① 大内容块 Write 工具传不动，改用 python stdin 写文件；② StatusView 六元素靠本地 .glass 提供表面，直接删类名会丢底色——须换成 gc-card；③ 全量 e2e 出现 2 个 merge spec 落盘阶段失败，重跑即过（worktree 清理的环境抖动，非回归，与阶段 2 记录同现象）。
+- **待办**：P3 合并/状态两页深水区（见 LAYOUT-GAPS.md）；用户 dev server 目视复核。
+
+### 布局级改造 P0-P2（2026-10-22 晚，门禁 5/5）
+
+用户指出「只换了配色和规则、布局没按设计稿改」——属实，布局按稿重建被前期阶段有意排在风险控制外。本次按 LAYOUT-GAPS.md 量化清单推进 P0-P2：
+
+- **P0 对话记录**（ConversationsView 整页重写）：表格+弹窗 → 双栏（288px conv-list + conv-detail）。新增搜索框（标题/仓库过滤）、复制全部；详情从 dialog 改内嵌；空态引导。数据层零改动。
+- **P1 日志**（LogsView）：工具栏加 log-search 搜索框，过滤覆盖 tool/repo/params/result/error。
+- **P1 设置**（SettingsView）：set-card 框架（card-head 36px/set-body/card-foot + frow/fctrl 表单行 + fhint）；页头 page-head + 配置 chip；LLM/Git/远程凭证三组卡片化；删死规则 .kv。tab 信息架构与全部交互保留（.el-switch/.field-switch 类名不动）。
+- **P2 工作台**（ReposView）：page-head + 常驻打开栏（原两处 open-row 合一，空态只留引导）+ attention 三联智能横幅（conflictCount/operation/dirtyCount/behind 真实推导，各取最严重一仓，点击跳转合并/状态）+ RepoCard 加仓库图标与 SVG 更多按钮。
+- **P2 任务**（JobsView 整页重写）：split 分栏 → job-group 分组卡片流（进行中/失败/成功；job 卡 = 类型图标 + 主副标题 + 4px 双段进度条 + 状态 chip + 实时耗时 mm:ss + 日志尾行）；**日志 pane 迁入右侧抽屉**（点卡滑出，取消/修改并重试/安装/自动滚动全保留）；clone.spec 行定位随之更新（aside.list .row → .job）。
+- **glass 零残留收官**：gc-glass 类/规则/3 令牌、ReposView/StatusView 本地 .glass 规则与 8 处类名、--gc-r-glass 全部清除，表面统一 gc-card。
+- **踩坑**：① 大内容块 Write 工具传不动，改用 python stdin 写文件；② StatusView 六元素靠本地 .glass 提供表面，直接删类名会丢底色——须换成 gc-card；③ 全量 e2e 出现 2 个 merge spec 落盘阶段失败，重跑即过（worktree 清理的环境抖动，非回归，与阶段 2 记录同现象）。
+- **待办**：P3 合并/状态两页深水区（见 LAYOUT-GAPS.md）；用户 dev server 目视复核。

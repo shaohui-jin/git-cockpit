@@ -130,6 +130,7 @@ onUnmounted(() => {
     @dragend="emit('dragend')"
   >
     <div class="card-top">
+      <GcIcon name="repo" :size="14" class="card-ico" />
       <span class="card-name mono">{{ overview?.name || repo.path.split(/[\\/]/).pop() }}</span>
       <em class="wx" :class="attentionOf(overview)">{{ missing() ? '丢失' : weatherOf(attentionOf(overview)) }}</em>
       <button
@@ -140,7 +141,7 @@ onUnmounted(() => {
         :aria-expanded="menu.open"
         @click="toggleMenu"
       >
-        ⋯
+        <GcIcon name="more" :size="14" />
       </button>
     </div>
     <div class="card-meta">
@@ -278,9 +279,13 @@ onUnmounted(() => {
   background: transparent;
   color: var(--el-text-color-regular);
   cursor: pointer;
-  font: inherit;
-  font-size: 16px;
-  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.card-ico {
+  flex: none;
+  color: var(--gc-text-3);
 }
 .more-btn:hover,
 .more-btn[aria-expanded='true'] {

@@ -72,8 +72,7 @@ const weatherTabs = computed(() => {
       weather: '薄雾',
       count: c.dirty,
       hint: weatherHint('dirty'),
-      aria: filterAriaName('dirty', c.dirty)
-    },
+      aria: filterAriaName('dirty', c.dirty)    },
     {
       key: 'sync' as const,
       weather: '刮风',
@@ -97,6 +96,77 @@ const current = computed(() => repos.repos.find((r) => r.id === repos.currentId)
 const currentOv = computed(() => (current.value ? overviewOf(current.value.path) : undefined));
 const currentAttention = computed(() => attentionOf(currentOv.value));
 const currentMissing = computed(() => currentOv.value?.available === false);
+
+/* ---- 需要关注（对齐设计稿 attention 三联）：每类取最严重的一仓，真实数据推导 ---- */
+interface AttentionItem {
+  tone: 'red' | 'amber' | 'accent';
+  icon: string;
+  name: string;
+  text: string;
+  repoId: number;
+  to: '/merge' | '/status';
+}
+const attentionItems = computed<AttentionItem[]>(() => {
+  const usable = repos.repos
+    .map((r) => ({ repo: r, ov: overviewOf(r.path) }))
+    .filter((x): x is { repo: (typeof repos.repos)[number]; ov: NonNullable<ReturnType<typeof overviewOf>> } =>
+      Boolean(x.ov) && x.ov!.available !== false
+    );
+  const worst = (pred: (ov: NonNullable<ReturnType<typeof overviewOf>>) => boolean, score: (ov: NonNullable<ReturnType<typeof overviewOf>>) => number) =>
+    usable.filter((x) => pred(x.ov)).sort((a, b) => score(b.ov) - score(a.ov))[0];
+  const items: AttentionItem[] = [];
+  const conflict = worst((ov) => ov.conflictCount > 0, (ov) => ov.conflictCount);
+  if (conflict) {
+    items.push({
+      tone: 'red',
+      icon: 'conflict',
+      name: conflict.ov.name,
+      text: `${conflict.ov.conflictCount} 个冲突未解决，合并已暂停`,
+      repoId: conflict.repo.id,
+      to: '/merge'
+    });
+  }
+  const op = worst((ov) => ov.operation !== 'none', () => 1);
+  if (op && items.length < 3) {
+    const label = op.ov.operation === 'merge' ? '合并' : op.ov.operation === 'rebase' ? '变基' : '拣选';
+    items.push({
+      tone: 'red',
+      icon: 'alert',
+      name: op.ov.name,
+      text: `有${label}未完成，先继续或中止`,
+      repoId: op.repo.id,
+      to: '/status'
+    });
+  }
+  const dirty = worst((ov) => ov.dirtyCount > 0, (ov) => ov.dirtyCount);
+  if (dirty && items.length < 3) {
+    items.push({
+      tone: 'amber',
+      icon: 'file',
+      name: dirty.ov.name,
+      text: `${dirty.ov.dirtyCount} 个文件未提交`,
+      repoId: dirty.repo.id,
+      to: '/status'
+    });
+  }
+  const behind = worst((ov) => ov.behind > 0, (ov) => ov.behind);
+  if (behind && items.length < 3) {
+    items.push({
+      tone: 'accent',
+      icon: 'pull',
+      name: behind.ov.name,
+      text: `落后远程 ${behind.ov.behind} 个提交`,
+      repoId: behind.repo.id,
+      to: '/status'
+    });
+  }
+  return items;
+});
+
+function attentionGo(item: AttentionItem): void {
+  repos.switchTo(item.repoId);
+  void router.push(item.to);
+}
 
 function setFilter(next: RepoFilter): void {
   filter.value = filter.value === next && next !== 'all' ? 'all' : next;
@@ -301,8 +371,10 @@ watch(revision, () => {
 
 <template>
   <div class="page board">
-    <div class="page-title-row">
-      <h2 class="page-title">工作台</h2>
+    <div class="page-head">
+      <h1>工作台</h1>
+      <span class="sub">本地 Git 仓库的驾驶舱</span>
+      <span class="spacer" />
       <span v-if="overview.refreshing" class="overview-refreshing" aria-live="polite">更新中…</span>
     </div>
 
@@ -315,62 +387,87 @@ watch(revision, () => {
       class="offline"
     />
 
-    <section class="hero glass">
-      <div v-if="!current" class="hero-copy">
+    <!-- 常驻打开栏：输入路径 / 克隆 / 一键抓取 -->
+    <section class="open-bar">
+      <el-input
+        v-model="newPath"
+        class="open-input"
+        placeholder="输入本地 Git 仓库路径，例如 D:\project\repo 或 /Users/me/code/app"
+        clearable
+        @keyup.enter="openRepo"
+      />
+      <el-button type="primary" :loading="opening" @click="openRepo">打开</el-button>
+      <el-button @click="openCloneDialog">克隆到本地</el-button>
+      <el-tooltip content="对所有可用仓 git fetch，合成一条后台任务。丢失仓会跳过。" placement="top">
+        <el-button :loading="fetching" @click="fetchAll">刷新</el-button>
+      </el-tooltip>
+    </section>
+
+    <!-- 需要关注：冲突 / 进行中操作 / 脏工作区 / 落后，各取最严重的一仓 -->
+    <section v-if="attentionItems.length" class="attention">
+      <button
+        v-for="(item, i) in attentionItems"
+        :key="i"
+        type="button"
+        class="att-item"
+        :class="item.tone"
+        @click="attentionGo(item)"
+      >
+        <GcIcon :name="item.icon" :size="16" />
+        <span class="att-copy">
+          <b>{{ item.name }}</b>
+          <span>{{ item.text }}</span>
+        </span>
+        <GcIcon name="chevron" :size="12" class="att-go" />
+      </button>
+    </section>
+
+    <section v-if="!current" class="hero">
+      <div class="hero-copy">
         <p class="eyebrow">工作台</p>
         <h3>还没有打开仓库</h3>
         <p class="hero-hint">输入本地 Git 路径，或从远程克隆。不会删盘上的文件。</p>
-        <div class="open-row">
-          <el-input
-            v-model="newPath"
-            placeholder="输入本地 Git 仓库路径，例如 D:\project\repo 或 /Users/me/code/app"
-            clearable
-            @keyup.enter="openRepo"
-          />
-          <el-button type="primary" :loading="opening" @click="openRepo">打开</el-button>
-          <el-button @click="openCloneDialog">克隆到本地</el-button>
+      </div>
+    </section>
+    <section v-else class="hero">
+      <div class="hero-copy">
+        <div class="hero-line">
+          <h3>{{ currentOv?.name || current.path.split(/[\\/]/).pop() }}</h3>
+          <span class="path mono" :title="current.path">{{ current.path }}</span>
+          <span class="hero-spacer" />
+          <el-button type="primary" :disabled="currentMissing" @click="openStatus(current.id)">进入工作区</el-button>
+          <el-button :disabled="currentMissing" @click="openMerge(current.id)">预演合并</el-button>
+          <el-button v-if="currentMissing" type="danger" plain @click="removeRepo(current.id, current.path)"
+            >移除</el-button
+          >
+        </div>
+        <div class="branch">
+          <span class="wx" :class="currentAttention">{{
+            currentMissing ? '丢失' : weatherOf(currentAttention)
+          }}</span>
+          <code>{{ currentMissing ? '不可用' : currentOv?.current || '…' }}</code>
+          <template v-if="currentOv && !currentMissing">
+            <span class="ab"
+              ><b :class="{ on: currentOv.ahead > 0 }">{{ currentOv.ahead }}</b
+              >↑ <b :class="{ on: currentOv.behind > 0 }">{{ currentOv.behind }}</b
+              >↓</span
+            >
+            <span v-if="currentOv.dirtyCount" class="chip">{{ currentOv.dirtyCount }} 更改</span>
+            <span v-if="currentOv.conflictCount" class="chip danger">{{ currentOv.conflictCount }} 冲突</span>
+            <span v-if="currentOv.operation !== 'none'" class="chip danger">{{ currentOv.operation }}</span>
+            <span v-if="currentOv.tempMergeBranchCount" class="chip"
+              >{{ currentOv.tempMergeBranchCount }} 合并草稿</span
+            >
+          </template>
+          <span v-if="currentMissing" class="hero-hint">路径不存在或不是 Git 仓库，移除不会删磁盘</span>
         </div>
       </div>
-      <template v-else>
-        <div class="hero-copy">
-          <div class="hero-line">
-            <h3>{{ currentOv?.name || current.path.split(/[\\/]/).pop() }}</h3>
-            <span class="path mono" :title="current.path">{{ current.path }}</span>
-            <span class="hero-spacer" />
-            <el-button type="primary" :disabled="currentMissing" @click="openStatus(current.id)">进入工作区</el-button>
-            <el-button :disabled="currentMissing" @click="openMerge(current.id)">预演合并</el-button>
-            <el-button v-if="currentMissing" type="danger" plain @click="removeRepo(current.id, current.path)"
-              >移除</el-button
-            >
-          </div>
-          <div class="branch">
-            <span class="wx" :class="currentAttention">{{
-              currentMissing ? '丢失' : weatherOf(currentAttention)
-            }}</span>
-            <code>{{ currentMissing ? '不可用' : currentOv?.current || '…' }}</code>
-            <template v-if="currentOv && !currentMissing">
-              <span class="ab"
-                ><b :class="{ on: currentOv.ahead > 0 }">{{ currentOv.ahead }}</b
-                >↑ <b :class="{ on: currentOv.behind > 0 }">{{ currentOv.behind }}</b
-                >↓</span
-              >
-              <span v-if="currentOv.dirtyCount" class="chip">{{ currentOv.dirtyCount }} 更改</span>
-              <span v-if="currentOv.conflictCount" class="chip danger">{{ currentOv.conflictCount }} 冲突</span>
-              <span v-if="currentOv.operation !== 'none'" class="chip danger">{{ currentOv.operation }}</span>
-              <span v-if="currentOv.tempMergeBranchCount" class="chip"
-                >{{ currentOv.tempMergeBranchCount }} 合并草稿</span
-              >
-            </template>
-            <span v-if="currentMissing" class="hero-hint">路径不存在或不是 Git 仓库，移除不会删磁盘</span>
-          </div>
-        </div>
-        <ActivityHeatmap
-          v-if="!currentMissing"
-          :days="currentOv?.activity"
-          :start="currentOv?.activityStart"
-          :total="currentOv?.activityTotal"
-        />
-      </template>
+      <ActivityHeatmap
+        v-if="!currentMissing"
+        :days="currentOv?.activity"
+        :start="currentOv?.activityStart"
+        :total="currentOv?.activityTotal"
+      />
     </section>
 
     <section v-if="repos.repos.length" class="weather">
@@ -378,7 +475,7 @@ watch(revision, () => {
         v-for="w in weatherTabs"
         :key="w.key"
         type="button"
-        class="wx-tab glass"
+        class="wx-tab"
         :class="[w.key, { on: filter === w.key }]"
         :aria-label="w.aria"
         :title="w.hint"
@@ -393,19 +490,6 @@ watch(revision, () => {
     <section v-if="repos.repos.length" class="mosaic-block">
       <div class="mosaic-head">
         <p class="eyebrow">仓库一览 · 点卡片换当前仓</p>
-        <div class="open-row">
-          <el-input
-            v-model="newPath"
-            placeholder="输入本地 Git 仓库路径，例如 D:\project\repo 或 /Users/me/code/app"
-            clearable
-            @keyup.enter="openRepo"
-          />
-          <el-button type="primary" :loading="opening" @click="openRepo">打开</el-button>
-          <el-button @click="openCloneDialog">克隆到本地</el-button>
-          <el-tooltip content="对所有可用仓 git fetch，合成一条后台任务。丢失仓会跳过。" placement="top">
-            <el-button :loading="fetching" @click="fetchAll">刷新</el-button>
-          </el-tooltip>
-        </div>
       </div>
 
       <el-empty v-if="cardRepos.length === 0" description="没有符合筛选的仓库" :image-size="40" />
@@ -452,16 +536,117 @@ watch(revision, () => {
   gap: var(--gc-pad);
   overflow: auto;
 }
-.page-title-row {
-  display: flex;
-  align-items: baseline;
-  gap: var(--gc-gap);
+.page-head {
   flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--gc-gap);
+  min-width: 0;
+}
+.page-head h1 {
+  margin: 0;
+  font-size: var(--gc-fs-page);
+  font-weight: 600;
+  line-height: var(--gc-lh-page);
+  color: var(--gc-text);
+  letter-spacing: -0.01em;
+}
+.page-head .sub {
+  font-size: var(--gc-fs-body);
+  color: var(--gc-text-3);
+}
+.page-head .spacer {
+  flex: 1;
 }
 .overview-refreshing {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
+  font-size: var(--gc-fs-meta);
+  color: var(--gc-text-3);
   animation: overview-pulse 1.2s ease-in-out infinite;
+}
+/* 常驻打开栏 */
+.open-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--gc-gap);
+  padding: var(--gc-gap) var(--gc-pad);
+  background: var(--gc-card);
+  border: 1px solid var(--gc-line);
+  border-radius: var(--gc-radius);
+}
+.open-bar .open-input {
+  flex: 1;
+  min-width: 0;
+  max-width: 560px;
+}
+/* 需要关注（对齐设计稿 attention 三联） */
+.attention {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--gc-gap);
+}
+.att-item {
+  display: flex;
+  align-items: center;
+  gap: var(--gc-gap);
+  padding: 9px var(--gc-pad);
+  border: 1px solid var(--gc-line);
+  border-left: 2px solid var(--gc-line);
+  border-radius: var(--gc-radius);
+  background: var(--gc-card);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+  transition: background var(--gc-t-micro) var(--gc-ease);
+}
+.att-item:hover {
+  background: var(--gc-btn-hover);
+}
+.att-item.red {
+  border-left-color: var(--gc-red);
+}
+.att-item.red > .gc-icon {
+  color: var(--gc-red);
+}
+.att-item.amber {
+  border-left-color: var(--gc-amber);
+}
+.att-item.amber > .gc-icon {
+  color: var(--gc-amber);
+}
+.att-item.accent {
+  border-left-color: var(--gc-accent);
+}
+.att-item.accent > .gc-icon {
+  color: var(--gc-accent-text);
+}
+.att-copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.att-copy b {
+  font-size: var(--gc-fs-body);
+  font-weight: 600;
+  color: var(--gc-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.att-copy span {
+  font-size: var(--gc-fs-meta);
+  color: var(--gc-text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.att-go {
+  flex: none;
+  color: var(--gc-text-placeholder);
 }
 @keyframes overview-pulse {
   0%,
@@ -475,12 +660,6 @@ watch(revision, () => {
 .offline {
   flex: none;
 }
-.glass {
-  background: color-mix(in srgb, var(--el-bg-color) 82%, transparent);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: var(--gc-radius);
-  box-shadow: var(--gc-shadow-menu);
-}
 .hero {
   flex: none;
   display: flex;
@@ -488,6 +667,9 @@ watch(revision, () => {
   gap: var(--gc-pad);
   align-items: flex-start;
   padding: var(--gc-pad);
+  background: var(--gc-card);
+  border: 1px solid var(--gc-line);
+  border-radius: var(--gc-radius);
 }
 .hero-copy {
   min-width: 0;
