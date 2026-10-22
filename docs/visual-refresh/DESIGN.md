@@ -150,7 +150,7 @@ Git Cockpit 是基于 MCP 的 Git 可视化操作工具（本地常驻服务的 
 ## 10. 生产落地路径（给未来实施者）
 
 1. **令牌整体替换**：`assets/tokens.css` 的 `:root`（teal）与 `html[data-accent='white']` 两段，可整体替换生产 `packages/web/src/theme.css` 的 `:root`（约 17–68 行）与 `html.dark`（约 71–93 行）区块。Element Plus dark css-vars 之上的约 700 行覆盖层逻辑可保留，仅需将其中的字面值改引用新令牌。
-2. **最大剩余工作量：diff2html 段**。生产 `theme.css` 中 diff2html 段实测 **207 行、72 处 `!important`**（自 612 行起，含单栏 line-by-line 段），本次未纳入原型范围，落地时需单独对齐新令牌——建议新写一段 diff 令牌映射，再逐条收敛 `!important`（目标 ≤30 处）。
+2. **最大剩余工作量：diff2html 段**。生产 `theme.css` 中 diff2html 段实测 **207 行、72 处 `!important`**（自 612 行起，含单栏 line-by-line 段）。已于 2026-10 完成对齐：22 个 `--d2h-dark-*` 变量全量接 gc 语义令牌、hunk 头对齐 `.conflict-hunk` 形态、`!important` 收敛至 47 处并经浏览器级计算样式断言验证（官方 css 位于懒加载 chunk、晚于主题加载，同位冲突必须保留 important——详见 PRODUCTION.md 阶段 3 记录）。
 3. **玻璃拟态分区规则**：仅状态展示区可用 `--gc-glass-*`；效率敏感区实底。落地时按同样分区维持。
 4. **窄屏策略待定**：聊天面板 <1100px 收起策略未定，落地时需产品决策。
 5. 原型 `chrome.css` 的组件样式（顶栏、tag、脉冲条、dock、chip、干跑条、冲突行）可翻译为 Vue 组件样式，选择器语义可直接映射。

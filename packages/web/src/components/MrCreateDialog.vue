@@ -280,7 +280,7 @@ onUnmounted(() => {
             </el-form-item>
           </el-form>
         </div>
-        <div class="pane preview gc-glass">
+        <div class="pane preview gc-card">
           <header>
             <strong>预览</strong>
             <span class="preview-actions">
@@ -322,7 +322,7 @@ onUnmounted(() => {
   min-width: 0;
 }
 .req {
-  color: var(--el-color-danger);
+  color: var(--gc-red);
 }
 .md-block {
   margin-bottom: var(--gc-gap);
@@ -376,7 +376,7 @@ onUnmounted(() => {
   float: left;
   line-height: var(--gc-control);
   font-size: var(--gc-fs-body);
-  color: var(--el-color-danger);
+  color: var(--gc-red);
 }
 @media (max-width: 800px) {
   .split {

@@ -44,11 +44,11 @@ const OTHER_REMOTES_LIGHT = ['#8250df', '#0f7490', '#9a6700', '#3a7d34', '#c0392
 
 export function graphPalette(): GraphPalette {
   return {
-    local: cssVar('--el-color-warning', '#f0a35e'),
-    remote: cssVar('--el-color-primary', '#4c9aff'),
-    base: cssVar('--el-color-info', '#9d8cff'),
-    lineage: cssVar('--el-color-success', '#56d364'),
-    fallback: cssVar('--el-text-color-secondary', '#5a5a5a'),
+    local: cssVar('--gc-amber', '#f2c94c'),
+    remote: cssVar('--gc-accent', '#14c8b8'),
+    base: cssVar('--gc-purple', '#cbb2ff'),
+    lineage: cssVar('--gc-green', '#56d97a'),
+    fallback: cssVar('--gc-text-3', '#7c8698'),
     others: isDarkTheme() ? OTHER_REMOTES_DARK : OTHER_REMOTES_LIGHT
   };
 }

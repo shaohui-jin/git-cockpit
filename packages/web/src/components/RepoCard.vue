@@ -317,15 +317,15 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 .stat-ahead.on {
-  color: var(--el-color-success);
+  color: var(--gc-green);
 }
 .stat-behind.on {
-  color: var(--el-color-danger);
+  color: var(--gc-red);
 }
 .stat-dirty.on {
-  color: var(--el-color-warning);
+  color: var(--gc-amber);
 }
 .stat-draft {
-  color: var(--el-color-primary);
+  color: var(--gc-accent-text);
 }
 </style>

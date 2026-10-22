@@ -75,14 +75,20 @@ export async function turnOffFetch(page: Page): Promise<void> {
 export async function pickTreeBranches(page: Page, fieldHint: string, names: string[]): Promise<void> {
   const field = page.locator('.field').filter({ hasText: fieldHint });
   await field.locator('.el-select__wrapper').click();
+  // 只在本字段已打开的下拉内选树项（避免误点上一个未关闭的 popper），并等待其真正关闭
+  const pop = page.locator('.el-select-dropdown:visible').last();
+  await expect(pop).toBeVisible();
   for (const name of names) {
     const combo = field.getByRole('combobox');
     await combo.fill(name);
-    const item = page.getByRole('treeitem', { name, exact: true });
+    const item = pop.getByRole('treeitem', { name, exact: true });
     await expect(item).toBeVisible();
     await item.click({ force: true });
   }
   await page.keyboard.press('Escape');
+  // 该组件的 popper 不响应 Escape，点中性区域关掉再进入下一个字段
+  await page.locator('.gc-eyebrow').first().click();
+  await expect(page.locator('.el-select-dropdown:visible')).toHaveCount(0);
 }
 
 export async function acceptOurs(page: Page): Promise<void> {

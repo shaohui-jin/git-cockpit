@@ -255,7 +255,7 @@ defineExpose({ refresh: loadLog, loading });
 }
 .tr:hover,
 .tr.on {
-  background: color-mix(in srgb, var(--el-color-primary) 10%, transparent);
+  background: var(--gc-accent-weak);
 }
 .tr span,
 .tr .mono {
@@ -306,7 +306,7 @@ defineExpose({ refresh: loadLog, loading });
 .commit-hash {
   flex: none;
   font-size: var(--gc-fs-body);
-  color: var(--el-color-primary);
+  color: var(--gc-accent-text);
 }
 .commit-meta {
   display: flex;
@@ -335,15 +335,15 @@ defineExpose({ refresh: loadLog, loading });
 }
 .commit-meta .add {
   flex: none;
-  color: var(--el-color-success);
+  color: var(--gc-green);
 }
 .commit-meta .del {
   flex: none;
-  color: var(--el-color-danger);
+  color: var(--gc-red);
 }
 .commit-meta .warn {
   flex: none;
-  color: var(--el-color-warning);
+  color: var(--gc-amber);
 }
 .commit-body-toggle {
   display: block;
@@ -352,7 +352,7 @@ defineExpose({ refresh: loadLog, loading });
   padding: 0;
   border: 0;
   background: none;
-  color: var(--el-color-primary);
+  color: var(--gc-accent-text);
   font: inherit;
   font-size: var(--gc-fs-body);
   cursor: pointer;

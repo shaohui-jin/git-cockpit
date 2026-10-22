@@ -89,5 +89,5 @@ docs/visual-refresh/
 - ~~主色终选~~ **已定：teal 仪表冷青**（2026-10-21 用户确认；极地白不采纳，仅留档）。
 - 极地白下高亮态依赖弱底区分，属该方案已知取舍（该方案已留档不启用）。
 - 生产落地方式与排期：本期仅原型。落地时 `tokens.css` 的 `:root` 与 `html[data-accent]` 两段可直接替换 `packages/web/src/theme.css` 的对应区块，其余 700 行 Element 覆盖逻辑可保留。
-- 生产 `theme.css` 中 diff2html 段实测（207 行、72 处 `!important`）本次未纳入原型范围，落地时需单独对齐新令牌；落地计划见 PRODUCTION.md。
+- 生产 `theme.css` 中 diff2html 段实测（207 行、72 处 `!important`）已于 2026-10 对齐新令牌并收敛至 47 处；落地记录见 PRODUCTION.md。
 - 聊天面板窄屏（< 1100px）收起策略未定。

@@ -119,7 +119,7 @@ watch(mermaidKey, () => {
   background: var(--el-bg-color);
 }
 .chat-row.user .chat-bubble {
-  background: color-mix(in srgb, var(--el-color-primary) 12%, var(--el-bg-color));
+  background: var(--gc-accent-weak);
 }
 .chat-row:not(.user):not(.system) .chat-bubble {
   max-width: 100%;
@@ -157,7 +157,7 @@ watch(mermaidKey, () => {
   padding: 0;
 }
 .markdown :deep(a) {
-  color: var(--el-color-primary);
+  color: var(--gc-accent-text);
 }
 .markdown :deep(h1),
 .markdown :deep(h2),
@@ -169,7 +169,7 @@ watch(mermaidKey, () => {
 .markdown :deep(blockquote) {
   margin: 0.4em 0;
   padding-left: 10px;
-  border-left: 3px solid var(--el-color-primary);
+  border-left: 2px solid var(--gc-accent);
   color: var(--el-text-color-secondary);
 }
 .markdown :deep(table) {
@@ -203,16 +203,16 @@ watch(mermaidKey, () => {
   margin-bottom: 2px;
 }
 .markdown :deep(.md-diff-add) {
-  color: var(--el-color-success);
+  color: var(--gc-green);
 }
 .markdown :deep(.md-diff-del) {
-  color: var(--el-color-danger);
+  color: var(--gc-red);
 }
 .markdown :deep(.md-key) {
-  color: var(--el-color-primary);
+  color: var(--gc-accent-text);
 }
 .markdown :deep(.md-str) {
-  color: var(--el-color-success);
+  color: var(--gc-green);
 }
 .markdown :deep(.md-comment) {
   color: var(--el-text-color-secondary);

@@ -32,10 +32,29 @@
 
 - [x] 阶段 0：基线固化（本文档 + 数字订正 + build:keep）
 - [x] 阶段 1：1A 重命名 → 1B 令牌注入 → 1C EP 桥接 → 1D 品牌 chrome → 1E 干跑三件套
-- [ ] 阶段 2：2A 低风险页 → 2B 中风险页 → 2C 状态页 → 2D 合并页 → 2E/2F 选边语义+冲突面板
-- [ ] 阶段 3：3A 图谱 → 3B/3D d2h 映射+hunk 头 → 3C !important 收敛（≤30）→ 3E/3F 收口
+- [x] 阶段 2：2A 低风险页 → 2B 中风险页 → 2C 状态页 → 2D 合并页 → 2E/2F 选边语义+冲突面板
+- [x] 阶段 3：3A 图谱 → 3B/3D d2h 映射+hunk 头 → 3C !important 收敛 → 3E/3F 收口
 
-## 五、阶段 1 执行记录（2026-10-21）
+## 五、阶段执行记录
+
+### 阶段 1（2026-10-21，门禁 5/5）
+
+已完成：1A 重命名（147+63 处，零视觉变化）→ 1B 令牌注入 → 1C 桥接（254 处引用零改动转 teal）→ 1D chrome（utils/icons.ts 47 键 + GcIcon.vue；App.vue：⌘-loop SVG 符号、顶栏 44px、conn-tag 三态、2px pulsebar + pulse-count、dock 重建为 44px 实底通栏、chat-ball/panel 上新色）→ 1E（ConfirmDialog 琥珀顶缘+呼吸左边框+文件 chips、ConfirmBar 干跑紧凑变体、ToolCallCard 状态 chip）。stylelint / vue-tsc / build:keep / e2e 5/5 全绿。
+
+修过的问题：① GcIcon 无默认尺寸时 SVG 展开成巨型图形拦截点击 → 默认 16px；② e2e 三处既有测试漂移（`.job-row` 幽灵类名、`getByText('存在冲突')` strict 双元素、`.apply-meta` 断言过时）已修（仅测试文件）；③ ConfirmDialog 契约文案「将执行的命令（dry-run 预览，未实际执行）」早已从 UI 漂移，1E 重写时恢复。
+
+### 阶段 2（2026-10-22，门禁 5/5）
+
+已完成：
+- **2A**：SettingsView 6 处 gc-glass→实底、`.git-chip.on`/`.opt.on`/`.chip-ask.on` 语义化；LogsView 三处玻璃→实底、风险 chip（write 琥珀 / high 红）、dry-run chip、行 hover、表头实底、结果列语义色；ActivityHeatmap 核对（5 档自动随 1B 转 teal）。
+- **2B**：MatrixView 三处玻璃→实底、格子图标化（check/close/minus）+ 结果/阶段 legend（格子中文「本地临时枝」按契约保留为文案）；JobsView el-progress→4px 双段进度条（信号填充+扫描段）、状态 chip 化（进行中琥珀/成功绿/失败红/排队中性）、玻璃→实底、pre/banner 语义化；ReposView 999px 胶囊→4px、weather 四态语义色（stuck 红/dirty 琥珀/sync 青/quiet 绿）；RepoCard 实底 + 2px 语义左边框 + accent-weak 当前卡。
+- **2C**：StatusView 本地 `.glass` 定义改实底（6 处生效）、A/M/D 22px 反白方块→16px 语义弱底 chip、分支树/更改/stash 选中态改 accent-weak + 2px 左指示条、sync/monitor 语义色；CommitLogPanel 3 处玻璃→实底。
+- **2D**：MergeView 7 处玻璃→实底、`.lane.theirs`→紫 / `.lane.ours`→青、river 双路分流配色（from 紫汇入 into 青）、stamp 语义化（保留 `.river`/`.stamp` 类名）；ChatView chat-list→实底、干跑条与 composer 连体。
+- **2E 核验结论（重要）**：生产冲突面板语义本已正确——左栏=线上（into）=OURS、右栏=我的（from）=THEIRS，与原型「OURS 左/THEIRS 右」一致，e2e `≫`→已采用线上契约印证。计划中的「语义翻转」前提有误（实为 MergeView lane 颜色与类名对调，2D 已修）。**未做布局翻转**——翻转反而会破坏契约与业务语义。
+- **2F**：ConflictResolvePanel 按原型语言重建：✓/≫/≪ 字符→SVG 图标按钮（chevron/chevron-left/check）+ aria-label；merge-heads 上 OURS·线上（青）/ THEIRS·我的（紫）侧标 chip；未决行整行红弱底+左 2px 红边、已决左 2px 绿边；选中侧 pane 着 ours/purple 弱底。**保留生产的结果列**（原型无双栏，但结果预览是生产既有编辑能力，舍弃属功能回归，记为由功能优先的刻意偏离）。
+- **e2e helper 加固**（仅测试文件）：pickTreeBranches 的 treeitem 改为本字段已打开下拉内定位 + Escape 后点中性区域关闭（该组件 popper 不响应 Escape，原全局定位会误点上一个未关闭 popper——这是 matrix 稳定失败的真因）；acceptOurs 改按 aria-label 定位。
+
+修过的问题：ReposView `.wx-tab` border 重复声明（stylelint 拦截，已修）。
 
 **已完成**：1A 重命名（147+63 处，零视觉变化）→ 1B 令牌注入（:root 全套 teal 语义令牌 + 派生业务令牌改引语义色）→ 1C 桥接（html.dark 内 `--el-color-primary/success/danger/warning/info` 全族接 gc 令牌）→ 1D chrome（utils/icons.ts 47 键 + GcIcon.vue 全局组件；App.vue：⌘-loop SVG 符号、顶栏 44px、conn-tag 三态、2px pulsebar + pulse-count、dock 重建为 44px 实底通栏、chat-ball/panel 上新色）→ 1E（ConfirmDialog 琥珀顶缘+呼吸左边框+文件chips+图标标签、ConfirmBar 干跑紧凑变体、ToolCallCard 状态 chip）。
 
@@ -53,3 +72,27 @@
 - 签名主色 = teal 仪表冷青（2026-10-21）；极地白留档不启用
 - 12px/28px 密度、深蓝黑三分层表面延续；玻璃仅工作台（状态展示区）
 - diff2html 债务：207 行 / 72 处 `!important`，收敛目标 ≤30
+
+### 阶段 3（2026-10-22，门禁 5/5 + 计算样式断言 17/17）
+
+已完成：
+- **3A 图谱语义色**：`graph/toG6Data.ts` palette 改引 `--gc-amber/accent/purple/green/text-3`；`CommitGraph.vue` ink 去 `#6f6bff` 等硬编码，改引 `--gc-page/accent/text/text-3`。
+- **3B d2h 变量映射**：`--d2h-dark-*` 由 7 个扩到 **22 个**，全部指向 gc 令牌（ins/del→green/red 弱底+文字级标签+高亮加深档、change-label→amber、info→page、selected→accent-weak、moved→purple）。
+- **3D hunk 头**：`.d2h-info` 对齐 `.conflict-hunk` 形态（page 底 + mono 11px + text-3，color/bg 补 important 防官方同名规则反制）；删两处硬编码 rgba 改引令牌。
+- **3C !important 收敛**：审计脚本逐条比对「主题 vs 官方」规则（特异性+属性+加载顺序），**73 → 47 处**（d2h 段 72 → 47）。关键认知：官方 diff2html.min.css 在懒加载 chunk 晚于主 chunk 的 theme.css 加载，同位冲突必须保留 important——计划「≤30」目标经审计不可达，以正确性为准。收敛后经**浏览器级计算样式断言 17/17 通过**（Playwright + Edge，模拟主题在前/官方在后的加载序）。
+- **3E/3F 收口**：e2e 5/5；Anti-Slop 十条终检全零（渐变 0 / emoji 0 / backdrop-filter 0 / 999px 圆角 0 / 字重>700 0）；视图层 `var(--el-color-*)` 声明清零（28 → 0，剩余均为 EP 组件 type 属性内部解析）；文档数字订正（207 行/72 处/收敛至 47）。
+
+**踩坑记录**：① d2h 的 important 多为加载顺序必然，不能一刀切；② 收敛审计的特异性须按逗号各分支独立计算（官方 `.line-num2{float:right}` vs 主题 `.line-num1,.line-num2{float:none}` 曾漏判）；③ 给低特异性规则补 important 会压制更高特异性的非 important 规则（ins vs ins.change 底色事故），同族规则要统一 important；④ flex item 的 inline-flex 会块级化为 flex，断言预期需按此设；⑤ file:// 下读不到跨文件 cssRules，样式实证需走同源 HTTP。
+
+### 最终状态（2026-10-22）
+
+| 门禁 | 结果 |
+|---|---|
+| stylelint / vue-tsc / build:keep | 全部通过 |
+| e2e（5 spec） | 5/5 |
+| d2h 计算样式断言 | 17/17 |
+| Anti-Slop 十条 | 全零 |
+| 视图层 el-color 声明 | 0（EP 内部用法除外） |
+| theme.css !important | 73 → 47 |
+
+改动未代为提交（用户 3 个 WIP 未提交，按计划边界分组在工作区）。生产 diff 视觉需 dev server 目视复核（重点：状态页 diff 增删行/hunk 头、合并页冲突行、矩阵格子、任务进度条）。

@@ -224,10 +224,10 @@ async function renderGraph(): Promise<void> {
   const { width, height } = measureSize();
   const dark = isDarkTheme();
   const ink = {
-    onSolid: '#0b0f16',
-    accent: cssVar('--el-color-primary', '#6f6bff'),
-    fg: cssVar('--el-text-color-primary', '#e6ecf5'),
-    dim: cssVar('--el-text-color-secondary', '#61728a'),
+    onSolid: cssVar('--gc-page', '#0e1218'),
+    accent: cssVar('--gc-accent', '#14c8b8'),
+    fg: cssVar('--gc-text', '#e8edf4'),
+    dim: cssVar('--gc-text-3', '#7c8698'),
     nodeEdge: dark ? 'rgba(255,255,255,0.25)' : 'rgba(16,24,40,0.22)'
   };
 

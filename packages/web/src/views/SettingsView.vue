@@ -874,7 +874,7 @@ async function clearLlmKey(): Promise<void> {
   font-size: var(--gc-fs-body);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--el-color-primary);
+  color: var(--gc-accent-text);
 }
 .git-pack-h span {
   margin-left: 6px;
@@ -953,11 +953,11 @@ async function clearLlmKey(): Promise<void> {
   font-size: var(--gc-fs-body);
 }
 .ok {
-  color: var(--el-color-success);
+  color: var(--gc-green);
   font-size: var(--gc-fs-body);
 }
 .bad {
-  color: var(--el-color-danger);
+  color: var(--gc-red);
   font-size: var(--gc-fs-body);
 }
 .hint {
@@ -1084,10 +1084,10 @@ async function clearLlmKey(): Promise<void> {
   line-height: 1.5;
 }
 .token-title-status.ok {
-  color: var(--el-color-success);
+  color: var(--gc-green);
 }
 .token-title-status.bad {
-  color: var(--el-color-danger);
+  color: var(--gc-red);
 }
 .token-title-status.muted {
   color: var(--el-text-color-secondary);

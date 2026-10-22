@@ -26,6 +26,7 @@
   --gc-btn-mini: 22px;
   --gc-select-width: 280px;
   --gc-ctx-menu: 168px;
+  --gc-diff-gutter: 4.5em;
   --gc-pad: var(--gc-s3);
   --gc-gap: var(--gc-s2);
   --gc-radius: var(--gc-r);
@@ -118,13 +119,10 @@
   --gc-r: 6px;
   --gc-r-glass: 10px;
 
-  /* ---- 阴影 / 玻璃（玻璃仅状态展示区） ---- */
+  /* ---- 阴影 ---- */
   --gc-shadow-menu: 0 12px 32px rgba(2, 6, 12, 0.6), 0 2px 8px rgba(2, 6, 12, 0.5);
   --gc-shadow-pop: 0 8px 24px rgba(2, 6, 12, 0.55);
   --el-box-shadow-light: var(--gc-shadow-pop);
-  --gc-glass-bg: rgba(22, 27, 36, 0.82);
-  --gc-glass-line: rgba(255, 255, 255, 0.06);
-  --gc-glass-blur: 16px;
 
   /* ---- 动效 ---- */
   --gc-t-micro: 120ms;
@@ -709,14 +707,6 @@ body,
 }
 
 /* 玻璃卡：任务 / 日志 / 设置等与工作台同一套半透明底 */
-.gc-glass {
-  --el-card-bg-color: color-mix(in srgb, var(--el-bg-color) 82%, transparent);
-  background: color-mix(in srgb, var(--el-bg-color) 82%, transparent);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: var(--gc-radius);
-  box-shadow: var(--gc-shadow-menu);
-}
-
 /* 实底卡（效率敏感区专用）：表面三级分层，禁玻璃、禁阴影 */
 .gc-card {
   --el-card-bg-color: var(--gc-card);
@@ -759,35 +749,58 @@ body,
   font-size: var(--gc-fs-body);
 }
 
-/* ---- diff2html（DiffViewer）：对齐紧凑令牌 + 暗色融入项目分层 ---- */
+/* ---- diff2html（DiffViewer）：对齐紧凑令牌 + 暗色融入项目分层 ----
+   注意：官方 diff2html.min.css 由 DiffViewer.vue 引入、位于懒加载 chunk，
+   晚于本文件加载。下列 !important 仅保留与官方同位冲突的 23 处（2026-10 审计），
+   其余靠主题选择器特异性胜出；新增覆盖前先对照官方规则再决定是否加 important。 */
 .d2h-wrapper {
-  /* 面板底色对齐项目背景层级（覆盖 diff2html 默认 #0d1117） */
-  --d2h-dark-bg-color: var(--el-bg-color);
-  --d2h-dark-border-color: var(--el-border-color);
-  --d2h-dark-file-header-bg-color: var(--el-fill-color-light);
-  --d2h-dark-file-header-border-color: var(--el-border-color-light);
-  --d2h-dark-line-border-color: var(--el-border-color-lighter);
-  --d2h-dark-dim-color: var(--el-text-color-secondary);
-  --d2h-dark-color: var(--el-text-color-regular);
+  /* 面板底色对齐项目背景层级（覆盖 diff2html 默认 #0d1117；官方变量定义在 :root，wrapper 自身声明胜出） */
+  --d2h-dark-bg-color: var(--gc-page);
+  --d2h-dark-border-color: var(--gc-line);
+  --d2h-dark-dim-color: var(--gc-text-3);
+  --d2h-dark-color: var(--gc-text-2);
+  --d2h-dark-file-header-bg-color: var(--gc-card);
+  --d2h-dark-file-header-border-color: var(--gc-line);
+  --d2h-dark-line-border-color: var(--gc-line-weak);
+  /* 增 / 删：Git 语义色（弱底 + 文字级标签 + 高亮加深一档） */
+  --d2h-dark-ins-bg-color: var(--gc-green-weak);
+  --d2h-dark-ins-border-color: var(--gc-green-weak);
+  --d2h-dark-ins-label-color: var(--gc-green);
+  --d2h-dark-ins-highlight-bg-color: rgba(86, 217, 122, 0.2);
+  --d2h-dark-del-bg-color: var(--gc-red-weak);
+  --d2h-dark-del-border-color: var(--gc-red-weak);
+  --d2h-dark-del-label-color: var(--gc-red);
+  --d2h-dark-del-highlight-bg-color: rgba(255, 133, 133, 0.2);
+  /* 变更（ins/del 同现）：琥珀标签，两侧保持各自语义色 */
+  --d2h-dark-change-ins-color: var(--gc-green);
+  --d2h-dark-change-del-color: var(--gc-red);
+  --d2h-dark-change-label-color: var(--gc-amber);
+  /* info / 空占位 / 移动 / 选中 */
+  --d2h-dark-info-bg-color: var(--gc-page);
+  --d2h-dark-info-border-color: var(--gc-line-weak);
+  --d2h-dark-empty-placeholder-bg-color: var(--gc-card);
+  --d2h-dark-empty-placeholder-border-color: var(--gc-line-weak);
+  --d2h-dark-moved-label-color: var(--gc-purple);
+  --d2h-dark-selected-color: var(--gc-accent-weak);
   font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
 }
 
 /* 文件块间距收敛 */
 .d2h-file-wrapper {
-  margin-bottom: var(--gc-gap);
-  border-radius: var(--gc-radius);
+  margin-bottom: var(--gc-gap) !important;
+  border-radius: var(--gc-radius) !important;
 }
 
 /* 文件头：对齐 --gc-line / --gc-pad */
 .d2h-file-header {
-  height: var(--gc-row-lg);
-  padding: 0 var(--gc-pad);
-  font-family: inherit;
+  height: var(--gc-row-lg) !important;
+  padding: 0 var(--gc-pad) !important;
+  font-family: inherit !important;
   line-height: var(--gc-row-lg);
 }
 
 .d2h-file-name-wrapper {
-  font-size: var(--gc-fs-body);
+  font-size: var(--gc-fs-body) !important;
   min-width: 0;
 }
 
@@ -799,7 +812,7 @@ body,
 }
 
 .d2h-file-stats {
-  font-size: 11px;
+  font-size: var(--gc-fs-meta) !important;
   flex: none;
 }
 
@@ -807,73 +820,73 @@ body,
 
 .d2h-diff-table {
   border-collapse: collapse !important;
-  font-family: var(--el-font-family-mono, monospace);
-  font-size: var(--gc-fs-body);
+  font-family: var(--gc-font-mono) !important;
+  font-size: var(--gc-fs-body) !important;
 }
 
 .d2h-diff-tbody > tr > td {
-  vertical-align: top !important;
-  height: 20px !important;
-  padding: 0 !important;
-  box-sizing: border-box !important;
-  overflow: hidden !important;
+  vertical-align: top;
+  height: var(--gc-lh-row);
+  padding: 0;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .d2h-diff-tbody > tr > td.d2h-code-linenumber {
-  overflow: visible !important;
+  overflow: visible;
 }
 
 .d2h-code-line,
 .d2h-code-side-line {
   display: block !important;
   width: auto !important;
-  max-width: none !important;
-  line-height: 20px !important;
-  height: 20px !important;
+  max-width: none;
+  line-height: var(--gc-lh-row);
+  height: var(--gc-lh-row);
   white-space: nowrap !important;
-  box-sizing: border-box !important;
+  box-sizing: border-box;
   padding: 0 8px 0 4px !important;
-  margin: 0 !important;
-  vertical-align: top !important;
-  border: 0 !important;
-  overflow: hidden !important;
+  margin: 0;
+  vertical-align: top;
+  border: 0;
+  overflow: hidden;
 }
 
 .d2h-code-linenumber {
   position: relative !important;
   display: table-cell !important;
-  top: auto !important;
-  left: auto !important;
-  float: none !important;
+  top: auto;
+  left: auto;
+  float: none;
   width: auto !important;
-  min-width: 0 !important;
-  max-width: none !important;
-  line-height: 20px !important;
-  height: 20px !important;
+  min-width: 0;
+  max-width: none;
+  line-height: var(--gc-lh-row);
+  height: var(--gc-lh-row);
   box-sizing: border-box !important;
   padding: 0 !important;
-  margin: 0 !important;
+  margin: 0;
   vertical-align: top !important;
   border: 0 !important;
   white-space: nowrap !important;
-  overflow: visible !important;
+  overflow: visible;
   font-size: 0;
 }
 
 .line-num1,
 .line-num2 {
-  display: inline-block !important;
+  display: inline-block;
   float: none !important;
-  width: 4.5em !important;
-  min-width: 4.5em !important;
-  max-width: none !important;
+  width: var(--gc-diff-gutter) !important;
+  min-width: var(--gc-diff-gutter);
+  max-width: none;
   box-sizing: border-box !important;
   padding: 0 4px !important;
-  text-align: right !important;
-  font-size: 11px !important;
-  line-height: 20px !important;
-  height: 20px !important;
-  vertical-align: top !important;
+  text-align: right;
+  font-size: var(--gc-fs-meta);
+  line-height: var(--gc-lh-row);
+  height: var(--gc-lh-row);
+  vertical-align: top;
   overflow: visible !important;
   text-overflow: clip !important;
 }
@@ -881,29 +894,32 @@ body,
 .d2h-code-line-ctn,
 .d2h-code-side-line-ctn {
   white-space: pre !important;
-  line-height: 20px !important;
-  height: 20px !important;
-  box-sizing: border-box !important;
+  line-height: var(--gc-lh-row);
+  height: var(--gc-lh-row);
+  box-sizing: border-box;
   padding: 0 !important;
-  margin: 0 !important;
-  border: 0 !important;
+  margin: 0;
+  border: 0;
 }
 
 .d2h-code-line-prefix {
   display: inline-block !important;
   width: 1.2em;
-  height: 20px !important;
-  line-height: 20px !important;
+  height: var(--gc-lh-row);
+  line-height: var(--gc-lh-row);
   vertical-align: top !important;
   white-space: pre !important;
 }
 
+/* hunk 头：page 底 + mono 11px + 三级文字（对齐 .conflict-hunk 形态） */
 .d2h-info {
-  height: 20px !important;
-  line-height: 20px !important;
-  padding: 0 !important;
-  font-size: 11px;
-  box-sizing: border-box !important;
+  height: var(--gc-lh-row);
+  line-height: var(--gc-lh-row);
+  padding: 0;
+  font-size: var(--gc-fs-meta);
+  color: var(--gc-text-3) !important;
+  background-color: var(--gc-page) !important;
+  box-sizing: border-box;
 }
 
 .d2h-info .d2h-code-line {
@@ -917,10 +933,10 @@ body,
   background-color: var(--d2h-dark-del-bg-color) !important;
 }
 .d2h-dark-color-scheme .d2h-file-diff .d2h-code-linenumber.d2h-ins.d2h-change {
-  background-color: rgba(46, 160, 67, 0.25) !important;
+  background-color: var(--d2h-dark-ins-highlight-bg-color) !important;
 }
 .d2h-dark-color-scheme .d2h-file-diff .d2h-code-linenumber.d2h-del.d2h-change {
-  background-color: rgba(210, 153, 34, 0.2) !important;
+  background-color: var(--gc-amber-weak) !important;
 }
 .d2h-dark-color-scheme .d2h-file-diff .d2h-code-linenumber.d2h-info {
   background-color: var(--d2h-dark-info-bg-color) !important;
@@ -928,14 +944,14 @@ body,
 
 /* 文件头 CHANGED/ADDED 标签：对齐 --gc 设计令牌 */
 .d2h-tag {
-  font-size: var(--gc-fs-body);
-  line-height: 20px;
-  margin-left: var(--gc-gap);
-  padding: 0 var(--gc-gap);
+  font-size: var(--gc-fs-body) !important;
+  line-height: var(--gc-lh-row);
+  margin-left: var(--gc-gap) !important;
+  padding: 0 var(--gc-gap) !important;
   border-radius: var(--gc-radius);
-  height: 20px;
+  height: var(--gc-lh-row);
   box-sizing: border-box;
-  display: inline-flex;
+  display: inline-flex !important;
   align-items: center;
 }
 
@@ -943,27 +959,27 @@ body,
 .d2h-icon {
   width: 12px;
   height: 14px;
-  margin-right: 6px;
+  margin-right: 6px !important;
 }
 
 /* Viewed 折叠勾选对齐紧凑风格 */
 .d2h-file-collapse {
-  font-size: 11px;
-  padding: 2px 6px;
-  border-radius: 4px;
+  font-size: var(--gc-fs-meta) !important;
+  padding: 2px 6px !important;
+  border-radius: var(--gc-r-tag) !important;
 }
 
 /* DiffViewer 解析失败时的原始文本兜底 */
 .diff-fallback {
   margin: 0;
   padding: 10px 12px;
-  background: var(--el-fill-color-light);
+  background: var(--gc-card);
   border-radius: var(--gc-radius);
   overflow: auto;
   white-space: pre;
   line-height: 1.5;
   font-size: var(--gc-fs-body);
-  color: var(--el-text-color-primary);
+  color: var(--gc-text);
 }
 
 /* ---- 铺满卡片：头/身 flex，body 内部滚动（合并预演、工作台列表、状态更改） ---- */

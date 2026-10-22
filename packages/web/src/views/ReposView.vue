@@ -500,7 +500,7 @@ watch(revision, () => {
   font-size: var(--gc-fs-body);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--el-color-primary);
+  color: var(--gc-accent-text);
 }
 .hero h3 {
   margin: 0;

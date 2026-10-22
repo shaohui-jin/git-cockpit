@@ -1963,7 +1963,7 @@ onUnmounted(() => {
 }
 .stash-ref {
   flex: none;
-  color: var(--el-color-primary);
+  color: var(--gc-accent-text);
   font-weight: 600;
   line-height: var(--gc-row-lg);
 }

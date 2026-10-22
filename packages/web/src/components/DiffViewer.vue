@@ -208,11 +208,11 @@ watch(
 }
 
 .diff-file-stats .add {
-  color: var(--el-color-success);
+  color: var(--gc-green);
 }
 
 .diff-file-stats .del {
-  color: var(--el-color-danger);
+  color: var(--gc-red);
 }
 
 .diff-file-hint {

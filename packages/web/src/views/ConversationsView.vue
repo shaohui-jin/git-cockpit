@@ -111,7 +111,7 @@ onMounted(() => {
   <div class="page conv-page">
     <h2 class="page-title">对话记录</h2>
 
-    <div class="bar gc-glass">
+    <div class="bar gc-card">
       <label>
         仓库
         <el-select v-model="repoFilter" clearable placeholder="全部" class="repo-select">
@@ -122,11 +122,11 @@ onMounted(() => {
       <span class="tip">一组对话一行。最近 200 组。Git 写入另记在操作日志。</span>
     </div>
 
-    <div v-if="!loading && visible.length === 0" class="empty gc-glass">
+    <div v-if="!loading && visible.length === 0" class="empty gc-card">
       <strong>还没有对话记录</strong>
       <p>在聊天面板里发送后会出现在这里，本地预览也会记下来。</p>
     </div>
-    <div v-else class="table gc-glass" v-loading="loading">
+    <div v-else class="table gc-card" v-loading="loading">
       <div class="th">
         <span>标题</span>
         <span>仓库</span>
@@ -182,7 +182,7 @@ onMounted(() => {
 }
 .tip {
   font-size: var(--gc-fs-body);
-  color: var(--el-text-color-secondary);
+  color: var(--gc-text-3);
 }
 .table {
   flex: 1;
@@ -204,12 +204,15 @@ onMounted(() => {
   position: sticky;
   top: 0;
   z-index: 1;
-  color: var(--el-text-color-secondary);
+  color: var(--gc-text-3);
   font-weight: 600;
-  background: color-mix(in srgb, var(--el-bg-color) 92%, transparent);
+  background: var(--gc-card);
 }
 .tr {
-  border-top: 1px solid var(--el-border-color-lighter);
+  border-top: 1px solid var(--gc-line-weak);
+}
+.tr:hover {
+  background: var(--gc-btn-hover);
 }
 .tr > span {
   overflow: hidden;
@@ -232,11 +235,11 @@ onMounted(() => {
   text-align: center;
   padding: var(--gc-pad);
   gap: var(--gc-gap);
-  color: var(--el-text-color-secondary);
+  color: var(--gc-text-3);
 }
 .empty strong {
   font-size: var(--el-font-size-extra-large);
-  color: var(--el-text-color-primary);
+  color: var(--gc-text);
   font-weight: 600;
 }
 .empty p {
