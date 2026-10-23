@@ -25,8 +25,7 @@ const PATHS: Record<string, string> = {
   'git-merge':
     '<circle cx="7" cy="6" r="2"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="12" r="2"/>' +
     '<path d="M7 8v8"/><path d="M9 8.4A6 6 0 0 0 15 12"/>',
-  layers:
-    '<path d="M12 3.2 3.2 8 12 12.8 20.8 8 12 3.2Z"/><path d="m3.2 12.6 8.8 4.8 8.8-4.8"/>',
+  layers: '<path d="M12 3.2 3.2 8 12 12.8 20.8 8 12 3.2Z"/><path d="m3.2 12.6 8.8 4.8 8.8-4.8"/>',
   scroll:
     '<path d="M6.2 4h10.6a1.8 1.8 0 0 1 1.8 1.8V18a2 2 0 0 0 2 2H8a1.8 1.8 0 0 1-1.8-1.8V4Z"/>' +
     '<path d="M6.2 4A1.8 1.8 0 0 0 4.4 5.8v.9h1.8"/>' +
@@ -48,9 +47,7 @@ const PATHS: Record<string, string> = {
   remote:
     '<circle cx="12" cy="5.2" r="2"/><circle cx="6" cy="18.8" r="2"/><circle cx="18" cy="18.8" r="2"/>' +
     '<path d="M12 7.2v4.4M6 16.8v-2.6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2.6"/>',
-  repo:
-    '<path d="M5.4 4.4h11.2a1.8 1.8 0 0 1 1.8 1.8V20H7.2a1.8 1.8 0 0 1-1.8-1.8V4.4Z"/>' +
-    '<path d="M5.4 18h13"/>',
+  repo: '<path d="M5.4 4.4h11.2a1.8 1.8 0 0 1 1.8 1.8V20H7.2a1.8 1.8 0 0 1-1.8-1.8V4.4Z"/>' + '<path d="M5.4 18h13"/>',
   'dry-run':
     '<path d="M12 3.2 5.2 6v5.8c0 4 2.9 7.2 6.8 9 3.9-1.8 6.8-5 6.8-9V6L12 3.2Z"/>' +
     '<circle cx="12" cy="11.4" r="2.1"/>' +
@@ -61,9 +58,7 @@ const PATHS: Record<string, string> = {
   'chevron-left': '<path d="m14.6 6.2-5.8 5.8 5.8 5.8"/>',
   'chevron-down': '<path d="m6.2 9.4 5.8 5.8 5.8-5.8"/>',
   search: '<circle cx="11" cy="11" r="6.2"/><path d="m15.6 15.6 4.4 4.4"/>',
-  copy:
-    '<rect x="9" y="9" width="10.6" height="10.6" rx="2"/>' +
-    '<path d="M5.4 15.2V6.4a1.6 1.6 0 0 1 1.6-1.6h8.8"/>',
+  copy: '<rect x="9" y="9" width="10.6" height="10.6" rx="2"/>' + '<path d="M5.4 15.2V6.4a1.6 1.6 0 0 1 1.6-1.6h8.8"/>',
   refresh: '<path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4.4v5h-5"/>',
   close: '<path d="M6.4 6.4 17.6 17.6M17.6 6.4 6.4 17.6"/>',
   more:
@@ -86,30 +81,24 @@ const PATHS: Record<string, string> = {
     '<path d="M14 4.2h5.8V10"/><path d="M19.8 4.2 11.6 12.4"/>' +
     '<path d="M18 14v5.4a1.4 1.4 0 0 1-1.4 1.4H5.4A1.4 1.4 0 0 1 4 19.4V8.2a1.4 1.4 0 0 1 1.4-1.4H11"/>',
   file: '<path d="M6.4 3.6h7l4.6 4.6V20H6.4V3.6Z"/><path d="M13.4 3.6v4.6h4.6"/>',
-  key:
-    '<circle cx="8.2" cy="12" r="4"/><path d="M12.2 12H20"/><path d="M18 12v3M15.4 12v2"/>',
-  lock:
-    '<rect x="5.2" y="10.4" width="13.6" height="9.4" rx="2"/>' +
-    '<path d="M8.2 10.4V7.4a3.8 3.8 0 0 1 7.6 0v3"/>',
+  key: '<circle cx="8.2" cy="12" r="4"/><path d="M12.2 12H20"/><path d="M18 12v3M15.4 12v2"/>',
+  lock: '<rect x="5.2" y="10.4" width="13.6" height="9.4" rx="2"/>' + '<path d="M8.2 10.4V7.4a3.8 3.8 0 0 1 7.6 0v3"/>',
   cpu:
     '<rect x="7.4" y="7.4" width="9.2" height="9.2" rx="2"/>' +
     '<path d="M10 3.6v3.8M14 3.6v3.8M10 16.6v3.8M14 16.6v3.8M3.6 10h3.8M3.6 14h3.8M16.6 10h3.8M16.6 14h3.8"/>',
   list: '<path d="M4.4 6.4h15.2M4.4 12h15.2M4.4 17.6h9.6"/>',
   terminal:
-    '<rect x="3.4" y="4.4" width="17.2" height="15.2" rx="2"/>' +
-    '<path d="m7.4 9.4 2.8 2.6-2.8 2.6M13 14.6h3.8"/>',
+    '<rect x="3.4" y="4.4" width="17.2" height="15.2" rx="2"/>' + '<path d="m7.4 9.4 2.8 2.6-2.8 2.6M13 14.6h3.8"/>',
   push: '<path d="M12 16.4V4.4M7.2 9.2 12 4.4l4.8 4.8"/><path d="M4.4 19.6h15.2"/>',
   pull: '<path d="M12 4.4v12M7.2 11.6 12 16.4l4.8-4.8"/><path d="M4.4 19.6h15.2"/>',
-  diff:
-    '<path d="M7 4.4v15.2M17 4.4v15.2"/><path d="M4.4 9h5.2M14.4 15h5.2"/>',
-  shield:
-    '<path d="M12 3.2 5.2 6v5.8c0 4 2.9 7.2 6.8 9 3.9-1.8 6.8-5 6.8-9V6L12 3.2Z"/>',
+  diff: '<path d="M7 4.4v15.2M17 4.4v15.2"/><path d="M4.4 9h5.2M14.4 15h5.2"/>',
+  shield: '<path d="M12 3.2 5.2 6v5.8c0 4 2.9 7.2 6.8 9 3.9-1.8 6.8-5 6.8-9V6L12 3.2Z"/>',
   eye: '<circle cx="12" cy="12" r="2.4"/><path d="M3.6 12S6.8 6.4 12 6.4 20.4 12 20.4 12 17.2 17.6 12 17.6 3.6 12 3.6 12Z"/>',
-  calendar:
-    '<rect x="4" y="5.6" width="16" height="14.4" rx="2"/><path d="M4 10.4h16M8.4 3.6v4M15.6 3.6v4"/>',
+  calendar: '<rect x="4" y="5.6" width="16" height="14.4" rx="2"/><path d="M4 10.4h16M8.4 3.6v4M15.6 3.6v4"/>',
   plus: '<path d="M12 5.2v13.6M5.2 12h13.6"/>',
   minus: '<path d="M5.2 12h13.6"/>',
-  info: '<circle cx="12" cy="12" r="8.2"/><path d="M12 11v5.2"/>' +
+  info:
+    '<circle cx="12" cy="12" r="8.2"/><path d="M12 11v5.2"/>' +
     '<circle cx="12" cy="7.9" r=".95" fill="currentColor" stroke="none"/>',
   alert:
     '<path d="M12 3.4 2.8 19.8h18.4L12 3.4Z"/><path d="M12 9.4v4.6"/>' +

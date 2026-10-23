@@ -6,13 +6,13 @@
 
 ## 一、五要素
 
-| 维度 | 结论 |
-|------|------|
-| 场景 | 桌面 Electron 应用「Git Cockpit」的**设置页**，四 tab 结构（MR 配置 / 正文规范 / 模型 / Git 操作），改造为可切换 tab 的高保真 HTML 原型，供用户审阅后再改生产 |
-| 受众 | 开发者本人（技术素养高，日常使用本机 Git 驾驶舱）；信息密度优先，不是营销页 |
-| 调性 | 暗色驾驶舱工具风：深蓝黑三分层表面 + teal 签名主色（已定稿，极地白留档）、等宽字体用于路径/Token/host、禁渐变、圆角 ≤10px、发光仅限信号件。沿用现有 gc 令牌体系，不引入第二套设计语言 |
+| 维度       | 结论                                                                                                                                                                                                                                                                            |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 场景       | 桌面 Electron 应用「Git Cockpit」的**设置页**，四 tab 结构（MR 配置 / 正文规范 / 模型 / Git 操作），改造为可切换 tab 的高保真 HTML 原型，供用户审阅后再改生产                                                                                                                   |
+| 受众       | 开发者本人（技术素养高，日常使用本机 Git 驾驶舱）；信息密度优先，不是营销页                                                                                                                                                                                                     |
+| 调性       | 暗色驾驶舱工具风：深蓝黑三分层表面 + teal 签名主色（已定稿，极地白留档）、等宽字体用于路径/Token/host、禁渐变、圆角 ≤10px、发光仅限信号件。沿用现有 gc 令牌体系，不引入第二套设计语言                                                                                           |
 | 品牌上下文 | 已有完整设计体系（tokens.css / chrome.css）与 7 页原型；但现有 `settings.html` 原型是「5 张卡片、无 tab」结构，与生产四 tab 信息架构**货不对板**，且含虚构功能（重新生成密钥、连接测试、审计日志、自动升级、claude 模型等生产中不存在）。本次以**生产功能为唯一事实源**重做原型 |
-| 规模 | 单页四 tab 全量重设计；静态高保真原型（可 tab 切换、可展示关键状态态），不含真实数据请求；后续落地时才接生产 |
+| 规模       | 单页四 tab 全量重设计；静态高保真原型（可 tab 切换、可展示关键状态态），不含真实数据请求；后续落地时才接生产                                                                                                                                                                    |
 
 ## 二、生产实际功能清单（原型必须 1:1 覆盖，允许丢功能即不通过）
 
@@ -128,18 +128,18 @@
 - 分组（顺序固定，组头为 `{组名} {数量}`）：查看 / 分支 / 写入 / 同步 / 合并 / 变基 / MR / 任务 / Worktree / 高风险 / 其他
 - 芯片墙（真实工具名，去掉 `git_` 前缀显示；启用态 accent 弱底 + accent 文字；高风险芯片左侧 2px 红条；hover 显示工具描述；点击切换启用/禁用）：
 
-| 分组 | 芯片（生产真实工具名） | 数量 |
-|------|------|------|
-| 查看 | status、log、diff、show、file_content、graph、branch_graph、reflog、backup_list | 9 |
-| 分支 | branch_list、branch_create、branch_delete、tag_list、tag_create、remote_list、checkout | 7 |
-| 写入 | add、unstage、commit、stash、stash_list、stash_show、stash_apply、stash_drop、stash_pop | 9 |
-| 同步 | fetch、pull、push、push_force | 4 |
-| 合并 | merge_preview、merge_rehearse、merge_blame、merge_survey、merge_order、merge、merge_abort、merge_continue、apply_resolve | 9 |
-| 变基 | rebase、rebase_abort、rebase_continue | 3 |
-| MR | mr_prepare、mr_create | 2 |
-| 任务 | repo_overview、job_list、job_get、job_cancel | 4 |
-| Worktree | worktree_list、worktree_add、worktree_remove | 3 |
-| 高风险 | reset_hard、clean（默认关，红条） | 2 |
+| 分组     | 芯片（生产真实工具名）                                                                                                   | 数量 |
+| -------- | ------------------------------------------------------------------------------------------------------------------------ | ---- |
+| 查看     | status、log、diff、show、file_content、graph、branch_graph、reflog、backup_list                                          | 9    |
+| 分支     | branch_list、branch_create、branch_delete、tag_list、tag_create、remote_list、checkout                                   | 7    |
+| 写入     | add、unstage、commit、stash、stash_list、stash_show、stash_apply、stash_drop、stash_pop                                  | 9    |
+| 同步     | fetch、pull、push、push_force                                                                                            | 4    |
+| 合并     | merge_preview、merge_rehearse、merge_blame、merge_survey、merge_order、merge、merge_abort、merge_continue、apply_resolve | 9    |
+| 变基     | rebase、rebase_abort、rebase_continue                                                                                    | 3    |
+| MR       | mr_prepare、mr_create                                                                                                    | 2    |
+| 任务     | repo_overview、job_list、job_get、job_cancel                                                                             | 4    |
+| Worktree | worktree_list、worktree_add、worktree_remove                                                                             | 3    |
+| 高风险   | reset_hard、clean（默认关，红条）                                                                                        | 2    |
 
 ## 三、三个用户痛点与对应设计约束
 
@@ -148,7 +148,7 @@
 - 根因：上一轮把两个双内容 pane（正文规范的 结构/预览、Git 操作的 默认行为/工具开关）从左右分栏改成了上下堆叠，塞进 880px 单列容器。两个 pane 都被压扁，且下方 pane 被折到折叠线以下，纵向看不到。
 - **分栏 vs 堆叠判定规则（本次必须遵守）**：
   1. 设置页内容区不再死守 880px。tab 级自适应：单栏卡片 tab（MR 配置、模型）保持 ≤880px 居中；双 pane tab（正文规范、Git 操作）允许加宽至 ~1200px 或全宽，供左右分栏使用。
-  2.  pane 最小舒适宽度：结构编辑器 ≥360px、预览 ≥360px、工具芯片墙 ≥600px（52 个芯片一行 4–6 个）、默认行为表单 ≥320px。左右分栏后每侧不得低于各自最小值。
+  2. pane 最小舒适宽度：结构编辑器 ≥360px、预览 ≥360px、工具芯片墙 ≥600px（52 个芯片一行 4–6 个）、默认行为表单 ≥320px。左右分栏后每侧不得低于各自最小值。
   3. 判定优先级：**两个 pane 都完整可见且无需横向滚动 > 分栏形态**。若某视口下分栏必然压扁，则退化为「关键 pane 完整显示 + 次要 pane 独立滚动」，不允许两个 pane 同时残缺。
   4. 纵向「看不到内容」一票否决：任何 tab 的首屏必须完整露出该 tab 的主操作（正文规范的保存/导入/启用开关；Git 操作的保存按钮与工具墙首屏至少 3 组）。
 - 具体形态（供设计系统专家定稿，二选一或融合）：
@@ -189,4 +189,3 @@
   - 原型是静态高保真，但需用 JS 实现 tab 切换与关键状态展示（如 Token 校验态、CLI 三态、已启用/未导入 tag）
   - e2e 冻结契约（`.el-switch`、`.gc-chip-tabs`、`.field-switch` 等）在后续生产落地时须保留类名与可达性，原型阶段不涉及
   - 工作台（ReposView）重设计是下一件事，本稿不涉及
-

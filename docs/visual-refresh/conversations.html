@@ -498,7 +498,10 @@
               <div class="m m-agent">
                 <div class="who"><i class="ico" data-icon="agent"></i>Agent<span class="stamp">14:36</span></div>
                 <div class="acard">
-                  <p>已读取 <code>feature/payment-retry</code> 的差异。核心改动是把硬编码的 30 秒超时改为从 <code>options.timeout</code> 读取，默认值保持不变：</p>
+                  <p>
+                    已读取 <code>feature/payment-retry</code> 的差异。核心改动是把硬编码的 30 秒超时改为从
+                    <code>options.timeout</code> 读取，默认值保持不变：
+                  </p>
                   <ol>
                     <li><code>src/pay/retry.ts</code> 新增 42 行，重试上限从 3 提到 5</li>
                     <li><code>src/pay/timeout.ts</code> 抽出 <code>resolveTimeout()</code>，+18 −4</li>

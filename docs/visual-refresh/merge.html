@@ -410,7 +410,9 @@
 
             <div class="file-list">
               <div class="file-row">
-                <span class="stat conflict"><i class="ico" data-icon="conflict" style="width: 10px; height: 10px"></i>冲突</span>
+                <span class="stat conflict"
+                  ><i class="ico" data-icon="conflict" style="width: 10px; height: 10px"></i>冲突</span
+                >
                 <span class="fp">src/pay/retry.ts</span>
                 <span class="num">3 块 · 2 未决</span>
               </div>
@@ -420,22 +422,30 @@
                 <a href="#">!128 · release/2.4 ← feature/payment-retry</a>
               </div>
               <div class="file-row">
-                <span class="stat conflict"><i class="ico" data-icon="conflict" style="width: 10px; height: 10px"></i>冲突</span>
+                <span class="stat conflict"
+                  ><i class="ico" data-icon="conflict" style="width: 10px; height: 10px"></i>冲突</span
+                >
                 <span class="fp">src/pay/timeout.ts</span>
                 <span class="num">1 块 · 1 未决</span>
               </div>
               <div class="file-row">
-                <span class="stat clean"><i class="ico" data-icon="check" style="width: 10px; height: 10px"></i>干净</span>
+                <span class="stat clean"
+                  ><i class="ico" data-icon="check" style="width: 10px; height: 10px"></i>干净</span
+                >
                 <span class="fp">src/api/client.ts</span>
                 <span class="num">+8 −3</span>
               </div>
               <div class="file-row">
-                <span class="stat clean"><i class="ico" data-icon="check" style="width: 10px; height: 10px"></i>干净</span>
+                <span class="stat clean"
+                  ><i class="ico" data-icon="check" style="width: 10px; height: 10px"></i>干净</span
+                >
                 <span class="fp">src/config/defaults.ts</span>
                 <span class="num">+2 −2</span>
               </div>
               <div class="file-row">
-                <span class="stat unrelated"><i class="ico" data-icon="minus" style="width: 10px; height: 10px"></i>不相关</span>
+                <span class="stat unrelated"
+                  ><i class="ico" data-icon="minus" style="width: 10px; height: 10px"></i>不相关</span
+                >
                 <span class="fp">docs/legacy-migration.md</span>
                 <span class="num">仅 into 侧</span>
               </div>
@@ -548,39 +558,70 @@
                 <tbody>
                   <tr>
                     <th>main</th>
-                    <td class="self"><span class="cellv"><i class="ico" data-icon="minus"></i></span></td>
-                    <td class="clean"><span class="cellv"><i class="ico" data-icon="check"></i></span></td>
-                    <td class="clean"><span class="cellv"><i class="ico" data-icon="check"></i></span></td>
+                    <td class="self">
+                      <span class="cellv"><i class="ico" data-icon="minus"></i></span>
+                    </td>
+                    <td class="clean">
+                      <span class="cellv"><i class="ico" data-icon="check"></i></span>
+                    </td>
+                    <td class="clean">
+                      <span class="cellv"><i class="ico" data-icon="check"></i></span>
+                    </td>
                   </tr>
                   <tr>
                     <th>develop</th>
-                    <td class="clean"><span class="cellv"><i class="ico" data-icon="check"></i></span></td>
-                    <td class="self"><span class="cellv"><i class="ico" data-icon="minus"></i></span></td>
-                    <td class="conflict"><span class="cellv"><i class="ico" data-icon="close"></i></span></td>
+                    <td class="clean">
+                      <span class="cellv"><i class="ico" data-icon="check"></i></span>
+                    </td>
+                    <td class="self">
+                      <span class="cellv"><i class="ico" data-icon="minus"></i></span>
+                    </td>
+                    <td class="conflict">
+                      <span class="cellv"><i class="ico" data-icon="close"></i></span>
+                    </td>
                   </tr>
                   <tr>
                     <th>feature/payment-retry</th>
-                    <td class="conflict"><span class="cellv"><i class="ico" data-icon="close"></i></span></td>
-                    <td class="clean"><span class="cellv"><i class="ico" data-icon="check"></i></span></td>
-                    <td class="conflict"><span class="cellv"><i class="ico" data-icon="close"></i></span></td>
+                    <td class="conflict">
+                      <span class="cellv"><i class="ico" data-icon="close"></i></span>
+                    </td>
+                    <td class="clean">
+                      <span class="cellv"><i class="ico" data-icon="check"></i></span>
+                    </td>
+                    <td class="conflict">
+                      <span class="cellv"><i class="ico" data-icon="close"></i></span>
+                    </td>
                   </tr>
                   <tr>
                     <th>release/2.4</th>
-                    <td class="clean"><span class="cellv"><i class="ico" data-icon="check"></i></span></td>
-                    <td class="unrelated"><span class="cellv"><i class="ico" data-icon="minus"></i></span></td>
-                    <td class="self"><span class="cellv"><i class="ico" data-icon="minus"></i></span></td>
+                    <td class="clean">
+                      <span class="cellv"><i class="ico" data-icon="check"></i></span>
+                    </td>
+                    <td class="unrelated">
+                      <span class="cellv"><i class="ico" data-icon="minus"></i></span>
+                    </td>
+                    <td class="self">
+                      <span class="cellv"><i class="ico" data-icon="minus"></i></span>
+                    </td>
                   </tr>
                   <tr>
                     <th>hotfix/login-timeout</th>
-                    <td class="unrelated"><span class="cellv"><i class="ico" data-icon="minus"></i></span></td>
-                    <td class="unrelated"><span class="cellv"><i class="ico" data-icon="minus"></i></span></td>
-                    <td class="clean"><span class="cellv"><i class="ico" data-icon="check"></i></span></td>
+                    <td class="unrelated">
+                      <span class="cellv"><i class="ico" data-icon="minus"></i></span>
+                    </td>
+                    <td class="unrelated">
+                      <span class="cellv"><i class="ico" data-icon="minus"></i></span>
+                    </td>
+                    <td class="clean">
+                      <span class="cellv"><i class="ico" data-icon="check"></i></span>
+                    </td>
                   </tr>
                 </tbody>
               </table>
             </div>
             <span class="t3" style="font-size: 11px"
-              >矩阵为只读预演缓存，点击单元格可跳到对应 from/into 的预演结果。行高 28px，符号与底色双编码，不依赖颜色单一通道。</span
+              >矩阵为只读预演缓存，点击单元格可跳到对应 from/into 的预演结果。行高
+              28px，符号与底色双编码，不依赖颜色单一通道。</span
             >
           </div>
         </section>
@@ -599,7 +640,9 @@
                 <i class="ico sm" data-icon="git-merge" style="color: var(--gc-purple)"></i>
                 <b>执行合并落盘</b>
                 <span class="spacer"></span>
-                <button class="icon-btn" type="button" aria-label="关闭"><i class="ico sm" data-icon="close"></i></button>
+                <button class="icon-btn" type="button" aria-label="关闭">
+                  <i class="ico sm" data-icon="close"></i>
+                </button>
               </div>
               <div class="modal-body">
                 <div class="dryrun is-pending">

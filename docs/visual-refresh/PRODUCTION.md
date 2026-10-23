@@ -6,20 +6,20 @@
 
 改动 DOM 前先查本表；若必须调整，同步改 e2e 后再改生产代码，并在此登记。
 
-| 契约 | 位置 | 依赖内容 | 规则 |
-|---|---|---|---|
-| 连接状态文案 | `packages/e2e/helpers/ui.ts:5` | `getByText('后端已连接')` 需整串在同元素 | tag 重构时「后端已连接」四字不可拆分，版本号移入子元素 |
-| 选边按钮 | `helpers/ui.ts:88-90` | `getByRole('button',{name:'≫'})` + `getByTitle('已采用线上')` | 字符图标化后按钮补 `aria-label="采用线上"`，helper 改按 aria-label 定位；title 保留为状态钩子 |
-| 确认弹窗外壳 | `helpers/ui.ts:23-31` | `.el-overlay:visible .el-dialog` + 「dry-run 预览」标题 + `pre` | ConfirmDialog 外壳不动，只重写内部 |
-| chip tabs | `helpers/ui.ts:46` | `.gc-chip-tabs button` | 类名不得重命名 |
-| 分支河 | `helpers/ui.ts:50` | `.river` | MergeView 保留类名 |
-| 开关 | `helpers/ui.ts:67-72` | `.fetch .el-switch` / `.field-switch .el-switch` + `is-checked` | 保留 `.el-switch` 元素，只换 `--el-switch-on/off-color` |
-| 表单字段 | `helpers/ui.ts:76-83` | `.field`、`.el-select__wrapper`、`treeitem` role | 不换 Element 内部结构 |
-| dock 按钮 | `e2e/tests/clone.spec.ts:24` | `.dock-btn` | dock 重建保留类名与中文文案 |
-| 任务行 | `e2e/tests/clone.spec.ts:26` | `.job-row` | JobsView 改造保留类名 |
-| 矩阵格子 | `e2e/tests/matrix.spec.ts:34-42` | `button.cell.is-conflicts` / `.is-stage-local` + 格子内中文「本地临时枝」 | 格子图标化后中文以 chip 文案或 sr-only 保留 |
-| 应用元信息 | `e2e/tests/merge-pair.spec.ts:29` | `.apply-meta` | 保留类名 |
-| 仓库卡 | `e2e/tests/overview.spec.ts:10` | `.repo-card` | 保留类名 |
+| 契约         | 位置                              | 依赖内容                                                                  | 规则                                                                                          |
+| ------------ | --------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| 连接状态文案 | `packages/e2e/helpers/ui.ts:5`    | `getByText('后端已连接')` 需整串在同元素                                  | tag 重构时「后端已连接」四字不可拆分，版本号移入子元素                                        |
+| 选边按钮     | `helpers/ui.ts:88-90`             | `getByRole('button',{name:'≫'})` + `getByTitle('已采用线上')`             | 字符图标化后按钮补 `aria-label="采用线上"`，helper 改按 aria-label 定位；title 保留为状态钩子 |
+| 确认弹窗外壳 | `helpers/ui.ts:23-31`             | `.el-overlay:visible .el-dialog` + 「dry-run 预览」标题 + `pre`           | ConfirmDialog 外壳不动，只重写内部                                                            |
+| chip tabs    | `helpers/ui.ts:46`                | `.gc-chip-tabs button`                                                    | 类名不得重命名                                                                                |
+| 分支河       | `helpers/ui.ts:50`                | `.river`                                                                  | MergeView 保留类名                                                                            |
+| 开关         | `helpers/ui.ts:67-72`             | `.fetch .el-switch` / `.field-switch .el-switch` + `is-checked`           | 保留 `.el-switch` 元素，只换 `--el-switch-on/off-color`                                       |
+| 表单字段     | `helpers/ui.ts:76-83`             | `.field`、`.el-select__wrapper`、`treeitem` role                          | 不换 Element 内部结构                                                                         |
+| dock 按钮    | `e2e/tests/clone.spec.ts:24`      | `.dock-btn`                                                               | dock 重建保留类名与中文文案                                                                   |
+| 任务行       | `e2e/tests/clone.spec.ts:26`      | `.job-row`                                                                | JobsView 改造保留类名                                                                         |
+| 矩阵格子     | `e2e/tests/matrix.spec.ts:34-42`  | `button.cell.is-conflicts` / `.is-stage-local` + 格子内中文「本地临时枝」 | 格子图标化后中文以 chip 文案或 sr-only 保留                                                   |
+| 应用元信息   | `e2e/tests/merge-pair.spec.ts:29` | `.apply-meta`                                                             | 保留类名                                                                                      |
+| 仓库卡       | `e2e/tests/overview.spec.ts:10`   | `.repo-card`                                                              | 保留类名                                                                                      |
 
 ## 二、构建与验证约定
 
@@ -46,6 +46,7 @@
 ### 阶段 2（2026-10-22，门禁 5/5）
 
 已完成：
+
 - **2A**：SettingsView 6 处 gc-glass→实底、`.git-chip.on`/`.opt.on`/`.chip-ask.on` 语义化；LogsView 三处玻璃→实底、风险 chip（write 琥珀 / high 红）、dry-run chip、行 hover、表头实底、结果列语义色；ActivityHeatmap 核对（5 档自动随 1B 转 teal）。
 - **2B**：MatrixView 三处玻璃→实底、格子图标化（check/close/minus）+ 结果/阶段 legend（格子中文「本地临时枝」按契约保留为文案）；JobsView el-progress→4px 双段进度条（信号填充+扫描段）、状态 chip 化（进行中琥珀/成功绿/失败红/排队中性）、玻璃→实底、pre/banner 语义化；ReposView 999px 胶囊→4px、weather 四态语义色（stuck 红/dirty 琥珀/sync 青/quiet 绿）；RepoCard 实底 + 2px 语义左边框 + accent-weak 当前卡。
 - **2C**：StatusView 本地 `.glass` 定义改实底（6 处生效）、A/M/D 22px 反白方块→16px 语义弱底 chip、分支树/更改/stash 选中态改 accent-weak + 2px 左指示条、sync/monitor 语义色；CommitLogPanel 3 处玻璃→实底。
@@ -61,6 +62,7 @@
 **门禁结果**：stylelint ✓ / vue-tsc typecheck ✓ / build:keep ✓ / e2e **5/5 ✓**（1.2m）。
 
 **修过的问题**：
+
 1. GcIcon 未传 size 时 span 无默认尺寸，SVG 按浏览器默认替换元素尺寸展开成巨型图形，拦截页面点击（e2e matrix 失败暴露）→ 组件默认 16px 修复。
 2. e2e 三处**既有**测试漂移（非改版引入，经归因确认后顺手修复，仅动测试文件）：`clone.spec` 的 `.job-row` 幽灵类名（生产实为 `aside.list .row`）→ 已修；`merge-pair/matrix` 的 `getByText('存在冲突')` strict mode 双元素 → 改精确 `.stamp` 定位；`merge-pair` 的 `.apply-meta` 断言与现行标记不符 → 改断 `.next-pane .sha` 含 `merge/`。
 3. ConfirmDialog 契约漂移：生产标题本为「执行操作：{tool}」，e2e 契约文案「将执行的命令（dry-run 预览，未实际执行）」早已不在 UI 中 → 1E 重写时恢复该文案，open-commit 契约随之通过。
@@ -76,6 +78,7 @@
 ### 阶段 3（2026-10-22，门禁 5/5 + 计算样式断言 17/17）
 
 已完成：
+
 - **3A 图谱语义色**：`graph/toG6Data.ts` palette 改引 `--gc-amber/accent/purple/green/text-3`；`CommitGraph.vue` ink 去 `#6f6bff` 等硬编码，改引 `--gc-page/accent/text/text-3`。
 - **3B d2h 变量映射**：`--d2h-dark-*` 由 7 个扩到 **22 个**，全部指向 gc 令牌（ins/del→green/red 弱底+文字级标签+高亮加深档、change-label→amber、info→page、selected→accent-weak、moved→purple）。
 - **3D hunk 头**：`.d2h-info` 对齐 `.conflict-hunk` 形态（page 底 + mono 11px + text-3，color/bg 补 important 防官方同名规则反制）；删两处硬编码 rgba 改引令牌。
@@ -86,14 +89,14 @@
 
 ### 最终状态（2026-10-22）
 
-| 门禁 | 结果 |
-|---|---|
-| stylelint / vue-tsc / build:keep | 全部通过 |
-| e2e（5 spec） | 5/5 |
-| d2h 计算样式断言 | 17/17 |
-| Anti-Slop 十条 | 全零 |
-| 视图层 el-color 声明 | 0（EP 内部用法除外） |
-| theme.css !important | 73 → 47 |
+| 门禁                             | 结果                 |
+| -------------------------------- | -------------------- |
+| stylelint / vue-tsc / build:keep | 全部通过             |
+| e2e（5 spec）                    | 5/5                  |
+| d2h 计算样式断言                 | 17/17                |
+| Anti-Slop 十条                   | 全零                 |
+| 视图层 el-color 声明             | 0（EP 内部用法除外） |
+| theme.css !important             | 73 → 47              |
 
 改动未代为提交（用户 3 个 WIP 未提交，按计划边界分组在工作区）。生产 diff 视觉需 dev server 目视复核（重点：状态页 diff 增删行/hunk 头、合并页冲突行、矩阵格子、任务进度条）。
 

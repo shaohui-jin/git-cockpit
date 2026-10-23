@@ -26,10 +26,10 @@
 
 ### 1. 对话记录 ConversationsView —— 大差异 · 风险零 · 1.5h ★试点
 
-| 维度 | 设计稿 | 生产现状 |
-|---|---|---|
+| 维度 | 设计稿                                                                                                                | 生产现状                                                      |
+| ---- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
 | 布局 | 双栏：288px 会话列表（conv-list：conv-list-top + conv-search + conv-items/conv-item[ct/when/cmeta]）+ 右侧详情 flex:1 | 单表（5 列 grid：标题/仓库/时间/条数/操作）+ 底部 dialog 详情 |
-| 形态 | 行 = 标题 + 摘要元信息 + 时间；选中态 is-active 左指示 | 表格行 + 行内文字按钮（查看/继续/删除） |
+| 形态 | 行 = 标题 + 摘要元信息 + 时间；选中态 is-active 左指示                                                                | 表格行 + 行内文字按钮（查看/继续/删除）                       |
 
 - 需重写：整个模板（table → conv-list/conv-item 双栏）
 - 交互迁移：仓库筛选、刷新、行点击查看（dialog → 内嵌详情）、继续对话、删除确认、空态
@@ -38,11 +38,11 @@
 
 ### 2. 工作台 ReposView —— 大差异 · 风险高 · 2–3h
 
-| 维度 | 设计稿 | 生产现状 |
-|---|---|---|
-| 头部 | page-head（标题+副题）+ pulse-count | page-title h2 + bar（weather 四联 tab） |
-| 智能横幅 | **attention 横幅**（att-item ×3：red/amber/accent 三色提醒 + att-copy）——原型标志组件 | 无此组件 |
-| 主体 | repo-grid 卡片（repo-top/repo-name + 卡内 wx 天气胶囊 + stats） | mosaic-block 卡片 + 顶部四联天气 tab |
+| 维度     | 设计稿                                                                                | 生产现状                                |
+| -------- | ------------------------------------------------------------------------------------- | --------------------------------------- |
+| 头部     | page-head（标题+副题）+ pulse-count                                                   | page-title h2 + bar（weather 四联 tab） |
+| 智能横幅 | **attention 横幅**（att-item ×3：red/amber/accent 三色提醒 + att-copy）——原型标志组件 | 无此组件                                |
+| 主体     | repo-grid 卡片（repo-top/repo-name + 卡内 wx 天气胶囊 + stats）                       | mosaic-block 卡片 + 顶部四联天气 tab    |
 
 - 需重写：头部 + 新增 attention 横幅组件（需定义数据源：哪些仓值得提醒——如卡住/脏/同步失败，可从 weather 统计推导）+ 卡片字段重排
 - 交互迁移：卡片拖拽排序、更多菜单、双击进入、克隆入口、天气筛选（tab → 卡内胶囊后筛选入口要重新安置）
@@ -51,10 +51,10 @@
 
 ### 3. 任务 JobsView —— 大差异 · 风险中 · 2h
 
-| 维度 | 设计稿 | 生产现状 |
-|---|---|---|
-| 布局 | 分组卡片流：job-group（card-head + cnt）+ job 卡（job-top/job-ico/job-main/job-title/job-sub/job-prog 进度条） | 左右分栏：aside 列表（chips + rows）+ 右栏日志 pre |
-| 日志 | 原型无日志 pane | 生产有完整日志 pane（v-loading + pre + 取消/重试按钮） |
+| 维度 | 设计稿                                                                                                         | 生产现状                                               |
+| ---- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| 布局 | 分组卡片流：job-group（card-head + cnt）+ job 卡（job-top/job-ico/job-main/job-title/job-sub/job-prog 进度条） | 左右分栏：aside 列表（chips + rows）+ 右栏日志 pre     |
+| 日志 | 原型无日志 pane                                                                                                | 生产有完整日志 pane（v-loading + pre + 取消/重试按钮） |
 
 - 需重写：split → job-group 卡片流；卡内嵌 4px 双段进度条（2B 已做好组件，搬迁即用）
 - 交互迁移：筛选 chips、行选中、日志 pane 须重新安置（建议点卡片展开抽屉或右侧弹出，不能直接砍）、取消/重试/安装按钮、自动滚动
@@ -63,11 +63,11 @@
 
 ### 4. 合并 MergeView（含矩阵） —— 中大差异 · 风险高 · 2h
 
-| 维度 | 设计稿 | 生产现状 |
-|---|---|---|
-| 表单 | sec-block 卡片化（card-head/sec-body/sel-row/select-wrap/sel-arrow） | 平铺 filter-bar 字段 |
-| 结果区 | result-chip + file-list（file-row/stat/conflict/fp/num 列） | next-pane + ConflictResolvePanel（file-list + 三栏 merge） |
-| 矩阵 | 原型含矩阵 grid + legend | 生产矩阵为增强页（filter-card + summary + legend + grid + detail） |
+| 维度   | 设计稿                                                               | 生产现状                                                           |
+| ------ | -------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| 表单   | sec-block 卡片化（card-head/sec-body/sel-row/select-wrap/sel-arrow） | 平铺 filter-bar 字段                                               |
+| 结果区 | result-chip + file-list（file-row/stat/conflict/fp/num 列）          | next-pane + ConflictResolvePanel（file-list + 三栏 merge）         |
+| 矩阵   | 原型含矩阵 grid + legend                                             | 生产矩阵为增强页（filter-card + summary + legend + grid + detail） |
 
 - 需重写：表单区卡片化包装（sel-row 结构）；结果区 file-row 加 stat/conflict 列
 - 交互迁移： BranchTreeSelect、fetch 开关、预演按钮、落盘流程（dialog 契约 `将执行的命令` 须保留）、矩阵全套（2B 已对齐的 legend/cell 不动）
@@ -75,11 +75,11 @@
 
 ### 5. 状态 StatusView —— 中差异 · 风险中 · 1.5–2h
 
-| 维度 | 设计稿 | 生产现状 |
-|---|---|---|
-| 头部 | toolbar（分支选择 + **dirty-pill** + workbench 按钮） | head-branch（branch-tag） |
-| 分支树 | panel-top + search-box + tree-group 分组 + tree-row（is-current/nm/ahead） | branch-panel + tree（2C 已语义化） |
-| 右栏 | 三卡（graph/changes/monitor） | graph-pane + changes-card + monitor-card + history-card（4 卡，多记录卡） |
+| 维度   | 设计稿                                                                     | 生产现状                                                                  |
+| ------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| 头部   | toolbar（分支选择 + **dirty-pill** + workbench 按钮）                      | head-branch（branch-tag）                                                 |
+| 分支树 | panel-top + search-box + tree-group 分组 + tree-row（is-current/nm/ahead） | branch-panel + tree（2C 已语义化）                                        |
+| 右栏   | 三卡（graph/changes/monitor）                                              | graph-pane + changes-card + monitor-card + history-card（4 卡，多记录卡） |
 
 - 需重写：头部 toolbar 化（dirty-pill 为净新增小组件，可用 changes 统计推导）+ 树分组（tree-group）
 - 交互迁移：分支树全部（搜索/分组/选中/远程优先）、暂存/提交/dry-run 流程（e2e 锁）、差异监视器、记录卡
@@ -87,8 +87,8 @@
 
 ### 6. 设置 SettingsView —— 中差异 · 风险低 · 1.5h
 
-| 维度 | 设计稿 | 生产现状 |
-|---|---|---|
+| 维度 | 设计稿                                                                                            | 生产现状                                       |
+| ---- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
 | 布局 | settings-col 单列 + set-card 网格（card-head/set-body/frow/fc/fctrl/input/secret/fhint/test-tag） | 分节 + opt 卡片网格 + git-split（侧栏 + 主栏） |
 
 - 需重写：set-card 卡片框架统一（card-head/set-body）、字段行 frow/fctrl 形态、密钥 input[type=secret] + fhint
@@ -97,10 +97,10 @@
 
 ### 7. 日志 LogsView —— 小差异 · 风险零 · 0.5–1h
 
-| 维度 | 设计稿 | 生产现状 |
-|---|---|---|
+| 维度   | 设计稿                             | 生产现状                       |
+| ------ | ---------------------------------- | ------------------------------ |
 | 工具栏 | log-toolbar + log-search（搜索框） | bar（下拉筛选 + limit + 刷新） |
-| 行 | table-wrap/trow | table/th/tr（2A 已对齐） |
+| 行     | table-wrap/trow                    | table/th/tr（2A 已对齐）       |
 
 - 需重写：工具栏加搜索框（生产是工具名下拉筛选——两者信息架构不同，建议保留下拉 + 增搜索框）
 - e2e：零
@@ -112,12 +112,12 @@
 
 ## 三、执行顺序建议
 
-| 批次 | 页面 | 理由 |
-|---|---|---|
-| **P0 试点** | 对话记录 | 零 e2e 风险、差异最大、能完整验证「按稿改布局」流程；验收后定后续节奏 |
-| P1 低风险 | 日志、设置 | e2e 零/低覆盖，形态差异小，适合连续推进建立信心 |
-| P2 高价值 | 工作台、任务 | 用户每天看得最多的两页；attention 横幅为净新增功能；任务页需先解决日志 pane 安置设计 |
-| P3 深水区 | 合并、状态 | e2e 锁最深、交互最重；合并页与 2F 冲突面板联动，状态页与 dry-run 流程联动 |
+| 批次        | 页面         | 理由                                                                                 |
+| ----------- | ------------ | ------------------------------------------------------------------------------------ |
+| **P0 试点** | 对话记录     | 零 e2e 风险、差异最大、能完整验证「按稿改布局」流程；验收后定后续节奏                |
+| P1 低风险   | 日志、设置   | e2e 零/低覆盖，形态差异小，适合连续推进建立信心                                      |
+| P2 高价值   | 工作台、任务 | 用户每天看得最多的两页；attention 横幅为净新增功能；任务页需先解决日志 pane 安置设计 |
+| P3 深水区   | 合并、状态   | e2e 锁最深、交互最重；合并页与 2F 冲突面板联动，状态页与 dry-run 流程联动            |
 
 ## 四、通用约束（每页必查）
 

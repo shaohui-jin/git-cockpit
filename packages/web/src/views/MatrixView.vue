@@ -360,24 +360,9 @@ function isActive(cell: MergeSurveyCell): boolean {
                     :title="cellTitle(col.cell)"
                     @click="session.active = col.cell"
                   >
-                    <GcIcon
-                      v-if="col.cell.outcome === 'clean'"
-                      name="check"
-                      :size="12"
-                      class="cell-ico"
-                    />
-                    <GcIcon
-                      v-else-if="col.cell.outcome === 'conflicts'"
-                      name="close"
-                      :size="12"
-                      class="cell-ico"
-                    />
-                    <GcIcon
-                      v-else-if="col.cell.outcome === 'unrelated'"
-                      name="minus"
-                      :size="12"
-                      class="cell-ico"
-                    />
+                    <GcIcon v-if="col.cell.outcome === 'clean'" name="check" :size="12" class="cell-ico" />
+                    <GcIcon v-else-if="col.cell.outcome === 'conflicts'" name="close" :size="12" class="cell-ico" />
+                    <GcIcon v-else-if="col.cell.outcome === 'unrelated'" name="minus" :size="12" class="cell-ico" />
                     <span class="cell-text">{{ cellLabel(col.cell) }}</span>
                   </button>
                 </td>

@@ -110,9 +110,7 @@ function bySeverity(a: { path: string }, b: { path: string }): number {
   return a.path.localeCompare(b.path);
 }
 const actionRepos = computed(() =>
-  cardRepos.value
-    .filter((r) => ['stuck', 'dirty', 'sync'].includes(attentionOf(overviewOf(r.path))))
-    .sort(bySeverity)
+  cardRepos.value.filter((r) => ['stuck', 'dirty', 'sync'].includes(attentionOf(overviewOf(r.path)))).sort(bySeverity)
 );
 const cleanRepos = computed(() =>
   cardRepos.value.filter((r) => attentionOf(overviewOf(r.path)) === 'quiet').sort(bySeverity)
@@ -148,11 +146,12 @@ async function removeAllLost(): Promise<void> {
   const lost = repos.repos.filter((r) => overviewOf(r.path)?.available === false);
   if (!lost.length) return;
   try {
-    await ElMessageBox.confirm(
-      `从列表移除 ${lost.length} 个失效仓库？不会删除磁盘上的文件。`,
-      '批量移除失效仓库',
-      { type: 'warning', confirmButtonText: '移除', cancelButtonText: '取消', closeOnClickModal: false }
-    );
+    await ElMessageBox.confirm(`从列表移除 ${lost.length} 个失效仓库？不会删除磁盘上的文件。`, '批量移除失效仓库', {
+      type: 'warning',
+      confirmButtonText: '移除',
+      cancelButtonText: '取消',
+      closeOnClickModal: false
+    });
   } catch {
     return;
   }

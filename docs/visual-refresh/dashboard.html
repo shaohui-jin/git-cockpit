@@ -224,7 +224,9 @@
         font-size: var(--gc-fs-meta);
         cursor: pointer;
         white-space: nowrap;
-        transition: background var(--gc-t-micro) var(--gc-ease), color var(--gc-t-micro) var(--gc-ease);
+        transition:
+          background var(--gc-t-micro) var(--gc-ease),
+          color var(--gc-t-micro) var(--gc-ease);
       }
       .seg button:hover {
         color: var(--gc-text-2);
@@ -330,7 +332,9 @@
         border-radius: var(--gc-r);
         cursor: pointer;
         min-width: 0;
-        transition: background var(--gc-t-micro) var(--gc-ease), border-color var(--gc-t-micro) var(--gc-ease);
+        transition:
+          background var(--gc-t-micro) var(--gc-ease),
+          border-color var(--gc-t-micro) var(--gc-ease);
       }
       .repo-card:hover {
         background: var(--gc-btn-hover);
@@ -467,12 +471,14 @@
             <span class="chip red">2 冲突</span>
             <span class="cb-spacer"></span>
             <span class="cb-heat" title="近 12 周提交 46 次" aria-label="近 12 周提交趋势">
-              <i class="lv1"></i><i class="lv0"></i><i class="lv2"></i><i class="lv3"></i><i class="lv2"></i><i class="lv0"></i>
-              <i class="lv3"></i><i class="lv4"></i><i class="lv2"></i><i class="lv1"></i><i class="lv3"></i><i class="lv2"></i>
+              <i class="lv1"></i><i class="lv0"></i><i class="lv2"></i><i class="lv3"></i><i class="lv2"></i
+              ><i class="lv0"></i> <i class="lv3"></i><i class="lv4"></i><i class="lv2"></i><i class="lv1"></i
+              ><i class="lv3"></i><i class="lv2"></i>
             </span>
             <span class="cb-heat" title="近 12 周提交 46 次" aria-label="近 12 周提交趋势">
-              <i class="lv1"></i><i class="lv0"></i><i class="lv2"></i><i class="lv3"></i><i class="lv2"></i><i class="lv0"></i>
-              <i class="lv3"></i><i class="lv4"></i><i class="lv2"></i><i class="lv1"></i><i class="lv3"></i><i class="lv2"></i>
+              <i class="lv1"></i><i class="lv0"></i><i class="lv2"></i><i class="lv3"></i><i class="lv2"></i
+              ><i class="lv0"></i> <i class="lv3"></i><i class="lv4"></i><i class="lv2"></i><i class="lv1"></i
+              ><i class="lv3"></i><i class="lv2"></i>
             </span>
             <button type="button" class="btn primary h24">进入工作区</button>
             <button type="button" class="btn h24">预演合并</button>
@@ -508,11 +514,15 @@
                 <div class="r1">
                   <span class="r-name">git-cockpit</span>
                   <span class="chip red">雷雨</span>
-                  <button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button>
+                  <button type="button" class="r-more" aria-label="更多">
+                    <i class="ico sm" data-icon="more"></i>
+                  </button>
                 </div>
                 <div class="r2">
                   <span class="r-branch">master</span>
-                  <span class="r-stats"><b class="on">0</b>↑ <b>0</b>↓ <span>10 更改</span> <span class="danger">2 冲突</span></span>
+                  <span class="r-stats"
+                    ><b class="on">0</b>↑ <b>0</b>↓ <span>10 更改</span> <span class="danger">2 冲突</span></span
+                  >
                 </div>
               </article>
 
@@ -520,7 +530,9 @@
                 <div class="r1">
                   <span class="r-name">dryTools</span>
                   <span class="chip red">雷雨</span>
-                  <button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button>
+                  <button type="button" class="r-more" aria-label="更多">
+                    <i class="ico sm" data-icon="more"></i>
+                  </button>
                 </div>
                 <div class="r2">
                   <span class="r-branch">feature/cli</span>
@@ -532,7 +544,9 @@
                 <div class="r1">
                   <span class="r-name">git-insight</span>
                   <span class="chip amber">薄雾</span>
-                  <button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button>
+                  <button type="button" class="r-more" aria-label="更多">
+                    <i class="ico sm" data-icon="more"></i>
+                  </button>
                 </div>
                 <div class="r2">
                   <span class="r-branch">master</span>
@@ -554,7 +568,9 @@
               <article class="repo-card" title="D:////_myproject////why-css-insight">
                 <div class="r1">
                   <span class="r-name">why-css-insight</span>
-                  <button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button>
+                  <button type="button" class="r-more" aria-label="更多">
+                    <i class="ico sm" data-icon="more"></i>
+                  </button>
                 </div>
                 <div class="r2">
                   <span class="r-branch">master</span>
@@ -564,7 +580,9 @@
               <article class="repo-card" title="D:////_myproject////comp-insight">
                 <div class="r1">
                   <span class="r-name">comp-insight</span>
-                  <button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button>
+                  <button type="button" class="r-more" aria-label="更多">
+                    <i class="ico sm" data-icon="more"></i>
+                  </button>
                 </div>
                 <div class="r2">
                   <span class="r-branch">master</span>
@@ -574,7 +592,9 @@
               <article class="repo-card" title="D:////_myproject////game-demo">
                 <div class="r1">
                   <span class="r-name">game-demo</span>
-                  <button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button>
+                  <button type="button" class="r-more" aria-label="更多">
+                    <i class="ico sm" data-icon="more"></i>
+                  </button>
                 </div>
                 <div class="r2">
                   <span class="r-branch">main</span>
@@ -595,20 +615,132 @@
               <button type="button" class="btn ghost h22">批量移除</button>
             </div>
             <div class="grid" id="lostGrid" hidden>
-              <article class="repo-card lost"><div class="r1"><span class="r-name">PropStudio</span><span class="chip">丢失</span><button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button></div><div class="r2"><span class="r-branch">不可用</span></div></article>
-              <article class="repo-card lost"><div class="r1"><span class="r-name">LayoutStudio</span><span class="chip">丢失</span><button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button></div><div class="r2"><span class="r-branch">不可用</span></div></article>
-              <article class="repo-card lost"><div class="r1"><span class="r-name">UIModule</span><span class="chip">丢失</span><button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button></div><div class="r2"><span class="r-branch">不可用</span></div></article>
-              <article class="repo-card lost"><div class="r1"><span class="r-name">AppCommon</span><span class="chip">丢失</span><button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button></div><div class="r2"><span class="r-branch">不可用</span></div></article>
-              <article class="repo-card lost"><div class="r1"><span class="r-name">XTCommon</span><span class="chip">丢失</span><button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button></div><div class="r2"><span class="r-branch">不可用</span></div></article>
-              <article class="repo-card lost"><div class="r1"><span class="r-name">SchemaStudio</span><span class="chip">丢失</span><button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button></div><div class="r2"><span class="r-branch">不可用</span></div></article>
-              <article class="repo-card lost"><div class="r1"><span class="r-name">ParamStudio</span><span class="chip">丢失</span><button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button></div><div class="r2"><span class="r-branch">不可用</span></div></article>
-              <article class="repo-card lost"><div class="r1"><span class="r-name">HarvestStudio</span><span class="chip">丢失</span><button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button></div><div class="r2"><span class="r-branch">不可用</span></div></article>
-              <article class="repo-card lost"><div class="r1"><span class="r-name">DramStudio</span><span class="chip">丢失</span><button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button></div><div class="r2"><span class="r-branch">不可用</span></div></article>
-              <article class="repo-card lost"><div class="r1"><span class="r-name">CustomStudio</span><span class="chip">丢失</span><button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button></div><div class="r2"><span class="r-branch">不可用</span></div></article>
-              <article class="repo-card lost"><div class="r1"><span class="r-name">Application</span><span class="chip">丢失</span><button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button></div><div class="r2"><span class="r-branch">不可用</span></div></article>
-              <article class="repo-card lost"><div class="r1"><span class="r-name">domain</span><span class="chip">丢失</span><button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button></div><div class="r2"><span class="r-branch">不可用</span></div></article>
-              <article class="repo-card lost"><div class="r1"><span class="r-name">XtHubForWin</span><span class="chip">丢失</span><button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button></div><div class="r2"><span class="r-branch">不可用</span></div></article>
-              <article class="repo-card lost"><div class="r1"><span class="r-name">XtHubLibs</span><span class="chip">丢失</span><button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button></div><div class="r2"><span class="r-branch">不可用</span></div></article>
+              <article class="repo-card lost">
+                <div class="r1">
+                  <span class="r-name">PropStudio</span><span class="chip">丢失</span
+                  ><button type="button" class="r-more" aria-label="更多">
+                    <i class="ico sm" data-icon="more"></i>
+                  </button>
+                </div>
+                <div class="r2"><span class="r-branch">不可用</span></div>
+              </article>
+              <article class="repo-card lost">
+                <div class="r1">
+                  <span class="r-name">LayoutStudio</span><span class="chip">丢失</span
+                  ><button type="button" class="r-more" aria-label="更多">
+                    <i class="ico sm" data-icon="more"></i>
+                  </button>
+                </div>
+                <div class="r2"><span class="r-branch">不可用</span></div>
+              </article>
+              <article class="repo-card lost">
+                <div class="r1">
+                  <span class="r-name">UIModule</span><span class="chip">丢失</span
+                  ><button type="button" class="r-more" aria-label="更多">
+                    <i class="ico sm" data-icon="more"></i>
+                  </button>
+                </div>
+                <div class="r2"><span class="r-branch">不可用</span></div>
+              </article>
+              <article class="repo-card lost">
+                <div class="r1">
+                  <span class="r-name">AppCommon</span><span class="chip">丢失</span
+                  ><button type="button" class="r-more" aria-label="更多">
+                    <i class="ico sm" data-icon="more"></i>
+                  </button>
+                </div>
+                <div class="r2"><span class="r-branch">不可用</span></div>
+              </article>
+              <article class="repo-card lost">
+                <div class="r1">
+                  <span class="r-name">XTCommon</span><span class="chip">丢失</span
+                  ><button type="button" class="r-more" aria-label="更多">
+                    <i class="ico sm" data-icon="more"></i>
+                  </button>
+                </div>
+                <div class="r2"><span class="r-branch">不可用</span></div>
+              </article>
+              <article class="repo-card lost">
+                <div class="r1">
+                  <span class="r-name">SchemaStudio</span><span class="chip">丢失</span
+                  ><button type="button" class="r-more" aria-label="更多">
+                    <i class="ico sm" data-icon="more"></i>
+                  </button>
+                </div>
+                <div class="r2"><span class="r-branch">不可用</span></div>
+              </article>
+              <article class="repo-card lost">
+                <div class="r1">
+                  <span class="r-name">ParamStudio</span><span class="chip">丢失</span
+                  ><button type="button" class="r-more" aria-label="更多">
+                    <i class="ico sm" data-icon="more"></i>
+                  </button>
+                </div>
+                <div class="r2"><span class="r-branch">不可用</span></div>
+              </article>
+              <article class="repo-card lost">
+                <div class="r1">
+                  <span class="r-name">HarvestStudio</span><span class="chip">丢失</span
+                  ><button type="button" class="r-more" aria-label="更多">
+                    <i class="ico sm" data-icon="more"></i>
+                  </button>
+                </div>
+                <div class="r2"><span class="r-branch">不可用</span></div>
+              </article>
+              <article class="repo-card lost">
+                <div class="r1">
+                  <span class="r-name">DramStudio</span><span class="chip">丢失</span
+                  ><button type="button" class="r-more" aria-label="更多">
+                    <i class="ico sm" data-icon="more"></i>
+                  </button>
+                </div>
+                <div class="r2"><span class="r-branch">不可用</span></div>
+              </article>
+              <article class="repo-card lost">
+                <div class="r1">
+                  <span class="r-name">CustomStudio</span><span class="chip">丢失</span
+                  ><button type="button" class="r-more" aria-label="更多">
+                    <i class="ico sm" data-icon="more"></i>
+                  </button>
+                </div>
+                <div class="r2"><span class="r-branch">不可用</span></div>
+              </article>
+              <article class="repo-card lost">
+                <div class="r1">
+                  <span class="r-name">Application</span><span class="chip">丢失</span
+                  ><button type="button" class="r-more" aria-label="更多">
+                    <i class="ico sm" data-icon="more"></i>
+                  </button>
+                </div>
+                <div class="r2"><span class="r-branch">不可用</span></div>
+              </article>
+              <article class="repo-card lost">
+                <div class="r1">
+                  <span class="r-name">domain</span><span class="chip">丢失</span
+                  ><button type="button" class="r-more" aria-label="更多">
+                    <i class="ico sm" data-icon="more"></i>
+                  </button>
+                </div>
+                <div class="r2"><span class="r-branch">不可用</span></div>
+              </article>
+              <article class="repo-card lost">
+                <div class="r1">
+                  <span class="r-name">XtHubForWin</span><span class="chip">丢失</span
+                  ><button type="button" class="r-more" aria-label="更多">
+                    <i class="ico sm" data-icon="more"></i>
+                  </button>
+                </div>
+                <div class="r2"><span class="r-branch">不可用</span></div>
+              </article>
+              <article class="repo-card lost">
+                <div class="r1">
+                  <span class="r-name">XtHubLibs</span><span class="chip">丢失</span
+                  ><button type="button" class="r-more" aria-label="更多">
+                    <i class="ico sm" data-icon="more"></i>
+                  </button>
+                </div>
+                <div class="r2"><span class="r-branch">不可用</span></div>
+              </article>
             </div>
           </section>
         </div>

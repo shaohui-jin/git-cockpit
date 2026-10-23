@@ -101,7 +101,7 @@ export function buildBranchPanes(
   if (locals.length && scope !== 'remote') {
     panes.push({
       key: 'local',
-      title: `本地分支（${locals.length}）`,
+      title: '本地',
       tree: buildPathTree(
         locals.map((b) => ({ path: b.name, branch: b })),
         'local'
@@ -112,7 +112,7 @@ export function buildBranchPanes(
     for (const [remote, entries] of remoteMap) {
       panes.push({
         key: `remote:${remote}`,
-        title: `远程 · ${remote}（${entries.length}）`,
+        title: `远程 · ${remote}`,
         tree: buildPathTree(entries, `remote:${remote}`)
       });
     }

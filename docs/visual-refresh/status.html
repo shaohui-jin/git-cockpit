@@ -194,7 +194,7 @@
       /* 中：更改面板 300 */
       .changes-panel {
         flex: none;
-        width: 300px;
+        width: 380px;
         display: flex;
         flex-direction: column;
         min-height: 0;
@@ -539,12 +539,12 @@
       }
 
       .chat-panel {
+        display: none; /* 设计稿默认收起，避免遮挡右栏；实际由悬浮球唤出 */
         position: fixed;
         right: 16px;
         bottom: 56px;
         width: 380px;
         height: 508px;
-        display: flex;
         flex-direction: column;
         background: var(--gc-overlay);
         border: 1px solid var(--gc-line-strong);
@@ -725,6 +725,517 @@
           width: 260px;
         }
       }
+
+      /* ========== 补充：模式切换 / 更多菜单 / 操作告警 / 冲突 / 记录 / 图 / 提交 ========== */
+      .mode-seg {
+        display: inline-flex;
+        gap: 2px;
+        padding: 2px;
+        border-radius: var(--gc-r);
+        border: 1px solid var(--gc-line);
+        background: var(--gc-page);
+        flex: none;
+      }
+      .mode-seg button {
+        height: 24px;
+        padding: 0 10px;
+        border: 0;
+        border-radius: var(--gc-r-tag);
+        background: transparent;
+        color: var(--gc-text-3);
+        font: inherit;
+        font-size: var(--gc-fs-meta);
+        cursor: pointer;
+      }
+      .mode-seg button.on {
+        background: var(--gc-accent-weak);
+        color: var(--gc-accent-text);
+      }
+      .branch-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: var(--gc-control);
+        padding: 0 10px;
+        border-radius: var(--gc-r);
+        border: 1px solid var(--gc-line);
+        background: var(--gc-card);
+        font-family: var(--gc-font-mono);
+        font-size: var(--gc-fs-body);
+        white-space: nowrap;
+      }
+      .branch-chip .up {
+        color: var(--gc-amber);
+        font-size: var(--gc-fs-meta);
+      }
+      .more-wrap {
+        position: relative;
+        flex: none;
+      }
+      .more-menu {
+        position: absolute;
+        right: 0;
+        top: calc(100% + 4px);
+        z-index: 20;
+        min-width: 168px;
+        padding: 4px;
+        background: var(--gc-card);
+        border: 1px solid var(--gc-line-strong);
+        border-radius: var(--gc-r);
+        box-shadow: var(--gc-shadow-menu);
+        display: none;
+        flex-direction: column;
+        gap: 1px;
+      }
+      .more-menu.on {
+        display: flex;
+      }
+      .more-menu button {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        height: 28px;
+        padding: 0 8px;
+        border: 0;
+        border-radius: var(--gc-r-tag);
+        background: transparent;
+        color: var(--gc-text-2);
+        font: inherit;
+        font-size: var(--gc-fs-meta);
+        text-align: left;
+        cursor: pointer;
+      }
+      .more-menu button:hover {
+        background: var(--gc-btn-hover);
+        color: var(--gc-text);
+      }
+      .more-menu button.danger {
+        color: var(--gc-red);
+      }
+      .more-menu .sep {
+        height: 1px;
+        margin: 3px 4px;
+        background: var(--gc-line-weak);
+      }
+
+      .view {
+        display: none;
+        flex: 1;
+        min-height: 0;
+      }
+      .view.on {
+        display: flex;
+        gap: var(--gc-s2);
+      }
+
+      /* 进行中操作告警 */
+      .op-alert {
+        flex: none;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 6px var(--gc-s2);
+        padding: 6px 10px;
+        border-radius: var(--gc-r);
+        background: var(--gc-red-weak);
+        border: 1px solid rgba(255, 133, 133, 0.35);
+        color: var(--gc-red);
+        font-size: var(--gc-fs-meta);
+      }
+      .op-alert .spacer {
+        flex: 1;
+      }
+      .op-alert .btn {
+        height: 22px;
+        padding: 0 8px;
+        font-size: var(--gc-fs-meta);
+      }
+
+      /* 冲突面板 */
+      .conflict-box {
+        flex: none;
+        display: flex;
+        flex-direction: column;
+        border: 1px solid rgba(255, 133, 133, 0.35);
+        border-radius: var(--gc-r);
+        overflow: hidden;
+      }
+      .conflict-box .cf-head {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        background: var(--gc-red-weak);
+        color: var(--gc-red);
+        font-size: var(--gc-fs-meta);
+        font-weight: 600;
+      }
+      .cf-row {
+        display: flex;
+        align-items: center;
+        gap: var(--gc-s2);
+        padding: 5px 10px;
+        border-top: 1px solid var(--gc-line-weak);
+        background: var(--gc-card);
+        font-size: var(--gc-fs-meta);
+      }
+      .cf-row .fp {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-family: var(--gc-font-mono);
+        color: var(--gc-text-2);
+      }
+      .cf-row .tbtn {
+        padding: 0 4px;
+        font-size: var(--gc-fs-micro);
+      }
+
+      /* 更改分组 tabs */
+      .ctabs {
+        flex: none;
+        display: flex;
+        align-items: center;
+        gap: var(--gc-s2);
+        padding: 0 2px;
+      }
+      .ctabs button {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        height: 24px;
+        padding: 0 9px;
+        border: 1px solid transparent;
+        border-radius: var(--gc-r-tag);
+        background: transparent;
+        color: var(--gc-text-3);
+        font: inherit;
+        font-size: var(--gc-fs-meta);
+        cursor: pointer;
+      }
+      .ctabs button.on {
+        background: var(--gc-card);
+        border-color: var(--gc-line);
+        color: var(--gc-text);
+      }
+      .ctabs .n {
+        font-family: var(--gc-font-mono);
+        font-size: var(--gc-fs-micro);
+        color: var(--gc-text-3);
+      }
+
+      /* 记录 tabs */
+      .rec-tabs {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        padding: 2px;
+        border-radius: var(--gc-r);
+        background: var(--gc-page);
+        border: 1px solid var(--gc-line);
+      }
+      .rec-tabs button {
+        flex: 1;
+        height: 22px;
+        border: 0;
+        border-radius: var(--gc-r-tag);
+        background: transparent;
+        color: var(--gc-text-3);
+        font: inherit;
+        font-size: var(--gc-fs-micro);
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .rec-tabs button.on {
+        background: var(--gc-accent-weak);
+        color: var(--gc-accent-text);
+      }
+      .rec-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        overflow: auto;
+        min-height: 0;
+      }
+      .rec-row {
+        display: flex;
+        align-items: center;
+        gap: var(--gc-s2);
+        padding: 5px 2px;
+        border-bottom: 1px solid var(--gc-line-weak);
+        font-size: var(--gc-fs-meta);
+        min-width: 0;
+      }
+      .rec-row .ref {
+        flex: none;
+        font-family: var(--gc-font-mono);
+        color: var(--gc-accent-text);
+        font-size: var(--gc-fs-micro);
+      }
+      .rec-row .msg {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: var(--gc-text-2);
+      }
+      .rec-row .when {
+        flex: none;
+        color: var(--gc-text-3);
+        font-size: var(--gc-fs-micro);
+      }
+      .rec-row .acts {
+        flex: none;
+        display: flex;
+        gap: 2px;
+      }
+      .rec-row .acts button {
+        border: 0;
+        background: transparent;
+        color: var(--gc-text-3);
+        font: inherit;
+        font-size: var(--gc-fs-micro);
+        padding: 0 3px;
+        cursor: pointer;
+        border-radius: var(--gc-r-tag);
+      }
+      .rec-row .acts button:hover {
+        color: var(--gc-text);
+        background: var(--gc-btn-hover);
+      }
+      .rec-row .acts button.danger:hover {
+        color: var(--gc-red);
+        background: var(--gc-red-weak);
+      }
+
+      /* ===== 历史视图：泳道 + 提交列表 ===== */
+      #view-history {
+        display: none;
+        gap: var(--gc-s2);
+      }
+      #view-history.on {
+        display: flex;
+      }
+      .hist-main {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: var(--gc-s2);
+      }
+      .hist-bar {
+        flex: none;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: var(--gc-s2);
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-3);
+      }
+      .hist-bar .lb {
+        white-space: nowrap;
+      }
+      .hist-bar .spacer {
+        flex: 1;
+      }
+      .hist-bar select {
+        height: var(--gc-input);
+        padding: 0 8px;
+        border-radius: var(--gc-r);
+        border: 1px solid var(--gc-line);
+        background: var(--gc-page);
+        color: var(--gc-text);
+        font: inherit;
+        font-size: var(--gc-fs-meta);
+      }
+      .hist-search {
+        height: var(--gc-input);
+        width: 220px;
+        padding: 0 9px;
+        border-radius: var(--gc-r);
+        border: 1px solid var(--gc-line);
+        background: var(--gc-page);
+        color: var(--gc-text);
+        font: inherit;
+        font-size: var(--gc-fs-meta);
+      }
+      .lane-legend {
+        flex: none;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: var(--gc-s3);
+        padding: 4px 0;
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-2);
+      }
+      .lane-legend .lg {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        white-space: nowrap;
+      }
+      .lane-legend .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex: none;
+      }
+      .commit-table {
+        flex: 1;
+        min-height: 0;
+        overflow: auto;
+        background: var(--gc-card);
+        border: 1px solid var(--gc-line);
+        border-radius: var(--gc-r);
+      }
+      .c-row {
+        display: flex;
+        align-items: center;
+        gap: var(--gc-s2);
+        height: 28px;
+        padding: 0 var(--gc-s3) 0 6px;
+        border-bottom: 1px solid var(--gc-line-weak);
+        cursor: pointer;
+        min-width: 0;
+      }
+      .c-row:hover {
+        background: var(--gc-btn-hover);
+      }
+      .c-row.is-sel {
+        background: var(--gc-accent-weak);
+      }
+      .c-row .lane {
+        flex: none;
+        width: 116px;
+        height: 28px;
+      }
+      .c-row .hash {
+        flex: none;
+        width: 62px;
+        font-family: var(--gc-font-mono);
+        font-size: var(--gc-fs-micro);
+        color: var(--gc-text-3);
+      }
+      .c-row .msg {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text);
+      }
+      .c-row .who {
+        flex: none;
+        width: 52px;
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-3);
+      }
+      .c-row .brs {
+        flex: none;
+        display: flex;
+        gap: 4px;
+      }
+      .c-row .when {
+        flex: none;
+        width: 84px;
+        text-align: right;
+        font-size: var(--gc-fs-micro);
+        color: var(--gc-text-3);
+      }
+      .lane-hint {
+        flex: none;
+        margin: 0;
+        font-size: var(--gc-fs-micro);
+        color: var(--gc-text-3);
+      }
+
+      /* 提交详情抽屉 + 拣选条 */
+      .commit-drawer {
+        flex: none;
+        width: 420px;
+        display: flex;
+        flex-direction: column;
+        background: var(--gc-card);
+        border: 1px solid var(--gc-line-strong);
+        border-radius: var(--gc-r);
+        box-shadow: var(--gc-shadow-menu);
+        overflow: hidden;
+        z-index: 40;
+      }
+      .commit-drawer[hidden] {
+        display: none;
+      }
+      .cd-head {
+        flex: none;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        height: 36px;
+        padding: 0 var(--gc-s3);
+        border-bottom: 1px solid var(--gc-line);
+        background: var(--gc-page);
+      }
+      .cd-head .ico {
+        color: var(--gc-text-3);
+      }
+      .cd-head .spacer {
+        flex: 1;
+      }
+      .cd-hash {
+        font-size: var(--gc-fs-body);
+        color: var(--gc-accent-text);
+      }
+      .cd-meta {
+        flex: none;
+        padding: 8px var(--gc-s3) 0;
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-3);
+      }
+      .cd-body {
+        flex: none;
+        padding: 6px var(--gc-s3) 10px;
+        border-bottom: 1px solid var(--gc-line-weak);
+      }
+      .cd-body b {
+        display: block;
+        font-size: var(--gc-fs-body);
+        color: var(--gc-text);
+        line-height: 1.4;
+      }
+      .cd-body p {
+        margin: 6px 0 0;
+        font-size: var(--gc-fs-meta);
+        line-height: 1.6;
+        color: var(--gc-text-2);
+      }
+      .cd-diff {
+        flex: 1;
+        min-height: 0;
+        overflow: auto;
+        padding: var(--gc-s2) var(--gc-s3);
+      }
+      .pick-bar {
+        flex: none;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        padding: 10px var(--gc-s3);
+        border-top: 1px solid var(--gc-line);
+        background: var(--gc-page);
+      }
+      .pick-bar .btn {
+        align-self: flex-start;
+      }
+      .pick-hint {
+        font-size: var(--gc-fs-micro);
+        color: var(--gc-text-3);
+        line-height: 1.5;
+      }
     </style>
   </head>
   <body>
@@ -743,22 +1254,43 @@
       </div>
 
       <main class="page status-page">
+        <!-- ============ 工具栏：模式切换 + 分支信息 + 动作 ============ -->
         <div class="toolbar">
-          <button class="branch-select" type="button">
-            <i class="ico sm" data-icon="branch"></i>
-            api-gateway
-            <span class="cv">/</span>
+          <div class="mode-seg" id="modeSeg">
+            <button type="button" class="on" data-view="workspace">工作区</button>
+            <button type="button" data-view="history">历史</button>
+          </div>
+          <span class="branch-chip">
+            <i class="ico sm" data-icon="branch" style="color: var(--gc-accent-text)"></i>
             feature/payment-retry
-            <i class="ico sm cv" data-icon="chevron-down"></i>
-          </button>
+            <span class="up">↑3</span>
+          </span>
           <span class="dirty-pill"><i class="ico" data-icon="file" style="width: 11px; height: 11px"></i>8 个改动</span>
           <span class="spacer"></span>
+          <button class="btn primary" type="button"><i class="ico sm" data-icon="check"></i>提交 Commit</button>
+          <button class="btn" type="button">暂存全部</button>
+          <button class="btn" type="button">Stash <span class="chip plain sm mono">2</span></button>
           <button class="btn" type="button"><i class="ico sm" data-icon="pull"></i>拉取</button>
-          <button class="btn primary" type="button"><i class="ico sm" data-icon="check"></i>提交</button>
-          <button class="btn ghost" type="button" aria-label="更多"><i class="ico sm" data-icon="more"></i></button>
+          <div class="more-wrap">
+            <button class="btn ghost" type="button" id="moreBtn" aria-label="更多操作">
+              <i class="ico sm" data-icon="more"></i>
+            </button>
+            <div class="more-menu" id="moreMenu">
+              <button type="button"><i class="ico sm" data-icon="refresh"></i>Fetch（--prune）</button>
+              <button type="button"><i class="ico sm" data-icon="git-merge"></i>工作区合并</button>
+              <button type="button"><i class="ico sm" data-icon="branch"></i>打标签</button>
+              <button type="button">取消暂存全部</button>
+              <div class="sep"></div>
+              <button type="button" class="danger">硬重置</button>
+              <button type="button" class="danger">清理未跟踪</button>
+              <button type="button" class="danger">变基</button>
+              <button type="button" class="danger">强制推送</button>
+            </div>
+          </div>
         </div>
 
-        <div class="workbench">
+        <!-- ============ 视图一：工作区 ============ -->
+        <div class="view on" id="view-workspace">
           <!-- 左：分支树 -->
           <aside class="branch-panel">
             <div class="panel-top">
@@ -767,99 +1299,107 @@
                 <input type="text" placeholder="搜索分支" />
               </div>
             </div>
-            <div class="tree">
+            <div class="group-head" style="padding: 6px 10px 2px">
+              <b>分支</b>
+              <span class="spacer"></span>
+              <button class="icon-btn" type="button" title="新建分支"><i class="ico sm" data-icon="plus"></i></button>
+              <button class="icon-btn" type="button" title="刷新"><i class="ico sm" data-icon="refresh"></i></button>
+            </div>
+            <div class="tree" title="双击切换 · 右键：拉取 / 推送 / 检出 / 合并 / 删除">
               <div class="tree-group"><i class="ico" data-icon="chevron-down"></i>本地</div>
+              <div class="tree-row"><span class="nm" style="padding-left: 18px">main</span></div>
+              <div class="tree-row"><span class="nm" style="padding-left: 18px">develop</span></div>
               <div class="tree-row is-current">
                 <i class="ico" data-icon="check"></i>
-                <span class="nm">main</span>
-                <span class="ahead"><i class="ico" data-icon="arrow-up"></i>2</span>
-              </div>
-              <div class="tree-row"><span class="nm" style="padding-left: 18px">develop</span></div>
-              <div class="tree-row">
-                <span class="nm" style="padding-left: 18px">feature/payment-retry</span>
+                <span class="nm">feature/payment-retry</span>
                 <span class="ahead"><i class="ico" data-icon="arrow-up"></i>3</span>
               </div>
               <div class="tree-row"><span class="nm" style="padding-left: 18px">release/2.4</span></div>
-              <div class="tree-row"><span class="nm" style="padding-left: 18px">hotfix/login-timeout</span></div>
               <div class="tree-group" style="margin-top: 4px">
                 <i class="ico" data-icon="chevron-down"></i>远程 · origin/
               </div>
-              <div class="tree-row remote"><span class="nm">origin/main</span><span class="ahead"><i class="ico" data-icon="arrow-down"></i>1</span></div>
+              <div class="tree-row remote">
+                <span class="nm">origin/main</span
+                ><span class="ahead"><i class="ico" data-icon="arrow-down"></i>1</span>
+              </div>
               <div class="tree-row remote"><span class="nm">origin/develop</span></div>
               <div class="tree-row remote"><span class="nm">origin/release/2.4</span></div>
-              <div class="tree-row remote"><span class="nm">origin/hotfix/login-timeout</span></div>
             </div>
           </aside>
 
-          <!-- 中：更改面板 -->
+          <!-- 中：更改 + 冲突 -->
           <section class="changes-panel">
-            <div class="group-head">
-              <b>暂存的更改</b>
-              <span class="cnt">3</span>
+            <div class="op-alert">
+              <i class="ico sm" data-icon="alert"></i>
+              <span>merge 进行中 · 还有 2 个冲突文件。选边写回后点继续，或中止。</span>
               <span class="spacer"></span>
-              <button class="icon-btn" type="button" title="全部取消暂存">
-                <i class="ico sm" data-icon="minus"></i>
-              </button>
+              <button class="btn primary" type="button">完成选边并继续</button>
+              <button class="btn ghost" type="button" style="color: var(--gc-red)">中止</button>
             </div>
-            <div class="change-list">
-              <div class="chg-row">
-                <span class="st a">A</span>
-                <span class="chg-path"><span>src/pay/retry.ts</span></span>
-                <span class="chg-diff"><span class="p">+42</span></span>
+
+            <div class="conflict-box">
+              <div class="cf-head"><i class="ico sm" data-icon="conflict"></i>冲突文件 2</div>
+              <div class="cf-row">
+                <span class="fp">src/pay/retry.ts</span>
+                <button class="tbtn" type="button">选左边</button>
+                <button class="tbtn" type="button">选右边</button>
+                <button class="tbtn" type="button">两边都要</button>
               </div>
-              <div class="chg-row">
-                <span class="st m">M</span>
-                <span class="chg-path"><span>src/pay/timeout.ts</span></span>
-                <span class="chg-diff"><span class="p">+18</span><span class="n">−4</span></span>
-              </div>
-              <div class="chg-row">
-                <span class="st a">A</span>
-                <span class="chg-path"><span>src/pay/retry.spec.ts</span></span>
-                <span class="chg-diff"><span class="p">+96</span></span>
+              <div class="cf-row">
+                <span class="fp">src/api/client.ts</span>
+                <button class="tbtn" type="button">选左边</button>
+                <button class="tbtn" type="button">选右边</button>
+                <button class="tbtn" type="button">两边都要</button>
               </div>
             </div>
 
+            <div class="ctabs" id="ctabs">
+              <button type="button">暂存<span class="n">3</span></button>
+              <button type="button" class="on">更改<span class="n">5</span></button>
+              <button type="button">冲突<span class="n">2</span></button>
+            </div>
             <div class="group-head">
               <b>更改</b>
               <span class="cnt">5</span>
               <span class="spacer"></span>
-              <button class="icon-btn" type="button" title="全部暂存">
-                <i class="ico sm" data-icon="plus"></i>
-              </button>
-              <button class="icon-btn" type="button" title="刷新">
-                <i class="ico sm" data-icon="refresh"></i>
-              </button>
+              <button class="tbtn" type="button">全选本组</button>
+              <button class="icon-btn" type="button" title="全部暂存"><i class="ico sm" data-icon="plus"></i></button>
             </div>
             <div class="change-list grow-list">
               <div class="chg-row is-sel">
+                <input type="checkbox" class="cb" checked />
                 <span class="st m">M</span>
                 <span class="chg-path"><span>src/api/client.ts</span></span>
-                <span class="chg-diff"><span class="p">+8</span><span class="n">−3</span></span>
+                <button class="tbtn" type="button">暂存</button>
               </div>
               <div class="chg-row">
+                <input type="checkbox" class="cb" />
                 <span class="st m">M</span>
                 <span class="chg-path"><span>src/api/types.ts</span></span>
-                <span class="chg-diff"><span class="p">+5</span><span class="n">−1</span></span>
+                <button class="tbtn" type="button">暂存</button>
               </div>
               <div class="chg-row">
+                <input type="checkbox" class="cb" />
                 <span class="st m">M</span>
                 <span class="chg-path"><span>src/config/defaults.ts</span></span>
-                <span class="chg-diff"><span class="p">+2</span><span class="n">−2</span></span>
+                <button class="tbtn" type="button">暂存</button>
               </div>
               <div class="chg-row">
+                <input type="checkbox" class="cb" />
                 <span class="st d">D</span>
                 <span class="chg-path"><span>src/legacy/retry-old.ts</span></span>
-                <span class="chg-diff"><span class="n">−64</span></span>
+                <button class="tbtn" type="button">暂存</button>
               </div>
               <div class="chg-row">
+                <input type="checkbox" class="cb" />
                 <span class="st m">M</span>
                 <span class="chg-path"><span>README.md</span></span>
-                <span class="chg-diff"><span class="p">+12</span><span class="n">−0</span></span>
+                <button class="tbtn" type="button">暂存</button>
               </div>
             </div>
           </section>
 
-          <!-- 右：差异 + 记录 -->
+          <!-- 右：差异监视器 + 记录 -->
           <div class="right-col">
             <section class="diff-panel">
               <div class="file-head">
@@ -869,130 +1409,193 @@
                 <span class="spacer"></span>
                 <span class="chip plain sm mono" style="color: var(--gc-green)">+8</span>
                 <span class="chip plain sm mono" style="color: var(--gc-red)">−3</span>
-                <button class="icon-btn" type="button" title="折叠">
-                  <i class="ico sm" data-icon="chevron-down"></i>
-                </button>
               </div>
               <div class="diff-body">
                 <div class="hunk">
-                  <span class="rng">@@ -58,7 +58,12 @@</span>
-                  <span>export async function request()</span>
+                  <span class="rng">@@ -58,7 +58,12 @@</span><span>export async function request()</span>
                 </div>
                 <div class="dline ctx">
-                  <span class="ln">58</span><span class="sign"></span>
-                  <span class="code">  const url = buildUrl(path, query);</span>
-                </div>
-                <div class="dline ctx">
-                  <span class="ln">59</span><span class="sign"></span>
-                  <span class="code">  const ctrl = new AbortController();</span>
+                  <span class="ln">58</span><span class="sign"></span
+                  ><span class="code"> const timer = setTimeout(() =&gt; {</span>
                 </div>
                 <div class="dline del">
-                  <span class="ln">60</span><span class="sign">−</span>
-                  <span class="code">  const timer = setTimeout(() =&gt; ctrl.abort(), 30000);</span>
+                  <span class="ln">59</span><span class="sign">−</span><span class="code"> abort(signal);</span>
                 </div>
                 <div class="dline add">
-                  <span class="ln"></span><span class="sign">+</span>
-                  <span class="code">  const timeout = options.timeout ?? 30000;</span>
+                  <span class="ln"></span><span class="sign">+</span
+                  ><span class="code"> if (!signal.aborted) abort(signal);</span>
                 </div>
                 <div class="dline add">
-                  <span class="ln"></span><span class="sign">+</span>
-                  <span class="code">  const timer = setTimeout(() =&gt; ctrl.abort(), timeout);</span>
+                  <span class="ln"></span><span class="sign">+</span><span class="code"> retryCount += 1;</span>
                 </div>
                 <div class="dline ctx">
-                  <span class="ln">61</span><span class="sign"></span>
-                  <span class="code">  try {</span>
-                </div>
-                <div class="dline ctx">
-                  <span class="ln">62</span><span class="sign"></span>
-                  <span class="code">    const res = await fetch(url, {</span>
-                </div>
-                <div class="dline add">
-                  <span class="ln"></span><span class="sign">+</span>
-                  <span class="code">      signal: ctrl.signal,</span>
-                </div>
-                <div class="dline add">
-                  <span class="ln"></span><span class="sign">+</span>
-                  <span class="code">      retry: options.retry ?? 2</span>
-                </div>
-                <div class="dline ctx">
-                  <span class="ln">63</span><span class="sign"></span>
-                  <span class="code">    });</span>
-                </div>
-                <div class="dline ctx">
-                  <span class="ln">64</span><span class="sign"></span>
-                  <span class="code">    if (!res.ok) throw new ApiError(res);</span>
-                </div>
-                <div class="dline ctx">
-                  <span class="ln">65</span><span class="sign"></span>
-                  <span class="code">    return res.json();</span>
-                </div>
-                <div class="dline ctx">
-                  <span class="ln">66</span><span class="sign"></span>
-                  <span class="code">  } finally {</span>
-                </div>
-                <div class="dline del">
-                  <span class="ln">67</span><span class="sign">−</span>
-                  <span class="code">    clearTimeout(timer);</span>
-                </div>
-                <div class="dline add">
-                  <span class="ln"></span><span class="sign">+</span>
-                  <span class="code">    clearTimeout(timer);</span>
-                </div>
-                <div class="dline ctx">
-                  <span class="ln">68</span><span class="sign"></span>
-                  <span class="code">  }</span>
+                  <span class="ln">60</span><span class="sign"></span><span class="code"> }, timeout);</span>
                 </div>
               </div>
             </section>
 
-            <section class="log-panel">
+            <section class="log-panel" style="flex: 1; min-height: 0">
               <div class="card-head">
                 <i class="ico sm" data-icon="commit" style="color: var(--gc-text-3)"></i>
-                <h3>最近提交</h3>
+                <h3>记录 Records</h3>
                 <span class="spacer"></span>
-                <button class="icon-btn" type="button" title="查看全部">
-                  <i class="ico sm" data-icon="chevron"></i>
-                </button>
+                <button class="tbtn" type="button">添加 worktree</button>
+                <button class="icon-btn" type="button" title="刷新"><i class="ico sm" data-icon="refresh"></i></button>
               </div>
-              <div class="log-list">
-                <div class="commit-row">
-                  <span class="hash">7f3e9b1</span>
-                  <span class="msg">feat: 支付重试超时处理</span>
-                  <span class="who">李娜</span>
-                  <span class="br">HEAD</span>
-                  <span class="when">37 分钟前</span>
+              <div style="padding: 6px 10px 4px">
+                <div class="rec-tabs" id="recTabs">
+                  <button type="button" class="on" data-tab="stash">Stash 2</button>
+                  <button type="button" data-tab="backup">备份 2</button>
+                  <button type="button" data-tab="worktree">Worktree 2</button>
+                  <button type="button" data-tab="reflog">Reflog 3</button>
                 </div>
-                <div class="commit-row">
-                  <span class="hash">a1b2c3d</span>
-                  <span class="msg">chore: bump fastify to 4.28</span>
-                  <span class="who">张伟</span>
-                  <span class="br">main</span>
-                  <span class="when">2 小时前</span>
+              </div>
+              <div class="rec-list" style="padding: 0 10px 8px" data-rec="stash">
+                <div class="rec-row">
+                  <span class="ref">stash@{0}</span><span class="msg">WIP on feature/payment-retry: 支付重试超时</span
+                  ><span class="when">2 小时前</span
+                  ><span class="acts"
+                    ><button type="button">差异</button><button type="button">应用</button
+                    ><button type="button">恢复</button><button type="button" class="danger">删除</button></span
+                  >
                 </div>
-                <div class="commit-row">
-                  <span class="hash">c4e7a09</span>
-                  <span class="msg">fix: 修复鉴权中间件漏传 header</span>
-                  <span class="who">王磊</span>
-                  <span class="br">origin/main</span>
-                  <span class="when">昨天 14:32</span>
+                <div class="rec-row">
+                  <span class="ref">stash@{1}</span><span class="msg">WIP on main: 调整配置默认值</span
+                  ><span class="when">昨天</span
+                  ><span class="acts"
+                    ><button type="button">差异</button><button type="button">应用</button
+                    ><button type="button">恢复</button><button type="button" class="danger">删除</button></span
+                  >
                 </div>
-                <div class="commit-row">
-                  <span class="hash">b90f12e</span>
-                  <span class="msg">refactor: 拆出对账任务调度器</span>
-                  <span class="who">陈晨</span>
-                  <span class="br">develop</span>
-                  <span class="when">昨天 09:18</span>
+              </div>
+              <div class="rec-list" style="padding: 0 10px 8px; display: none" data-rec="backup">
+                <div class="rec-row">
+                  <span class="ref">backup/pre-op-20261022-1931</span
+                  ><span class="msg">硬重置前自动备份 · 检出不会恢复工作区</span><span class="when">昨天</span
+                  ><span class="acts"><button type="button">检出</button></span>
                 </div>
-                <div class="commit-row">
-                  <span class="hash">5d6a8f0</span>
-                  <span class="msg">docs: 补充 MCP 工具清单</span>
-                  <span class="who">张伟</span>
-                  <span class="br">release/2.4</span>
-                  <span class="when">2 天前</span>
+                <div class="rec-row">
+                  <span class="ref">stash@{2}</span><span class="msg">backup 自动 stash · 应用不会重置当前分支</span
+                  ><span class="when">昨天</span><span class="acts"><button type="button">应用</button></span>
+                </div>
+              </div>
+              <div class="rec-list" style="padding: 0 10px 8px; display: none" data-rec="worktree">
+                <div class="rec-row">
+                  <span class="ref">主区</span><span class="msg">D:/_myproject/git-cockpit</span
+                  ><span class="when">main</span
+                  ><span class="acts"><button type="button" class="danger">移除</button></span>
+                </div>
+                <div class="rec-row">
+                  <span class="ref">release-2.4</span><span class="msg">D:/_myproject/wt-release-2.4</span
+                  ><span class="when">7f3e9b1</span
+                  ><span class="acts"><button type="button" class="danger">移除</button></span>
+                </div>
+              </div>
+              <div class="rec-list" style="padding: 0 10px 8px; display: none" data-rec="reflog">
+                <div class="rec-row">
+                  <span class="ref">7f3e9b1</span><span class="msg">HEAD@{0} · commit: feat: 支付重试超时处理</span
+                  ><span class="when">37 分钟前</span><span class="acts"><button type="button">检出</button></span>
+                </div>
+                <div class="rec-row">
+                  <span class="ref">a1b2c3d</span><span class="msg">HEAD@{1} · checkout: moving from main</span
+                  ><span class="when">2 小时前</span><span class="acts"><button type="button">检出</button></span>
+                </div>
+                <div class="rec-row">
+                  <span class="ref">c4e7a09</span><span class="msg">HEAD@{2} · reset: moving to HEAD~1</span
+                  ><span class="when">昨天</span><span class="acts"><button type="button">检出</button></span>
                 </div>
               </div>
             </section>
           </div>
+        </div>
+
+        <!-- ============ 视图二：历史（泳道 + 提交列表 + 详情抽屉） ============ -->
+        <div class="view" id="view-history">
+          <div class="hist-main">
+            <div class="hist-bar">
+              <span class="lb">分支</span>
+              <select>
+                <option>当前分支</option>
+                <option>全部分支</option>
+                <option>指定分支…</option>
+              </select>
+              <input class="hist-search" type="text" placeholder="搜索提交信息 / hash" />
+              <span class="spacer"></span>
+              <span class="lb">对比</span>
+              <select>
+                <option>合入目标 release/2.4</option>
+                <option>合入目标 main</option>
+              </select>
+              <select>
+                <option>我的分支 feature/payment-retry</option>
+                <option>我的分支 develop</option>
+              </select>
+              <button class="btn primary" type="button">对比</button>
+              <button class="btn ghost" type="button">清除</button>
+              <button class="tbtn accent" type="button">去合并预演</button>
+            </div>
+
+            <div class="lane-legend" id="laneLegend"></div>
+
+            <div class="commit-table" id="commitTable"></div>
+
+            <p class="lane-hint">点提交看详情与拣选；泳道颜色对应分支，分支 tip 行标出分支名。</p>
+          </div>
+
+          <aside class="commit-drawer" id="commitDrawer" role="dialog" aria-label="提交详情">
+            <div class="cd-head">
+              <i class="ico sm" data-icon="commit"></i>
+              <span class="cd-hash mono" id="cdHash">7f3e9b1</span>
+              <span class="spacer"></span>
+              <button class="icon-btn" type="button" id="cdClose" aria-label="关闭">
+                <i class="ico sm" data-icon="close"></i>
+              </button>
+            </div>
+            <div class="cd-meta" id="cdMeta">李娜 · 37 分钟前 · HEAD</div>
+            <div class="cd-body">
+              <b id="cdMsg">feat: 支付重试超时处理</b>
+              <p>请求超时后按指数退避重试，最多 3 次；取消信号已生效时不再重试，避免无意义等待。</p>
+            </div>
+            <div class="cd-diff">
+              <div class="hunk">
+                <span class="rng">@@ -58,7 +58,12 @@</span><span>export async function request()</span>
+              </div>
+              <div class="dline ctx">
+                <span class="ln">58</span><span class="sign"></span
+                ><span class="code"> const timer = setTimeout(() =&gt; {</span>
+              </div>
+              <div class="dline del">
+                <span class="ln">59</span><span class="sign">−</span><span class="code"> abort(signal);</span>
+              </div>
+              <div class="dline add">
+                <span class="ln"></span><span class="sign">+</span
+                ><span class="code"> if (!signal.aborted) abort(signal);</span>
+              </div>
+              <div class="dline add">
+                <span class="ln"></span><span class="sign">+</span><span class="code"> retryCount += 1;</span>
+              </div>
+              <div class="dline ctx">
+                <span class="ln">60</span><span class="sign"></span><span class="code"> }, timeout);</span>
+              </div>
+              <div class="hunk">
+                <span class="rng">@@ -72,6 +77,9 @@</span><span> if (retryCount &gt; MAX_RETRY) {</span>
+              </div>
+              <div class="dline add">
+                <span class="ln"></span><span class="sign">+</span
+                ><span class="code"> logger.warn('retry exhausted', { url });</span>
+              </div>
+              <div class="dline ctx">
+                <span class="ln">73</span><span class="sign"></span
+                ><span class="code"> throw new RetryExceeded(url);</span>
+              </div>
+            </div>
+            <div class="pick-bar">
+              <button class="btn primary" type="button">拣选到当前分支</button>
+              <span class="pick-hint"
+                >工作区有 merge / rebase / cherry-pick 进行中时禁用，并提示「工作区正忙，先继续或中止」</span
+              >
+            </div>
+          </aside>
         </div>
       </main>
 
@@ -1082,5 +1685,237 @@
 
     <script src="assets/icons.js"></script>
     <script src="assets/switch.js"></script>
+    <script>
+      /* 视图切换：工作区 / 历史 */
+      (function () {
+        var seg = document.getElementById('modeSeg');
+        var views = {
+          workspace: document.getElementById('view-workspace'),
+          history: document.getElementById('view-history')
+        };
+        seg.querySelectorAll('button').forEach(function (b) {
+          b.addEventListener('click', function () {
+            seg.querySelectorAll('button').forEach(function (x) {
+              x.classList.remove('on');
+            });
+            b.classList.add('on');
+            var key = b.dataset.view;
+            Object.keys(views).forEach(function (k) {
+              views[k].classList.toggle('on', k === key);
+            });
+            var ball = document.querySelector('.chat-ball');
+            if (ball) ball.style.display = key === 'history' ? 'none' : '';
+          });
+        });
+      })();
+
+      /* 历史视图：泳道提交列表（每行一段 SVG，线连续，tip 行标分支名） */
+      (function () {
+        var LANES = [
+          { name: 'feature/payment-retry', color: 'var(--gc-amber)', mergeRow: 8, parent: 1 },
+          { name: 'main', color: 'var(--gc-accent)' },
+          { name: 'release/2.4', color: 'var(--gc-green)', mergeRow: 8, parent: 1 },
+          { name: 'develop', color: 'var(--gc-purple)', mergeRow: 8, parent: 1 }
+        ];
+        var ROWS = [
+          { hash: '7f3e9b1', msg: 'feat: 支付重试超时处理', who: '李娜', when: '37 分钟前', lane: 0, tip: true },
+          { hash: '3c9d1a2', msg: 'test: 补充重试单测', who: '李娜', when: '1 小时前', lane: 0 },
+          { hash: 'a1b2c3d', msg: 'chore: bump fastify to 4.28', who: '张伟', when: '2 小时前', lane: 1, tip: true },
+          { hash: 'c4e7a09', msg: 'fix: 修复鉴权中间件漏传 header', who: '王磊', when: '昨天 14:32', lane: 1 },
+          { hash: 'b90f12e', msg: 'refactor: 拆出对账任务调度器', who: '陈晨', when: '昨天 09:18', lane: 2, tip: true },
+          { hash: '5d6a8f0', msg: 'docs: 补充 MCP 工具清单', who: '张伟', when: '2 天前', lane: 2 },
+          { hash: 'e1f2a3b', msg: 'feat: 对账任务支持重跑', who: '陈晨', when: '2 天前', lane: 3, tip: true },
+          { hash: '4c5d6e7', msg: 'test: 对账任务回归用例', who: '陈晨', when: '3 天前', lane: 3 },
+          { hash: '9a8b7c6', msg: 'merge: release/2.4 合回 main', who: '张伟', when: '3 天前', lane: 1 },
+          { hash: '0a1b2c3', msg: 'chore: 初始化仓库结构', who: '张伟', when: '2 周前', lane: 1, base: true }
+        ];
+        var LANE_W = 28;
+        var X0 = 16;
+
+        function laneRange(lane) {
+          var first = -1;
+          var last = -1;
+          ROWS.forEach(function (r, i) {
+            if (r.lane === lane) {
+              if (first < 0) first = i;
+              last = i;
+            }
+          });
+          return { first: first, last: last };
+        }
+
+        function svgForRow(row, index) {
+          var parts = [];
+          LANES.forEach(function (ln, li) {
+            var rg = laneRange(li);
+            if (rg.first < 0) return;
+            var endRow = ln.mergeRow === undefined ? rg.last : Math.max(rg.last, ln.mergeRow);
+            if (index < rg.first || index > endRow) return;
+            var x = X0 + li * LANE_W;
+            var y1 = index === rg.first ? 14 : 0;
+            var y2 = index === endRow && ln.mergeRow === undefined ? 14 : 28;
+            parts.push(
+              '<line x1="' +
+                x +
+                '" y1="' +
+                y1 +
+                '" x2="' +
+                x +
+                '" y2="' +
+                y2 +
+                '" stroke="' +
+                ln.color +
+                '" stroke-width="2" stroke-opacity="0.75" />'
+            );
+            if (ln.mergeRow !== undefined && index === ln.mergeRow) {
+              var px = X0 + ln.parent * LANE_W;
+              parts.push(
+                '<path d="M' +
+                  x +
+                  ' 0 Q' +
+                  x +
+                  ' 14 ' +
+                  px +
+                  ' 14" fill="none" stroke="' +
+                  ln.color +
+                  '" stroke-width="2" stroke-opacity="0.75" />'
+              );
+            }
+          });
+          var cx = X0 + row.lane * LANE_W;
+          var color = LANES[row.lane].color;
+          parts.push('<circle cx="' + cx + '" cy="14" r="4" fill="' + color + '" />');
+          if (row.base) {
+            parts.push(
+              '<circle cx="' + cx + '" cy="14" r="7" fill="none" stroke="' + color + '" stroke-opacity="0.6" />'
+            );
+          }
+          return '<svg class="lane" viewBox="0 0 116 28" width="116" height="28">' + parts.join('') + '</svg>';
+        }
+
+        function chip(text, color) {
+          return (
+            '<span class="chip sm" style="color:' +
+            color +
+            ';border-color:' +
+            color +
+            '55;background:transparent">' +
+            text +
+            '</span>'
+          );
+        }
+
+        var table = document.getElementById('commitTable');
+        var legend = document.getElementById('laneLegend');
+        legend.innerHTML = LANES.map(function (ln) {
+          return '<span class="lg"><i class="dot" style="background:' + ln.color + '"></i>' + ln.name + '</span>';
+        }).join('');
+
+        table.innerHTML = ROWS.map(function (r, i) {
+          var brs = '';
+          if (r.tip) brs = chip(LANES[r.lane].name, LANES[r.lane].color);
+          if (r.base) brs = chip('分叉点', 'var(--gc-purple)');
+          return (
+            '<div class="c-row' +
+            (i === 0 ? ' is-sel' : '') +
+            '" data-hash="' +
+            r.hash +
+            '" data-msg="' +
+            r.msg +
+            '" data-who="' +
+            r.who +
+            '" data-when="' +
+            r.when +
+            '">' +
+            svgForRow(r, i) +
+            '<span class="hash">' +
+            r.hash +
+            '</span>' +
+            '<span class="msg">' +
+            r.msg +
+            '</span>' +
+            '<span class="who">' +
+            r.who +
+            '</span>' +
+            '<span class="brs">' +
+            brs +
+            '</span>' +
+            '<span class="when">' +
+            r.when +
+            '</span>' +
+            '</div>'
+          );
+        }).join('');
+      })();
+
+      /* 提交详情抽屉：点行更新，默认打开第一条 */
+      (function () {
+        var drawer = document.getElementById('commitDrawer');
+        var rows = document.querySelectorAll('#commitTable .c-row');
+        if (!drawer || !rows.length) return;
+        function open(row) {
+          rows.forEach(function (r) {
+            r.classList.remove('is-sel');
+          });
+          row.classList.add('is-sel');
+          document.getElementById('cdHash').textContent = row.dataset.hash;
+          document.getElementById('cdMsg').textContent = row.dataset.msg;
+          document.getElementById('cdMeta').textContent = row.dataset.who + ' · ' + row.dataset.when;
+          drawer.hidden = false;
+        }
+        rows.forEach(function (r) {
+          r.addEventListener('click', function () {
+            open(r);
+          });
+        });
+        document.getElementById('cdClose').addEventListener('click', function () {
+          drawer.hidden = true;
+        });
+        open(rows[0]);
+      })();
+
+      /* 更多操作菜单 */
+      (function () {
+        var btn = document.getElementById('moreBtn');
+        var menu = document.getElementById('moreMenu');
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          menu.classList.toggle('on');
+        });
+        document.addEventListener('click', function () {
+          menu.classList.remove('on');
+        });
+      })();
+
+      /* 更改分组 tab */
+      (function () {
+        var tabs = document.querySelectorAll('#ctabs button');
+        tabs.forEach(function (b) {
+          b.addEventListener('click', function () {
+            tabs.forEach(function (x) {
+              x.classList.remove('on');
+            });
+            b.classList.add('on');
+          });
+        });
+      })();
+
+      /* 记录 tab：切换列表内容 */
+      (function () {
+        var tabs = document.querySelectorAll('#recTabs button');
+        tabs.forEach(function (b) {
+          b.addEventListener('click', function () {
+            tabs.forEach(function (x) {
+              x.classList.remove('on');
+            });
+            b.classList.add('on');
+            var key = b.dataset.tab;
+            document.querySelectorAll('[data-rec]').forEach(function (l) {
+              l.style.display = l.dataset.rec === key ? '' : 'none';
+            });
+          });
+        });
+      })();
+    </script>
   </body>
 </html>

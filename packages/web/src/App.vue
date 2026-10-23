@@ -31,6 +31,7 @@ const { bump } = useRevision();
 /** 顶栏页标题：仅声明了 meta 的页面启用（当前只有设置页），其余页面保留页内 page-head */
 const PAGE_META: Record<string, { title: string; sub: string }> = {
   '/dashboard': { title: '工作台', sub: '本地 Git 仓库的驾驶舱' },
+  '/status': { title: '仓库状态', sub: '工作区与历史' },
   '/settings': { title: '设置', sub: '本机保存，不上传' }
 };
 const pageMeta = computed(() => PAGE_META[route.path] ?? null);

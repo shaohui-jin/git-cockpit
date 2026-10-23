@@ -121,7 +121,9 @@ onMounted(() => {
         <el-option label="最近 100 条" :value="100" />
       </el-select>
       <span class="spacer" />
-      <span class="log-count">共 <b>{{ logs.logs.length }}</b> 条 · 显示 <b>{{ visible.length }}</b> 条</span>
+      <span class="log-count"
+        >共 <b>{{ logs.logs.length }}</b> 条 · 显示 <b>{{ visible.length }}</b> 条</span
+      >
     </div>
 
     <div v-if="!logs.loading && logs.logs.length === 0" class="empty gc-card">

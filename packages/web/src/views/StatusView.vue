@@ -8,7 +8,7 @@ import { useMergeSessionStore } from '@/stores/mergeSession';
 import { useToolAction } from '@/composables/useToolAction';
 import { useRevision } from '@/composables/revision';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
-import CommitLogPanel from '@/components/CommitLogPanel.vue';
+import CommitHistory from '@/components/CommitHistory.vue';
 import BranchTreeSelect from '@/components/BranchTreeSelect.vue';
 import ConflictResolvePanel from '@/components/ConflictResolvePanel.vue';
 import { useBranchesStore } from '@/stores/branches';
@@ -16,7 +16,6 @@ import type { BranchTreeNode } from '@/utils/branchTree';
 import { buildChangeTree, treeFilePaths, type ChangeTreeNode } from '@/utils/changeTree';
 import type {
   BackupList,
-  BranchGraph,
   BranchInfo,
   DiffResult,
   FileStatus,
@@ -29,7 +28,6 @@ import type {
 } from '@/api/types';
 
 const DiffViewer = defineAsyncComponent(() => import('@/components/DiffViewer.vue'));
-const CommitGraph = defineAsyncComponent(() => import('@/components/CommitGraph.vue'));
 
 const repos = useReposStore();
 const branchStore = useBranchesStore();
@@ -43,13 +41,8 @@ const stashes = ref<StashInfo[]>([]);
 const worktrees = ref<WorktreeInfo[]>([]);
 const loading = ref(false);
 const loadError = ref('');
-const contentMode = ref<'workspace' | 'graph' | 'log'>('workspace');
-const graph = ref<BranchGraph | null>(null);
-const graphLoading = ref(false);
-const graphError = ref('');
-const logPanel = ref<{ refresh: () => Promise<void>; loading: boolean } | null>(null);
-const lineageInto = ref('');
-const lineageFrom = ref('');
+const contentMode = ref<'workspace' | 'history'>('workspace');
+const historyPanel = ref<{ refresh: () => Promise<void>; loading: boolean } | null>(null);
 const workspaceConflicts = ref<WorkspaceConflicts | null>(null);
 const workspacePanel = ref<{ buildFiles: () => Array<{ path: string; resolvedContent: string }> } | null>(null);
 const backups = ref<BackupList>({ branches: [], stashes: [] });
@@ -115,7 +108,7 @@ const rebaseOnto = ref('');
 const checkedFiles = reactive<Set<string>>(new Set());
 const checkedCount = computed(() => checkedFiles.size);
 
-const activeTab = ref<'unstaged' | 'staged' | 'untracked' | 'all'>('unstaged');
+const activeTab = ref<'staged' | 'changes' | 'conflicted'>('changes');
 
 const { confirmVisible, pending, canRun, previewAndConfirm, executeConfirmed, cancel } = useToolAction(repoId);
 
@@ -124,11 +117,44 @@ const currentBranch = computed(() => status.value?.currentShort ?? status.value?
 const ahead = computed(() => status.value?.ahead ?? 0);
 const behind = computed(() => status.value?.behind ?? 0);
 const branchPanes = computed(() => branchStore.panes);
-const graphRemotes = computed(() => branchStore.remotes.map((r) => r.name));
-const graphDefaultRemote = computed(() =>
-  graphRemotes.value.includes('origin') ? 'origin' : (graphRemotes.value[0] ?? 'origin')
-);
 
+/* 分支搜索：按名称过滤树（保留命中节点的祖先链） */
+const branchQuery = ref('');
+interface BranchNodeLike {
+  label?: string;
+  fullName?: string;
+  branch?: unknown;
+  children?: BranchNodeLike[];
+}
+function filterTree(nodes: BranchNodeLike[], q: string): BranchNodeLike[] {
+  const out: BranchNodeLike[] = [];
+  for (const n of nodes) {
+    const hit = `${n.label ?? ''} ${n.fullName ?? ''}`.toLowerCase().includes(q);
+    const kids = n.children ? filterTree(n.children, q) : [];
+    if (hit) out.push(n);
+    else if (kids.length) out.push({ ...n, children: kids });
+  }
+  return out;
+}
+const filteredPanes = computed(() => {
+  const q = branchQuery.value.trim().toLowerCase();
+  if (!q) return branchPanes.value;
+  return branchPanes.value.map((p) => ({ ...p, tree: filterTree(p.tree as BranchNodeLike[], q) }));
+});
+
+/* 「更多」菜单命令 */
+function onMoreCommand(cmd: string | number | object): void {
+  const c = String(cmd);
+  if (c === 'fetch') fetchRemote();
+  else if (c === 'merge') mergeVisible.value = true;
+  else if (c === 'tag') tagVisible.value = true;
+  else if (c === 'unstage') unstageAll();
+  else if (c === 'reset') resetVisible.value = true;
+  else if (c === 'clean') void run('git_clean');
+  else if (c === 'rebase') rebaseVisible.value = true;
+  else if (c === 'push-force') void run('git_push_force');
+  else if (c === 'refresh') void refresh();
+}
 /** 各标签页文件列表（untracked 转成 FileStatus 统一渲染） */
 const tabLists = computed(() => {
   const s = status.value;
@@ -137,7 +163,9 @@ const tabLists = computed(() => {
       unstaged: [] as FileStatus[],
       staged: [] as FileStatus[],
       untracked: [] as FileStatus[],
-      all: [] as FileStatus[]
+      all: [] as FileStatus[],
+      changes: [] as FileStatus[],
+      conflicted: [] as FileStatus[]
     };
   }
   const untracked: FileStatus[] = s.untracked.map((p) => ({
@@ -156,25 +184,22 @@ const tabLists = computed(() => {
     seen.add(f.path);
     return f.path !== '';
   });
-  return { unstaged: s.unstaged, staged: s.staged, untracked, all };
+  // 更改 = 未暂存 + 未跟踪；冲突单列
+  const changes = [...s.unstaged, ...untracked];
+  const conflicted = all.filter((f) => f.conflicted);
+  return { unstaged: s.unstaged, staged: s.staged, untracked, all, changes, conflicted };
 });
 
 const tabs = computed(() => [
-  { key: 'unstaged' as const, label: '未暂存', hint: '已修改，未 git add', count: tabLists.value.unstaged.length },
-  { key: 'staged' as const, label: '已暂存', hint: '已 git add，未提交', count: tabLists.value.staged.length },
-  { key: 'untracked' as const, label: '未跟踪', hint: '工作区新文件', count: tabLists.value.untracked.length },
-  { key: 'all' as const, label: '全部', hint: '全部更改', count: tabLists.value.all.length }
+  { key: 'staged' as const, label: '暂存', hint: '已 git add，未提交', count: tabLists.value.staged.length },
+  { key: 'changes' as const, label: '更改', hint: '已修改或未跟踪，未 git add', count: tabLists.value.changes.length },
+  { key: 'conflicted' as const, label: '冲突', hint: '冲突未解决', count: tabLists.value.conflicted.length }
 ]);
 
 const activeList = computed<FileStatus[]>(() => tabLists.value[activeTab.value] ?? []);
 const totalFiles = computed(() => tabLists.value.all.length);
 
-const tabTrees = computed(() => ({
-  unstaged: buildChangeTree(tabLists.value.unstaged),
-  staged: buildChangeTree(tabLists.value.staged),
-  untracked: buildChangeTree(tabLists.value.untracked),
-  all: buildChangeTree(tabLists.value.all)
-}));
+
 
 function syncText(b?: BranchInfo): string {
   if (!b || b.remote || !b.upstream) return '';
@@ -239,70 +264,9 @@ async function loadWorkspaceConflicts(): Promise<void> {
   }
 }
 
-async function loadGraph(): Promise<void> {
-  const id = repoId();
-  if (id === null) return;
-  graphLoading.value = true;
-  graphError.value = '';
-  try {
-    const into = lineageInto.value.trim();
-    const from = lineageFrom.value.trim();
-    graph.value = await api.getBranchGraph(id, {
-      maxNodes: 200,
-      into: graph.value?.lineage && into && from ? into : undefined,
-      from: graph.value?.lineage && into && from ? from : undefined
-    });
-  } catch (err) {
-    graphError.value = err instanceof Error ? err.message : String(err);
-    graph.value = null;
-  } finally {
-    graphLoading.value = false;
-  }
-}
-
-async function compareLineage(): Promise<void> {
-  const id = repoId();
-  const into = lineageInto.value.trim();
-  const from = lineageFrom.value.trim();
-  if (id === null || !into || !from) {
-    ElMessage.warning('请选择合入目标与我的分支');
-    return;
-  }
-  graphLoading.value = true;
-  graphError.value = '';
-  try {
-    graph.value = await api.getBranchGraph(id, { maxNodes: 200, into, from });
-    if (graph.value.lineage && !graph.value.lineage.mergeBase) {
-      ElMessage.warning('两条分支没有共同祖先，无法画分叉图');
-    }
-  } catch (err) {
-    graphError.value = err instanceof Error ? err.message : String(err);
-    graph.value = null;
-  } finally {
-    graphLoading.value = false;
-  }
-}
-
-async function clearLineage(): Promise<void> {
-  lineageInto.value = '';
-  lineageFrom.value = '';
-  const id = repoId();
-  if (id === null) return;
-  graphLoading.value = true;
-  try {
-    graph.value = await api.getBranchGraph(id, { maxNodes: 200 });
-  } catch (err) {
-    graphError.value = err instanceof Error ? err.message : String(err);
-  } finally {
-    graphLoading.value = false;
-  }
-}
-
-function goMergePreview(): void {
-  const L = graph.value?.lineage;
-  if (!L) return;
-  mergeSession.pairInto = L.into;
-  mergeSession.pairFrom = L.from;
+function goMergePreview(into: string, from: string): void {
+  mergeSession.pairInto = into;
+  mergeSession.pairFrom = from;
   mergeSession.mode = 'pair';
   void router.push('/merge');
 }
@@ -320,12 +284,8 @@ async function loadBackupsAndReflog(): Promise<void> {
 }
 
 async function refresh(): Promise<void> {
-  if (contentMode.value === 'graph') {
-    await Promise.all([loadStatus(), loadBranches(), loadGraph()]);
-    return;
-  }
-  if (contentMode.value === 'log') {
-    await Promise.all([loadStatus(), loadBranches(), logPanel.value?.refresh() ?? Promise.resolve()]);
+  if (contentMode.value === 'history') {
+    await Promise.all([loadStatus(), loadBranches(), historyPanel.value?.refresh() ?? Promise.resolve()]);
     return;
   }
   await Promise.all([loadStatus(), loadBranches(), loadStashes(), loadWorktrees(), loadBackupsAndReflog()]);
@@ -774,7 +734,8 @@ watch(revision, () => {
 });
 watch(contentMode, (mode) => {
   closeBranchMenu();
-  if (mode === 'graph') void loadGraph();
+  const ball = document.querySelector('.chat-ball');
+  if (ball instanceof HTMLElement) ball.style.display = mode === 'history' ? 'none' : '';
 });
 
 onMounted(() => {
@@ -792,26 +753,50 @@ onUnmounted(() => {
 
 <template>
   <div class="page status-page">
-    <!-- 顶部：标题 + 当前分支信息（与右侧操作按钮分离） -->
-    <div class="page-head">
-      <h2 class="page-title">仓库状态</h2>
-      <div class="head-branch">
-        <el-tag type="primary" effect="dark" class="branch-tag">{{ currentBranch || '—' }}</el-tag>
-        <span v-if="status?.tracking" class="tracking mono">{{ status.tracking }}</span>
-        <span v-if="ahead" class="sync ahead">↑{{ ahead }}</span>
-        <span v-if="behind" class="sync behind">↓{{ behind }}</span>
-        <el-tag v-if="status?.isClean" type="success" effect="plain" size="small">工作区干净</el-tag>
-        <el-tag v-else-if="status" type="warning" effect="plain" size="small">{{ totalFiles }} 处更改</el-tag>
-        <span class="repo-path mono">{{ currentPath }}</span>
-      </div>
-      <div class="head-actions">
-        <el-radio-group v-model="contentMode" size="small">
-          <el-radio-button value="workspace">工作区</el-radio-button>
-          <el-radio-button value="graph">分支图</el-radio-button>
-          <el-radio-button value="log">提交</el-radio-button>
-        </el-radio-group>
-        <el-button :loading="loading || graphLoading || logPanel?.loading" @click="refresh">刷新</el-button>
-      </div>
+    <!-- 工具栏：模式 + 分支信息 + 主操作（其余收进「更多」） -->
+    <div class="st-toolbar">
+      <el-radio-group v-model="contentMode" size="small">
+        <el-radio-button value="workspace">工作区</el-radio-button>
+        <el-radio-button value="history">历史</el-radio-button>
+      </el-radio-group>
+      <span class="st-branch">
+        <GcIcon name="branch" :size="12" />
+        {{ currentBranch || '—' }}
+        <span v-if="status?.tracking" class="st-track mono">{{ status.tracking }}</span>
+        <span v-if="ahead" class="st-sync up">↑{{ ahead }}</span>
+        <span v-if="behind" class="st-sync down">↓{{ behind }}</span>
+      </span>
+      <span v-if="status" class="st-dirty" :class="{ clean: status.isClean }">
+        {{ status.isClean ? '工作区干净' : `${totalFiles} 处更改` }}
+      </span>
+      <span class="st-path mono" :title="currentPath">{{ currentPath }}</span>
+      <span class="spacer" />
+      <template v-if="contentMode === 'workspace'">
+        <el-button type="primary" size="small" @click="commitVisible = true">提交 Commit</el-button>
+        <el-button size="small" @click="stageAll">暂存全部</el-button>
+        <el-badge :value="checkedCount" :hidden="checkedCount === 0" :offset="[2, 4]">
+          <el-button size="small" @click="openStashDialog">Stash</el-button>
+        </el-badge>
+        <el-button size="small" @click="pull">拉取</el-button>
+        <el-dropdown trigger="click" @command="onMoreCommand">
+          <el-button size="small" aria-label="更多操作"><GcIcon name="more" :size="14" /></el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="fetch">Fetch（--prune）</el-dropdown-item>
+              <el-dropdown-item command="merge">工作区合并</el-dropdown-item>
+              <el-dropdown-item command="tag">打标签</el-dropdown-item>
+              <el-dropdown-item command="unstage" :disabled="(status?.staged.length ?? 0) === 0"
+                >取消暂存全部</el-dropdown-item
+              >
+              <el-dropdown-item command="reset" divided>硬重置</el-dropdown-item>
+              <el-dropdown-item command="clean">清理未跟踪</el-dropdown-item>
+              <el-dropdown-item command="rebase">变基</el-dropdown-item>
+              <el-dropdown-item command="push-force">强制推送</el-dropdown-item>
+              <el-dropdown-item command="refresh" divided>刷新</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+      </template>
     </div>
 
     <el-alert v-if="loadError" :title="loadError" type="error" :closable="false" show-icon class="mb" />
@@ -824,17 +809,23 @@ onUnmounted(() => {
         shadow="never"
         class="branch-panel gc-card gc-card-fill gc-card-fill--tight"
       >
-        <template #header>
-          <div class="panel-head">
-            <span class="panel-title">分支 Branch</span>
-            <div class="panel-actions">
-              <el-button size="small" text @click="loadBranches">刷新</el-button>
-              <el-button size="small" text type="primary" @click="branchVisible = true">+ 新建</el-button>
-            </div>
-          </div>
-        </template>
+        <div class="panel-top">
+          <el-input v-model="branchQuery" size="small" clearable placeholder="搜索分支">
+            <template #prefix><GcIcon name="search" :size="12" /></template>
+          </el-input>
+        </div>
+        <div class="group-head">
+          <b>分支</b>
+          <span class="spacer" />
+          <button type="button" class="icon-btn" title="新建分支" @click="branchVisible = true">
+            <GcIcon name="plus" :size="12" />
+          </button>
+          <button type="button" class="icon-btn" title="刷新" @click="loadBranches">
+            <GcIcon name="refresh" :size="12" />
+          </button>
+        </div>
         <div class="tree-scroll">
-          <template v-for="pane in branchPanes" :key="pane.key">
+          <template v-for="pane in filteredPanes" :key="pane.key">
             <div class="group-label">{{ pane.title }}</div>
             <el-tree
               v-if="pane.tree.length"
@@ -873,82 +864,17 @@ onUnmounted(() => {
 
       <!-- 右：工作区 / 分支图 / 提交 -->
       <div class="status-content">
-        <div v-if="contentMode === 'graph'" class="graph-pane gc-card">
-          <div class="lineage-bar">
-            <span class="field-label">合入目标</span>
-            <BranchTreeSelect v-model="lineageInto" remote-first placeholder="选择线上目标" />
-            <span class="field-label">我的分支</span>
-            <BranchTreeSelect v-model="lineageFrom" placeholder="选择我的分支" />
-            <el-button
-              type="primary"
-              :disabled="!lineageInto || !lineageFrom"
-              :loading="graphLoading"
-              @click="compareLineage"
-              >对比</el-button
-            >
-            <el-button :disabled="!graph?.lineage" @click="clearLineage">清除</el-button>
-            <el-button v-if="graph?.lineage?.mergeBase" text type="primary" @click="goMergePreview"
-              >去合并预演</el-button
-            >
-          </div>
-          <p v-if="graph?.lineage" class="lineage-meta">
-            <template v-if="graph.lineage.mergeBase">
-              merge-base {{ graph.lineage.mergeBase.slice(0, 7) }} · {{ graph.lineage.into }} 独有
-              {{ graph.lineage.intoOnlyCount }} · {{ graph.lineage.from }} 独有 {{ graph.lineage.fromOnlyCount }}
-            </template>
-            <template v-else>两条分支没有共同祖先</template>
-          </p>
-          <CommitGraph
-            :data="graph"
-            :loading="graphLoading"
-            :error="graphError"
-            :default-remote="graphDefaultRemote"
-            :remotes="graphRemotes"
+        <div v-if="contentMode === 'history'" class="history-pane">
+          <CommitHistory
+            ref="historyPanel"
+            :operation="status?.operation ?? 'none'"
+            @pick="cherryPickCommit"
+            @merge-preview="goMergePreview"
           />
-        </div>
-
-        <div v-else-if="contentMode === 'log'" class="log-pane">
-          <CommitLogPanel ref="logPanel" :operation="status?.operation ?? 'none'" @pick="cherryPickCommit" />
         </div>
 
         <template v-else>
           <!-- 工具栏 -->
-          <el-card shadow="never" class="toolbar-card gc-card">
-            <div class="toolbar">
-              <div class="toolbar-group gc-gap-btns">
-                <el-button type="primary" @click="commitVisible = true">提交 Commit</el-button>
-                <el-button plain @click="stageAll">暂存全部</el-button>
-                <el-button plain :disabled="(status?.staged.length ?? 0) === 0" @click="unstageAll"
-                  >取消暂存全部</el-button
-                >
-                <el-badge :value="checkedCount" :hidden="checkedCount === 0" :offset="[2, 4]">
-                  <el-button type="success" plain @click="openStashDialog">Stash</el-button>
-                </el-badge>
-                <el-tooltip
-                  content="把选中分支合并进当前检出分支（会改工作区）。预演请走底栏「合并」。"
-                  placement="top"
-                >
-                  <el-button plain @click="mergeVisible = true">工作区合并</el-button>
-                </el-tooltip>
-                <el-tooltip content="git fetch --prune，更新远程跟踪分支，不改工作区" placement="top">
-                  <el-button plain @click="fetchRemote">Fetch</el-button>
-                </el-tooltip>
-                <el-tooltip content="把当前分支的上游更新合并进来。没有上游时会失败。" placement="top">
-                  <el-button plain @click="pull">拉取</el-button>
-                </el-tooltip>
-                <el-button plain @click="tagVisible = true">打标签</el-button>
-                <el-button type="danger" plain @click="resetVisible = true">硬重置</el-button>
-                <el-button type="danger" plain @click="run('git_clean')">清理未跟踪</el-button>
-                <el-tooltip content="把当前分支变基到所选目标（高风险，改历史）" placement="top">
-                  <el-button type="danger" plain @click="rebaseVisible = true">变基</el-button>
-                </el-tooltip>
-                <el-tooltip content="--force-with-lease 推送当前分支（高风险）" placement="top">
-                  <el-button type="danger" plain @click="run('git_push_force')">强制推送</el-button>
-                </el-tooltip>
-              </div>
-            </div>
-          </el-card>
-
           <el-alert
             v-if="status?.operation && status.operation !== 'none'"
             :title="operationTitle(status.operation)"
@@ -993,103 +919,90 @@ onUnmounted(() => {
             <!-- 更改文件 -->
             <el-card shadow="never" class="changes-card gc-card gc-card-fill gc-card-fill--flush">
               <template #header>
-                <div class="card-head">
-                  <span class="card-title">更改 Changes</span>
+                <div class="group-head">
+                  <b>更改</b>
+                  <span class="card-count">{{ totalFiles }}</span>
+                  <span class="spacer" />
                   <div class="card-actions gc-gap-btns">
                     <el-tag v-if="checkedCount" size="small" type="primary" effect="plain"
                       >已选 {{ checkedCount }}</el-tag
                     >
                     <el-button size="small" text @click="checkAllCurrentTab">全选本组</el-button>
+                    <button type="button" class="icon-btn" title="全部暂存" @click="stageAll">
+                      <GcIcon name="plus" :size="12" />
+                    </button>
                     <el-button v-if="checkedCount" size="small" text type="danger" @click="clearChecked"
                       >清除选择</el-button
                     >
                   </div>
                 </div>
               </template>
-              <el-tabs v-model="activeTab" class="changes-tabs gc-tabs-fill">
-                <el-tab-pane v-for="t in tabs" :key="t.key" :name="t.key">
-                  <template #label>
-                    <span class="tab-label">
-                      {{ t.label }}
-                      <el-badge :value="t.count" :hidden="t.count === 0" type="primary" class="tab-badge" />
-                    </span>
-                  </template>
-                  <div v-if="t.count === 0" class="file-empty">
-                    <span>没有{{ t.label }}的文件</span>
-                    <span class="file-empty-hint">「{{ t.hint }}」</span>
-                  </div>
-                  <el-tree
-                    v-else
-                    :data="tabTrees[t.key]"
-                    :props="{ label: 'label', children: 'children' }"
-                    node-key="key"
-                    default-expand-all
-                    :indent="12"
-                    class="change-tree gc-tree gc-tree-files"
+              <div class="ctabs">
+                <button
+                  v-for="t in tabs"
+                  :key="t.key"
+                  type="button"
+                  :class="{ on: activeTab === t.key }"
+                  @click="activeTab = t.key"
+                >
+                  {{ t.label }}<span class="n">{{ t.count }}</span>
+                </button>
+              </div>
+              <div class="chg-list">
+                <div v-if="!activeList.length" class="file-empty">
+                  <span>没有{{ tabs.find((t) => t.key === activeTab)?.label }}的文件</span>
+                  <span class="file-empty-hint">「{{ tabs.find((t) => t.key === activeTab)?.hint }}」</span>
+                </div>
+                <div
+                  v-for="f in activeList"
+                  :key="f.path"
+                  class="chg-row"
+                  :class="{ on: monitor.path === f.path }"
+                  @click="showDiff(f)"
+                >
+                  <el-checkbox :model-value="isChecked(f.path)" @click.stop @change="toggleChecked(f.path)" />
+                  <span class="file-status" :class="statusClass(f)">{{ statusLetter(f) }}</span>
+                  <span class="file-path mono" :title="f.path">{{ f.path }}</span>
+                  <el-button
+                    v-if="f.conflicted"
+                    size="small"
+                    text
+                    type="warning"
+                    @click.stop="stageFile(f)"
+                    >标记已解决(git add)</el-button
                   >
-                    <template #default="{ data }">
-                      <div
-                        v-if="data.file"
-                        class="change-file gc-gap-btns"
-                        :class="{ on: monitor.path === data.file.path }"
-                        @click="showDiff(data.file)"
-                      >
-                        <el-checkbox
-                          :model-value="isChecked(data.file.path)"
-                          @click.stop
-                          @change="toggleChecked(data.file.path)"
-                        />
-                        <span class="file-status" :class="statusClass(data.file)">{{ statusLetter(data.file) }}</span>
-                        <span class="file-path mono" :title="data.file.path">{{ data.label }}</span>
-                        <el-button
-                          v-if="data.file.conflicted"
-                          size="small"
-                          text
-                          type="warning"
-                          @click.stop="stageFile(data.file)"
-                          >标记已解决(git add)</el-button
-                        >
-                        <el-button
-                          v-else
-                          size="small"
-                          text
-                          :type="data.file.staged ? 'warning' : 'success'"
-                          @click.stop="rowAction(data.file)"
-                        >
-                          {{ data.file.staged ? '取消暂存' : '暂存' }}
-                        </el-button>
-                      </div>
-                      <div v-else class="change-dir">
-                        <el-checkbox
-                          :model-value="folderChecked(data)"
-                          :indeterminate="folderIndeterminate(data)"
-                          @click.stop
-                          @change="toggleFolder(data)"
-                        />
-                        <span class="dir-name" :title="data.fullPath">{{ data.label }}</span>
-                        <span class="dir-count">{{ data.fileCount }}</span>
-                      </div>
-                    </template>
-                  </el-tree>
-                </el-tab-pane>
-              </el-tabs>
+                  <el-button
+                    v-else
+                    size="small"
+                    text
+                    :type="f.staged ? 'warning' : 'success'"
+                    @click.stop="rowAction(f)"
+                  >
+                    {{ f.staged ? '取消暂存' : '暂存' }}
+                  </el-button>
+                </div>
+              </div>
             </el-card>
 
             <div class="right-stack">
               <el-card shadow="never" class="monitor-card gc-card gc-card-fill gc-card-fill--flush">
                 <template #header>
-                  <div class="card-head">
-                    <span class="card-title">差异监视器</span>
+                  <div v-if="monitor.title" class="file-head">
+                    <GcIcon name="file" :size="12" />
+                    <span class="fp mono">{{ monitor.title }}</span>
+                    <span class="chip amber sm">MODIFIED</span>
+                    <span class="spacer" />
                     <span v-if="monitor.diff" class="monitor-stat">
-                      <span>{{ monitor.diff.files.length }} 个文件</span>
                       <span class="add">+{{ monitor.diff.insertions }}</span>
                       <span class="del">-{{ monitor.diff.deletions }}</span>
                       <span v-if="monitor.diff.truncated" class="warn">（已截断）</span>
                     </span>
                   </div>
+                  <div v-else class="group-head">
+                    <b>差异监视器</b>
+                  </div>
                 </template>
                 <div v-loading="monitor.loading" class="monitor-body">
-                  <p v-if="monitor.title" class="monitor-file mono">{{ monitor.title }}</p>
                   <DiffViewer v-if="monitor.diff?.rawPatch" :patch="monitor.diff.rawPatch" />
                   <DiffViewer v-else-if="monitor.patch" :patch="monitor.patch" />
                   <p v-else-if="monitor.diff" class="file-empty">无差异</p>
@@ -1099,8 +1012,8 @@ onUnmounted(() => {
 
               <el-card shadow="never" class="history-card gc-card gc-card-fill gc-card-fill--flush">
                 <template #header>
-                  <div class="card-head">
-                    <span class="card-title">记录 Records</span>
+                  <div class="group-head">
+                    <b>记录 Records</b>
                     <div class="card-actions gc-gap-btns">
                       <el-button size="small" text @click="openWorktreeDialog">添加 worktree</el-button>
                       <el-button
@@ -1653,6 +1566,128 @@ onUnmounted(() => {
 }
 
 /* 右：垂直弹性布局 */
+/* 顶部工具栏（页头并入） */
+.st-toolbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--gc-s2);
+  min-width: 0;
+  font-size: var(--gc-fs-meta);
+}
+.st-toolbar .spacer {
+  flex: 1;
+}
+.st-branch {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: var(--gc-control);
+  padding: 0 9px;
+  border-radius: var(--gc-radius);
+  border: 1px solid var(--gc-line);
+  background: var(--gc-card);
+  font-family: var(--gc-font-mono);
+  font-size: var(--gc-fs-meta);
+  color: var(--gc-text);
+  white-space: nowrap;
+}
+.st-branch .ico {
+  color: var(--gc-accent-text);
+}
+.st-track {
+  color: var(--gc-text-3);
+  font-size: var(--gc-fs-micro);
+}
+.st-sync.up {
+  color: var(--gc-amber);
+}
+.st-sync.down {
+  color: var(--gc-red);
+}
+.st-dirty {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: var(--gc-r-tag);
+  background: var(--gc-amber-weak);
+  color: var(--gc-amber);
+  font-size: var(--gc-fs-meta);
+  white-space: nowrap;
+}
+.st-dirty.clean {
+  background: var(--gc-green-weak);
+  color: var(--gc-green);
+}
+.st-path {
+  min-width: 0;
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--gc-text-3);
+  font-size: var(--gc-fs-micro);
+}
+.branch-tree :deep(.el-tree-node__content) {
+  height: var(--gc-row);
+  padding-left: 8px;
+}
+.file-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 8px 0 10px;
+  background: var(--gc-page);
+  border-bottom: 1px solid var(--gc-line-weak);
+  font-size: var(--gc-fs-meta);
+  color: var(--gc-text-2);
+}
+.file-head .fp {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-head .spacer {
+  flex: 1;
+}
+.monitor-card :deep(.el-card__header) {
+  padding: 0;
+  border-bottom: 0;
+}
+.panel-top {
+  flex: none;
+  padding: var(--gc-s2);
+  border-bottom: 1px solid var(--gc-line-weak);
+}
+.group-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 8px 0 10px;
+  background: var(--gc-page);
+  border-bottom: 1px solid var(--gc-line-weak);
+}
+.group-head b {
+  font-size: var(--gc-fs-meta);
+  font-weight: 500;
+  color: var(--gc-text-2);
+}
+.group-head .spacer {
+  flex: 1;
+}
+.history-pane {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
 .status-content {
   flex: 1;
   min-width: 0;
@@ -1791,6 +1826,122 @@ onUnmounted(() => {
   min-height: 0;
   overflow-y: auto;
 }
+
+/* 更改卡：标题计数 + 三档 ctabs + 平铺行 */
+
+/* 记录卡 tab：分段样式（对齐设计稿） */
+.history-tabs :deep(.el-tabs__header) {
+  margin: 0;
+  padding: 0 var(--gc-pad);
+}
+.history-tabs :deep(.el-tabs__nav-wrap::after) {
+  display: none;
+}
+.history-tabs :deep(.el-tabs__active-bar) {
+  display: none;
+}
+.history-tabs :deep(.el-tabs__nav) {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--gc-r);
+  background: var(--gc-page);
+  border: 1px solid var(--gc-line);
+  width: 100%;
+}
+.history-tabs :deep(.el-tabs__item) {
+  flex: 1;
+  height: 22px;
+  line-height: 22px;
+  padding: 0 6px !important;
+  font-size: var(--gc-fs-micro);
+  color: var(--gc-text-3);
+  text-align: center;
+  border-radius: var(--gc-r-tag);
+}
+.history-tabs :deep(.el-tabs__item.is-active) {
+  background: var(--gc-accent-weak);
+  color: var(--gc-accent-text);
+}
+
+
+
+.changes-card :deep(.el-card__header),
+.history-card :deep(.el-card__header) {
+  padding: 0;
+  border-bottom: 0;
+}
+.card-count {
+  font-family: var(--gc-font-mono);
+  font-size: var(--gc-fs-meta);
+  color: var(--gc-text-3);
+  font-variant-numeric: tabular-nums;
+}
+.ctabs {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--gc-s2);
+  padding: 4px 8px 2px;
+}
+.ctabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: var(--gc-r-tag);
+  background: transparent;
+  color: var(--gc-text-3);
+  font: inherit;
+  font-size: var(--gc-fs-meta);
+  cursor: pointer;
+}
+.ctabs button.on {
+  background: var(--gc-card);
+  border-color: var(--gc-line);
+  color: var(--gc-text);
+}
+.ctabs .n {
+  font-family: var(--gc-font-mono);
+  font-size: var(--gc-fs-micro);
+  color: var(--gc-text-3);
+  font-variant-numeric: tabular-nums;
+}
+.chg-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 2px 4px 8px;
+}
+.chg-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--gc-row);
+  padding: 0 8px;
+  border-radius: var(--gc-r-tag);
+  cursor: pointer;
+  min-width: 0;
+}
+.chg-row:hover {
+  background: var(--gc-btn-hover);
+}
+.chg-row.on {
+  background: var(--gc-accent-weak);
+  box-shadow: inset 2px 0 0 var(--gc-accent);
+}
+.chg-row .file-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--gc-fs-meta);
+  color: var(--gc-text-2);
+}
+
 .change-file,
 .change-dir {
   flex: 1;
@@ -1904,16 +2055,7 @@ onUnmounted(() => {
   min-height: 0;
   overflow: auto;
   padding: 0 0 var(--gc-gap);
-}
-.monitor-file {
-  margin: 0;
-  height: var(--gc-row-lg);
-  line-height: var(--gc-row-lg);
-  font-size: var(--gc-fs-body);
-  color: var(--el-text-color-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  background: var(--gc-page);
 }
 
 /* 记录：stash / 备份 / reflog / worktree，叠在监视器下面 */

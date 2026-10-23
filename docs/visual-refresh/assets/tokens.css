@@ -73,15 +73,15 @@
   --gc-font-ui: 'Inter', 'SF Pro Text', -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
   --gc-font-mono: 'JetBrains Mono', 'Cascadia Code', 'SF Mono', Consolas, monospace;
 
-  --gc-fs-micro: 10px;   /* 微标签 / kbd */
-  --gc-fs-meta: 11px;    /* tag / meta / dock 标签 */
-  --gc-fs-body: 12px;    /* 正文 */
-  --gc-fs-title: 13px;   /* 卡片标题 */
-  --gc-fs-page: 16px;    /* 页标题 */
-  --gc-fs-empty: 20px;   /* 空状态 */
+  --gc-fs-micro: 10px; /* 微标签 / kbd */
+  --gc-fs-meta: 11px; /* tag / meta / dock 标签 */
+  --gc-fs-body: 12px; /* 正文 */
+  --gc-fs-title: 13px; /* 卡片标题 */
+  --gc-fs-page: 16px; /* 页标题 */
+  --gc-fs-empty: 20px; /* 空状态 */
 
   --gc-lh-body: 18px;
-  --gc-lh-row: 20px;     /* 表格与 diff 行（mono） */
+  --gc-lh-row: 20px; /* 表格与 diff 行（mono） */
   --gc-lh-page: 22px;
   --gc-lh-tag: 15px;
 

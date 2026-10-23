@@ -31,9 +31,7 @@
     } catch (e) {
       /* 隐私模式下忽略 */
     }
-    document.dispatchEvent(
-      new CustomEvent('gc:accent', { detail: { accent: accent === WHITE ? WHITE : TEAL } })
-    );
+    document.dispatchEvent(new CustomEvent('gc:accent', { detail: { accent: accent === WHITE ? WHITE : TEAL } }));
   }
 
   /* 尽早应用，避免首屏闪烁 */

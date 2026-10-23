@@ -12,7 +12,9 @@
          data-theme="soft"     刷新 B · 现代柔和（提升呼吸感）
          ============================================================ */
 
-      * { box-sizing: border-box; }
+      * {
+        box-sizing: border-box;
+      }
 
       :root {
         --font-sans: 'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, -apple-system, sans-serif;
@@ -106,7 +108,8 @@
         --card-left: 3px;
       }
 
-      html, body {
+      html,
+      body {
         height: 100%;
         margin: 0;
         background: #05070a;
@@ -137,8 +140,12 @@
         background: var(--bg);
         border-bottom: 1px solid var(--border-light);
       }
-      [data-theme='refined'] .topbar { border-bottom-color: var(--border-lighter); }
-      [data-theme='soft'] .topbar { border-bottom-color: var(--border-lighter); }
+      [data-theme='refined'] .topbar {
+        border-bottom-color: var(--border-lighter);
+      }
+      [data-theme='soft'] .topbar {
+        border-bottom-color: var(--border-lighter);
+      }
 
       .brand {
         display: flex;
@@ -149,7 +156,10 @@
         color: var(--text-1);
         letter-spacing: -0.01em;
       }
-      .brand-mark { color: var(--primary); font-size: 15px; }
+      .brand-mark {
+        color: var(--primary);
+        font-size: 15px;
+      }
 
       .top-end {
         margin-left: auto;
@@ -172,19 +182,30 @@
         max-width: 260px;
       }
       .pulse i {
-        width: 6px; height: 6px; border-radius: 50%;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
         background: var(--success);
         box-shadow: 0 0 8px var(--success);
         flex: none;
       }
       .pulse span {
-        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
       .pulse em {
-        font-style: normal; flex: none;
-        min-width: 15px; height: 15px; padding: 0 4px;
-        border-radius: 8px; background: var(--danger);
-        color: #fff; font-size: 10px; line-height: 15px; text-align: center;
+        font-style: normal;
+        flex: none;
+        min-width: 15px;
+        height: 15px;
+        padding: 0 4px;
+        border-radius: 8px;
+        background: var(--danger);
+        color: #fff;
+        font-size: 10px;
+        line-height: 15px;
+        text-align: center;
       }
 
       .tag {
@@ -208,7 +229,11 @@
         border-color: color-mix(in srgb, var(--danger) 34%, transparent);
         background: color-mix(in srgb, var(--danger) 12%, transparent);
       }
-      .tag b { font-weight: 500; color: inherit; opacity: 0.82; }
+      .tag b {
+        font-weight: 500;
+        color: inherit;
+        opacity: 0.82;
+      }
 
       /* ---------- 主体 ---------- */
       .board {
@@ -220,7 +245,9 @@
         gap: var(--pad);
         padding: var(--pad);
       }
-      [data-theme='soft'] .board { gap: calc(var(--gap) + 4px); }
+      [data-theme='soft'] .board {
+        gap: calc(var(--gap) + 4px);
+      }
 
       .page-head {
         flex: none;
@@ -240,7 +267,15 @@
         color: var(--text-3);
         animation: breathe 1.2s ease-in-out infinite;
       }
-      @keyframes breathe { 0%,100% { opacity: .4 } 50% { opacity: 1 } }
+      @keyframes breathe {
+        0%,
+        100% {
+          opacity: 0.4;
+        }
+        50% {
+          opacity: 1;
+        }
+      }
 
       .glass {
         background: color-mix(in srgb, var(--bg) var(--surface-mix), transparent);
@@ -249,11 +284,7 @@
         box-shadow: var(--shadow);
       }
       [data-theme='soft'] .glass {
-        background: linear-gradient(
-          180deg,
-          color-mix(in srgb, var(--bg) 96%, #fff 4%),
-          var(--bg)
-        );
+        background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 96%, #fff 4%), var(--bg));
       }
 
       /* ---------- Hero ---------- */
@@ -264,7 +295,9 @@
         flex-direction: column;
         gap: var(--gap);
       }
-      [data-theme='soft'] .hero { padding: calc(var(--pad) + 2px); }
+      [data-theme='soft'] .hero {
+        padding: calc(var(--pad) + 2px);
+      }
 
       .hero-line {
         display: flex;
@@ -289,7 +322,9 @@
         white-space: nowrap;
         min-width: 0;
       }
-      .spacer { flex: 1; }
+      .spacer {
+        flex: 1;
+      }
 
       .btn {
         height: var(--control);
@@ -305,17 +340,27 @@
         align-items: center;
         gap: 5px;
         white-space: nowrap;
-        transition: background .15s, border-color .15s, color .15s;
+        transition:
+          background 0.15s,
+          border-color 0.15s,
+          color 0.15s;
       }
-      .btn:hover { background: var(--fill); color: var(--text-1); }
+      .btn:hover {
+        background: var(--fill);
+        color: var(--text-1);
+      }
       .btn.primary {
         background: var(--primary);
         border-color: var(--primary);
         color: #0b0e14;
         font-weight: 600;
       }
-      [data-theme='current'] .btn.primary { color: #fff; }
-      .btn.primary:hover { filter: brightness(1.08); }
+      [data-theme='current'] .btn.primary {
+        color: #fff;
+      }
+      .btn.primary:hover {
+        filter: brightness(1.08);
+      }
 
       /* 分支行 */
       .branch {
@@ -347,14 +392,28 @@
       }
       .wx::before {
         content: '';
-        width: 5px; height: 5px; border-radius: 50%;
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
         background: currentColor;
         flex: none;
       }
-      .wx.stuck { color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, transparent); }
-      .wx.dirty { color: var(--warning); background: color-mix(in srgb, var(--warning) 14%, transparent); }
-      .wx.sync  { color: var(--primary); background: color-mix(in srgb, var(--primary) 15%, transparent); }
-      .wx.quiet { color: var(--success); background: color-mix(in srgb, var(--success) 13%, transparent); }
+      .wx.stuck {
+        color: var(--danger);
+        background: color-mix(in srgb, var(--danger) 14%, transparent);
+      }
+      .wx.dirty {
+        color: var(--warning);
+        background: color-mix(in srgb, var(--warning) 14%, transparent);
+      }
+      .wx.sync {
+        color: var(--primary);
+        background: color-mix(in srgb, var(--primary) 15%, transparent);
+      }
+      .wx.quiet {
+        color: var(--success);
+        background: color-mix(in srgb, var(--success) 13%, transparent);
+      }
 
       .ab {
         font-family: var(--font-mono);
@@ -363,9 +422,16 @@
         display: inline-flex;
         gap: 6px;
       }
-      .ab b { font-weight: 600; color: var(--text-2); }
-      .ab b.up { color: var(--success); }
-      .ab b.down { color: var(--danger); }
+      .ab b {
+        font-weight: 600;
+        color: var(--text-2);
+      }
+      .ab b.up {
+        color: var(--success);
+      }
+      .ab b.down {
+        color: var(--danger);
+      }
 
       .chip {
         height: 20px;
@@ -377,8 +443,14 @@
         display: inline-flex;
         align-items: center;
       }
-      .chip.danger { color: var(--danger); background: color-mix(in srgb, var(--danger) 13%, transparent); }
-      .chip.primary { color: var(--primary); background: color-mix(in srgb, var(--primary) 13%, transparent); }
+      .chip.danger {
+        color: var(--danger);
+        background: color-mix(in srgb, var(--danger) 13%, transparent);
+      }
+      .chip.primary {
+        color: var(--primary);
+        background: color-mix(in srgb, var(--primary) 13%, transparent);
+      }
 
       /* ---------- 天气统计 5 格 ---------- */
       .weather {
@@ -412,10 +484,18 @@
         color: var(--text-3);
         line-height: 1.3;
       }
-      .wx-tab.stuck strong { color: var(--danger); }
-      .wx-tab.dirty strong { color: var(--warning); }
-      .wx-tab.sync  strong { color: var(--primary); }
-      .wx-tab.quiet strong { color: var(--success); }
+      .wx-tab.stuck strong {
+        color: var(--danger);
+      }
+      .wx-tab.dirty strong {
+        color: var(--warning);
+      }
+      .wx-tab.sync strong {
+        color: var(--primary);
+      }
+      .wx-tab.quiet strong {
+        color: var(--success);
+      }
       .wx-tab.on {
         box-shadow: inset 0 0 0 1px var(--primary);
         background: color-mix(in srgb, var(--primary) 8%, var(--bg));
@@ -424,15 +504,29 @@
       [data-theme='soft'] .wx-tab::after {
         content: '';
         position: absolute;
-        left: 0; top: 0; bottom: 0;
+        left: 0;
+        top: 0;
+        bottom: 0;
         width: 2px;
         background: var(--text-3);
         opacity: 0;
       }
-      [data-theme='refined'] .wx-tab.stuck::after { background: var(--danger); opacity: 1; }
-      [data-theme='refined'] .wx-tab.dirty::after { background: var(--warning); opacity: 1; }
-      [data-theme='refined'] .wx-tab.sync::after  { background: var(--primary); opacity: 1; }
-      [data-theme='refined'] .wx-tab.quiet::after { background: var(--success); opacity: 1; }
+      [data-theme='refined'] .wx-tab.stuck::after {
+        background: var(--danger);
+        opacity: 1;
+      }
+      [data-theme='refined'] .wx-tab.dirty::after {
+        background: var(--warning);
+        opacity: 1;
+      }
+      [data-theme='refined'] .wx-tab.sync::after {
+        background: var(--primary);
+        opacity: 1;
+      }
+      [data-theme='refined'] .wx-tab.quiet::after {
+        background: var(--success);
+        opacity: 1;
+      }
 
       /* ---------- 卡片网格 ---------- */
       .grid {
@@ -444,7 +538,9 @@
         align-content: start;
         padding-bottom: var(--pad);
       }
-      [data-theme='soft'] .grid { gap: calc(var(--gap) + 2px); }
+      [data-theme='soft'] .grid {
+        gap: calc(var(--gap) + 2px);
+      }
 
       .repo {
         display: flex;
@@ -457,21 +553,37 @@
         background: color-mix(in srgb, var(--bg) 88%, transparent);
         cursor: grab;
         min-width: 0;
-        transition: background .15s, border-color .15s, transform .15s;
+        transition:
+          background 0.15s,
+          border-color 0.15s,
+          transform 0.15s;
       }
-      .repo:hover { background: var(--fill-light); }
+      .repo:hover {
+        background: var(--fill-light);
+      }
       .repo.current {
         background: color-mix(in srgb, var(--primary) 9%, var(--bg));
         border-color: color-mix(in srgb, var(--primary) 42%, var(--border-lighter));
         box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 22%, transparent);
       }
-      .repo.stuck { border-left-color: var(--danger); }
-      .repo.dirty { border-left-color: var(--warning); }
-      .repo.sync  { border-left-color: var(--primary); }
-      .repo.quiet { border-left-color: var(--success); }
-      .repo.muted { opacity: 0.42; }
+      .repo.stuck {
+        border-left-color: var(--danger);
+      }
+      .repo.dirty {
+        border-left-color: var(--warning);
+      }
+      .repo.sync {
+        border-left-color: var(--primary);
+      }
+      .repo.quiet {
+        border-left-color: var(--success);
+      }
+      .repo.muted {
+        opacity: 0.42;
+      }
 
-      .repo-top, .repo-meta {
+      .repo-top,
+      .repo-meta {
         display: flex;
         align-items: center;
         gap: var(--gap);
@@ -500,8 +612,10 @@
       }
       .more {
         flex: none;
-        width: 22px; height: 22px;
-        border: 0; border-radius: 4px;
+        width: 22px;
+        height: 22px;
+        border: 0;
+        border-radius: 4px;
         background: transparent;
         color: var(--text-3);
         cursor: pointer;
@@ -509,7 +623,10 @@
         font-size: 15px;
         line-height: 1;
       }
-      .more:hover { background: var(--fill); color: var(--text-1); }
+      .more:hover {
+        background: var(--fill);
+        color: var(--text-1);
+      }
 
       .stat {
         flex: none;
@@ -518,10 +635,18 @@
         color: var(--text-3);
         white-space: nowrap;
       }
-      .stat.ahead.on { color: var(--success); }
-      .stat.behind.on { color: var(--danger); }
-      .stat.dirty-stat.on { color: var(--warning); }
-      .stat.draft { color: var(--primary); }
+      .stat.ahead.on {
+        color: var(--success);
+      }
+      .stat.behind.on {
+        color: var(--danger);
+      }
+      .stat.dirty-stat.on {
+        color: var(--warning);
+      }
+      .stat.draft {
+        color: var(--primary);
+      }
 
       .repo-foot {
         display: flex;
@@ -532,16 +657,28 @@
         color: var(--text-3);
         font-family: var(--font-mono);
       }
-      .heat { display: flex; gap: 2px; }
+      .heat {
+        display: flex;
+        gap: 2px;
+      }
       .heat i {
-        width: 7px; height: 7px;
+        width: 7px;
+        height: 7px;
         border-radius: 2px;
         background: var(--fill);
       }
-      .heat i.l1 { background: color-mix(in srgb, var(--primary) 30%, var(--fill)); }
-      .heat i.l2 { background: color-mix(in srgb, var(--primary) 55%, var(--fill)); }
-      .heat i.l3 { background: color-mix(in srgb, var(--primary) 80%, var(--fill)); }
-      .heat i.l4 { background: var(--primary); }
+      .heat i.l1 {
+        background: color-mix(in srgb, var(--primary) 30%, var(--fill));
+      }
+      .heat i.l2 {
+        background: color-mix(in srgb, var(--primary) 55%, var(--fill));
+      }
+      .heat i.l3 {
+        background: color-mix(in srgb, var(--primary) 80%, var(--fill));
+      }
+      .heat i.l4 {
+        background: var(--primary);
+      }
 
       /* ---------- 底部 dock ---------- */
       .dock {
@@ -556,7 +693,9 @@
         border-top: 1px solid var(--border-light);
       }
       [data-theme='refined'] .dock,
-      [data-theme='soft'] .dock { border-top-color: var(--border-lighter); }
+      [data-theme='soft'] .dock {
+        border-top-color: var(--border-lighter);
+      }
 
       .dock-btn {
         height: var(--control);
@@ -573,19 +712,31 @@
         gap: 5px;
         position: relative;
       }
-      .dock-btn:hover { color: var(--text-1); background: var(--fill-light); }
-      .dock-btn.on { color: var(--primary); background: color-mix(in srgb, var(--primary) 12%, transparent); }
+      .dock-btn:hover {
+        color: var(--text-1);
+        background: var(--fill-light);
+      }
+      .dock-btn.on {
+        color: var(--primary);
+        background: color-mix(in srgb, var(--primary) 12%, transparent);
+      }
       .dock-btn.on::after {
         content: '';
         position: absolute;
-        left: 12px; right: 12px; bottom: -1px;
+        left: 12px;
+        right: 12px;
+        bottom: -1px;
         height: 2px;
         background: var(--primary);
         border-radius: 2px 2px 0 0;
       }
-      [data-theme='soft'] .dock-btn.on::after { display: none; }
+      [data-theme='soft'] .dock-btn.on::after {
+        display: none;
+      }
       .dock-count {
-        min-width: 15px; height: 15px; padding: 0 4px;
+        min-width: 15px;
+        height: 15px;
+        padding: 0 4px;
         border-radius: 8px;
         background: var(--danger);
         color: #fff;
@@ -594,7 +745,8 @@
         text-align: center;
       }
       .dock-sep {
-        width: 1px; height: 14px;
+        width: 1px;
+        height: 14px;
         background: var(--border);
         margin: 0 6px;
       }
@@ -626,10 +778,18 @@
         font: inherit;
         font-size: 12px;
         cursor: pointer;
-        transition: background .15s, color .15s;
+        transition:
+          background 0.15s,
+          color 0.15s;
       }
-      .switcher button:hover { color: #e6eaf2; }
-      .switcher button.on { background: #2a3446; color: #fff; font-weight: 500; }
+      .switcher button:hover {
+        color: #e6eaf2;
+      }
+      .switcher button.on {
+        background: #2a3446;
+        color: #fff;
+        font-weight: 500;
+      }
 
       .badge-note {
         position: fixed;
@@ -646,7 +806,9 @@
       }
 
       @media (max-width: 900px) {
-        .weather { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .weather {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
       }
     </style>
   </head>
@@ -739,9 +901,8 @@
             </div>
             <div class="repo-foot">
               <div class="heat">
-                <i class="l1"></i><i class="l3"></i><i></i><i class="l2"></i><i class="l4"></i>
-                <i class="l1"></i><i></i><i class="l3"></i><i class="l2"></i><i></i>
-                <i class="l1"></i><i class="l4"></i><i class="l2"></i>
+                <i class="l1"></i><i class="l3"></i><i></i><i class="l2"></i><i class="l4"></i> <i class="l1"></i><i></i
+                ><i class="l3"></i><i class="l2"></i><i></i> <i class="l1"></i><i class="l4"></i><i class="l2"></i>
               </div>
               <span>12 分钟前</span>
             </div>
@@ -760,8 +921,7 @@
             </div>
             <div class="repo-foot">
               <div class="heat">
-                <i></i><i></i><i class="l1"></i><i></i><i></i>
-                <i class="l2"></i><i></i><i></i><i class="l1"></i><i></i>
+                <i></i><i></i><i class="l1"></i><i></i><i></i> <i class="l2"></i><i></i><i></i><i class="l1"></i><i></i>
                 <i></i><i></i><i></i>
               </div>
               <span>3 天前</span>
@@ -781,9 +941,9 @@
             </div>
             <div class="repo-foot">
               <div class="heat">
-                <i class="l2"></i><i class="l4"></i><i class="l3"></i><i class="l1"></i><i></i>
-                <i class="l3"></i><i class="l2"></i><i></i><i class="l4"></i><i class="l1"></i>
-                <i class="l2"></i><i></i><i class="l3"></i>
+                <i class="l2"></i><i class="l4"></i><i class="l3"></i><i class="l1"></i><i></i> <i class="l3"></i
+                ><i class="l2"></i><i></i><i class="l4"></i><i class="l1"></i> <i class="l2"></i><i></i
+                ><i class="l3"></i>
               </div>
               <span>1 小时前</span>
             </div>
@@ -802,8 +962,7 @@
             </div>
             <div class="repo-foot">
               <div class="heat">
-                <i></i><i class="l1"></i><i></i><i></i><i class="l2"></i>
-                <i></i><i></i><i class="l1"></i><i></i><i></i>
+                <i></i><i class="l1"></i><i></i><i></i><i class="l2"></i> <i></i><i></i><i class="l1"></i><i></i><i></i>
                 <i class="l3"></i><i></i><i></i>
               </div>
               <span>昨天</span>
@@ -823,8 +982,7 @@
             </div>
             <div class="repo-foot">
               <div class="heat">
-                <i class="l1"></i><i></i><i></i><i class="l1"></i><i></i>
-                <i></i><i class="l2"></i><i></i><i></i><i></i>
+                <i class="l1"></i><i></i><i></i><i class="l1"></i><i></i> <i></i><i class="l2"></i><i></i><i></i><i></i>
                 <i></i><i class="l1"></i><i></i>
               </div>
               <span>2 天前</span>
@@ -843,9 +1001,7 @@
             </div>
             <div class="repo-foot">
               <div class="heat">
-                <i></i><i></i><i></i><i></i><i></i>
-                <i></i><i></i><i></i><i></i><i></i>
-                <i class="l1"></i><i></i><i></i>
+                <i></i><i></i><i></i><i></i><i></i> <i></i><i></i><i></i><i></i><i></i> <i class="l1"></i><i></i><i></i>
               </div>
               <span>2 个月前</span>
             </div>

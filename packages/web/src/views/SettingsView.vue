@@ -575,8 +575,12 @@ async function clearLlmKey(): Promise<void> {
             <p class="fhint">用于 fetch、MR 短名剥前缀、CLI 未传远程时的默认值。切换后立即保存。</p>
             <div v-if="hasRepoRemotes && platform === 'unknown'" class="mr-platform-row">
               <span class="mr-hint">未能自动识别远程平台，请手动选择。</span>
-              <el-button :disabled="!current?.host || settings.saving" @click="pickPlatform('github')">GitHub</el-button>
-              <el-button :disabled="!current?.host || settings.saving" @click="pickPlatform('gitlab')">GitLab</el-button>
+              <el-button :disabled="!current?.host || settings.saving" @click="pickPlatform('github')"
+                >GitHub</el-button
+              >
+              <el-button :disabled="!current?.host || settings.saving" @click="pickPlatform('gitlab')"
+                >GitLab</el-button
+              >
             </div>
           </div>
         </div>
@@ -781,7 +785,9 @@ async function clearLlmKey(): Promise<void> {
                     type="password"
                     show-password
                     autocomplete="new-password"
-                    :placeholder="settings.llm?.tokenSet ? `已保存 ${settings.llm.tokenPreview}，输入新 Key 覆盖` : 'sk-…'"
+                    :placeholder="
+                      settings.llm?.tokenSet ? `已保存 ${settings.llm.tokenPreview}，输入新 Key 覆盖` : 'sk-…'
+                    "
                   />
                 </div>
               </div>
@@ -798,83 +804,85 @@ async function clearLlmKey(): Promise<void> {
 
       <section v-show="activeTab === 'git'" class="tab-pane">
         <div class="git-ops-split">
-        <div class="set-card">
-          <header class="card-head">
-            <GcIcon name="shield" :size="14" />
-            <h3>默认行为</h3>
-          </header>
-          <div class="set-body">
-            <div class="swrow">
-              <div class="sw-copy">
-                <b>dry-run 默认</b>
-                <span>开启后写操作（MCP / CLI）默认只生成预览，不真正执行。</span>
-              </div>
-              <el-switch v-model="gitDraft.dryRunDefault" />
-            </div>
-            <div class="frow stack">
-              <label>允许打开的仓库</label>
-              <div class="fc">
-                <div class="fctrl">
-                  <el-input
-                    v-model="gitDraft.allowedReposText"
-                    type="textarea"
-                    :rows="6"
-                    placeholder="一行一个本地路径。留空 = 不限制"
-                  />
+          <div class="set-card">
+            <header class="card-head">
+              <GcIcon name="shield" :size="14" />
+              <h3>默认行为</h3>
+            </header>
+            <div class="set-body">
+              <div class="swrow">
+                <div class="sw-copy">
+                  <b>dry-run 默认</b>
+                  <span>开启后写操作（MCP / CLI）默认只生成预览，不真正执行。</span>
                 </div>
-                <span class="fhint">
-                  非空时，打开路径必须等于其中一条或位于其下。空名单不限制路径，MCP 带的 repoPath 同样不限制。
-                </span>
+                <el-switch v-model="gitDraft.dryRunDefault" />
+              </div>
+              <div class="frow stack">
+                <label>允许打开的仓库</label>
+                <div class="fc">
+                  <div class="fctrl">
+                    <el-input
+                      v-model="gitDraft.allowedReposText"
+                      type="textarea"
+                      :rows="6"
+                      placeholder="一行一个本地路径。留空 = 不限制"
+                    />
+                  </div>
+                  <span class="fhint">
+                    非空时，打开路径必须等于其中一条或位于其下。空名单不限制路径，MCP 带的 repoPath 同样不限制。
+                  </span>
+                </div>
+              </div>
+              <div class="frow stack">
+                <label>本机访问密钥</label>
+                <div class="fc">
+                  <div class="fctrl">
+                    <el-button @click="copyAccessSecret">复制本机访问密钥</el-button>
+                  </div>
+                  <span class="fhint">
+                    HTTP 的 /api 与 /mcp 要带请求头 X-Git-Cockpit-Secret。探活不校验。能读到 config.json
+                    的本机进程不受这道头限制。
+                  </span>
+                </div>
               </div>
             </div>
-            <div class="frow stack">
-              <label>本机访问密钥</label>
-              <div class="fc">
-                <div class="fctrl">
-                  <el-button @click="copyAccessSecret">复制本机访问密钥</el-button>
+            <footer class="card-foot">
+              <span class="spacer" />
+              <el-button :disabled="!gitDirty" @click="syncGitDraft">放弃</el-button>
+              <el-button type="primary" :loading="settings.saving" :disabled="!gitDirty" @click="saveGit"
+                >保存</el-button
+              >
+            </footer>
+          </div>
+          <div class="set-card" v-loading="settings.loading">
+            <header class="card-head">
+              <GcIcon name="list" :size="14" />
+              <h3>工具开关</h3>
+              <span class="spacer" />
+              <span class="chip plain">高危左边红条，默认关</span>
+            </header>
+            <div class="set-body">
+              <p class="fhint">点芯片启用或禁用。打开后执行前仍会自动备份。没有审批队列。</p>
+              <div v-for="g in gitToolGroups" :key="g.name" class="git-pack">
+                <p class="git-pack-h">
+                  {{ g.name }} <span>{{ g.items.length }}</span>
+                </p>
+                <div class="git-wall">
+                  <button
+                    v-for="t in g.items"
+                    :key="t.name"
+                    type="button"
+                    class="git-chip"
+                    :class="{ on: toolEnabled(t), high: t.riskLevel === 'dangerous' }"
+                    :title="t.description"
+                    @click="toggleChip(t)"
+                  >
+                    {{ toolChipLabel(t.name) }}
+                  </button>
                 </div>
-                <span class="fhint">
-                  HTTP 的 /api 与 /mcp 要带请求头 X-Git-Cockpit-Secret。探活不校验。能读到 config.json
-                  的本机进程不受这道头限制。
-                </span>
               </div>
             </div>
           </div>
-          <footer class="card-foot">
-            <span class="spacer" />
-            <el-button :disabled="!gitDirty" @click="syncGitDraft">放弃</el-button>
-            <el-button type="primary" :loading="settings.saving" :disabled="!gitDirty" @click="saveGit">保存</el-button>
-          </footer>
-        </div>
-        <div class="set-card" v-loading="settings.loading">
-          <header class="card-head">
-            <GcIcon name="list" :size="14" />
-            <h3>工具开关</h3>
-            <span class="spacer" />
-            <span class="chip plain">高危左边红条，默认关</span>
-          </header>
-          <div class="set-body">
-            <p class="fhint">点芯片启用或禁用。打开后执行前仍会自动备份。没有审批队列。</p>
-            <div v-for="g in gitToolGroups" :key="g.name" class="git-pack">
-              <p class="git-pack-h">
-                {{ g.name }} <span>{{ g.items.length }}</span>
-              </p>
-              <div class="git-wall">
-                <button
-                  v-for="t in g.items"
-                  :key="t.name"
-                  type="button"
-                  class="git-chip"
-                  :class="{ on: toolEnabled(t), high: t.riskLevel === 'dangerous' }"
-                  :title="t.description"
-                  @click="toggleChip(t)"
-                >
-                  {{ toolChipLabel(t.name) }}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
         </div>
       </section>
     </div>

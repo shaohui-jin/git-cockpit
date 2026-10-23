@@ -281,7 +281,13 @@ onUnmounted(() => {
         <span class="st" :class="activeJob.status">{{ statusLabel(activeJob.status) }}</span>
         <span class="drawer-title">{{ kindLabel(activeJob.kind) }} · {{ relTime(activeJob.startedAt) }}</span>
         <span class="spacer" />
-        <el-button v-if="activeJob.status === 'running'" size="small" :loading="cancellingId === activeJob.id" @click="cancelJob(activeJob.id)">取消</el-button>
+        <el-button
+          v-if="activeJob.status === 'running'"
+          size="small"
+          :loading="cancellingId === activeJob.id"
+          @click="cancelJob(activeJob.id)"
+          >取消</el-button
+        >
         <el-button
           v-if="activeJob.status === 'error' && activeJob.kind === 'clone'"
           size="small"

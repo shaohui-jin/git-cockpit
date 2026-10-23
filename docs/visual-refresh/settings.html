@@ -60,7 +60,9 @@
         line-height: 1;
         white-space: nowrap;
         cursor: pointer;
-        transition: background var(--gc-t-micro) var(--gc-ease), border-color var(--gc-t-micro) var(--gc-ease),
+        transition:
+          background var(--gc-t-micro) var(--gc-ease),
+          border-color var(--gc-t-micro) var(--gc-ease),
           color var(--gc-t-micro) var(--gc-ease);
       }
       .gc-chip-tabs button:hover {
@@ -355,7 +357,9 @@
         height: 14px;
         border-radius: 50%;
         background: var(--gc-knob);
-        transition: transform var(--gc-t-micro) var(--gc-ease), background var(--gc-t-micro) var(--gc-ease);
+        transition:
+          transform var(--gc-t-micro) var(--gc-ease),
+          background var(--gc-t-micro) var(--gc-ease);
       }
       .sw.on {
         background: var(--gc-accent);
@@ -387,7 +391,9 @@
         cursor: pointer;
         font: inherit;
         color: inherit;
-        transition: background var(--gc-t-micro) var(--gc-ease), border-color var(--gc-t-micro) var(--gc-ease);
+        transition:
+          background var(--gc-t-micro) var(--gc-ease),
+          border-color var(--gc-t-micro) var(--gc-ease);
       }
       .mr-card:hover {
         border-color: var(--gc-line-strong);
@@ -528,7 +534,9 @@
         line-height: 20px;
         white-space: nowrap;
         cursor: pointer;
-        transition: background var(--gc-t-micro) var(--gc-ease), border-color var(--gc-t-micro) var(--gc-ease),
+        transition:
+          background var(--gc-t-micro) var(--gc-ease),
+          border-color var(--gc-t-micro) var(--gc-ease),
           color var(--gc-t-micro) var(--gc-ease);
       }
       .tool-chip:hover {
@@ -593,7 +601,9 @@
         cursor: pointer;
         line-height: 1;
         font-family: inherit;
-        transition: background var(--gc-t-micro) var(--gc-ease), color var(--gc-t-micro) var(--gc-ease);
+        transition:
+          background var(--gc-t-micro) var(--gc-ease),
+          color var(--gc-t-micro) var(--gc-ease);
       }
       .seg button:first-child {
         border-left: 0;
@@ -724,7 +734,9 @@
         display: inline-flex;
         align-items: center;
         gap: 4px;
-        transition: color var(--gc-t-micro) var(--gc-ease), background var(--gc-t-micro) var(--gc-ease);
+        transition:
+          color var(--gc-t-micro) var(--gc-ease),
+          background var(--gc-t-micro) var(--gc-ease);
       }
       .tbtn:hover {
         color: var(--gc-text);
@@ -902,9 +914,13 @@
                   </div>
                 </div>
                 <div class="row" style="justify-content: flex-end; gap: var(--gc-s2)">
-                  <button type="button" class="btn ghost h24" disabled onclick="event.stopPropagation()">放弃修改</button>
+                  <button type="button" class="btn ghost h24" disabled onclick="event.stopPropagation()">
+                    放弃修改
+                  </button>
                   <button type="button" class="btn h24" onclick="event.stopPropagation()">重新校验</button>
-                  <button type="button" class="btn primary h24" disabled onclick="event.stopPropagation()">保存此远程配置</button>
+                  <button type="button" class="btn primary h24" disabled onclick="event.stopPropagation()">
+                    保存此远程配置
+                  </button>
                 </div>
               </div>
             </div>
@@ -965,7 +981,9 @@
                 </div>
                 <div class="row" style="gap: var(--gc-s2); flex-wrap: wrap">
                   <button type="button" class="btn h24"><i class="ico sm" data-icon="file"></i>导入 Markdown</button>
-                  <button type="button" class="btn h24" id="pasteToggle"><i class="ico sm" data-icon="copy"></i>粘贴导入</button>
+                  <button type="button" class="btn h24" id="pasteToggle">
+                    <i class="ico sm" data-icon="copy"></i>粘贴导入
+                  </button>
                   <span class="spacer" style="flex: 1"></span>
                   <button type="button" class="btn ghost h24" disabled>放弃修改</button>
                   <button type="button" class="btn primary h24">保存规范</button>
@@ -995,7 +1013,9 @@
                             </select>
                           </span>
                           <input class="input" value="变更说明" placeholder="标题" />
-                          <label class="cbx on"><span class="box"><i class="ico" data-icon="check"></i></span>必填</label>
+                          <label class="cbx on"
+                            ><span class="box"><i class="ico" data-icon="check"></i></span>必填</label
+                          >
                           <span class="fld-id">change_desc</span>
                           <button type="button" class="tbtn danger">删除</button>
                         </div>
@@ -1015,7 +1035,9 @@
                             </select>
                           </span>
                           <input class="input" value="影响范围" placeholder="标题" />
-                          <label class="cbx on"><span class="box"><i class="ico" data-icon="check"></i></span>必填</label>
+                          <label class="cbx on"
+                            ><span class="box"><i class="ico" data-icon="check"></i></span>必填</label
+                          >
                           <span class="fld-id">scope</span>
                           <button type="button" class="tbtn danger">删除</button>
                         </div>
@@ -1053,17 +1075,23 @@
                         <div class="fld-body">
                           <div class="row" style="gap: 6px">
                             <input class="input" style="flex: 1" value="本地已验证" placeholder="条目" />
-                            <label class="cbx on"><span class="box"><i class="ico" data-icon="check"></i></span>必勾</label>
+                            <label class="cbx on"
+                              ><span class="box"><i class="ico" data-icon="check"></i></span>必勾</label
+                            >
                             <button type="button" class="tbtn danger">删</button>
                           </div>
                           <div class="row" style="gap: 6px">
                             <input class="input" style="flex: 1" value="已补充测试" placeholder="条目" />
-                            <label class="cbx"><span class="box"><i class="ico" data-icon="check"></i></span>必勾</label>
+                            <label class="cbx"
+                              ><span class="box"><i class="ico" data-icon="check"></i></span>必勾</label
+                            >
                             <button type="button" class="tbtn danger">删</button>
                           </div>
                           <div class="row" style="gap: 6px">
                             <input class="input" style="flex: 1" value="已更新文档" placeholder="条目" />
-                            <label class="cbx"><span class="box"><i class="ico" data-icon="check"></i></span>必勾</label>
+                            <label class="cbx"
+                              ><span class="box"><i class="ico" data-icon="check"></i></span>必勾</label
+                            >
                             <button type="button" class="tbtn danger">删</button>
                           </div>
                           <div><button type="button" class="tbtn accent">添加条目</button></div>
@@ -1079,7 +1107,8 @@
                     </div>
                     <div class="pane-body">
                       <div class="preview-box">
-                        <pre>## 变更说明
+                        <pre>
+## 变更说明
 
 {{change_desc}}
 
@@ -1114,16 +1143,21 @@
               </div>
               <div class="set-body">
                 <span class="fhint"
-                  >Key 与 MR Token 一样只存在本机设置里，不进 MCP 工具参数，页面不回填明文。浏览器和桌面同一套配置。</span
+                  >Key 与 MR Token 一样只存在本机设置里，不进 MCP
+                  工具参数，页面不回填明文。浏览器和桌面同一套配置。</span
                 >
                 <div class="frow">
                   <label>模型名</label>
-                  <div class="fc"><div class="fctrl"><input class="input" value="gpt-4.1" placeholder="gpt-4.1" /></div></div>
+                  <div class="fc">
+                    <div class="fctrl"><input class="input" value="gpt-4.1" placeholder="gpt-4.1" /></div>
+                  </div>
                 </div>
                 <div class="frow">
                   <label>Base URL</label>
                   <div class="fc">
-                    <div class="fctrl"><input class="input" placeholder="空 = https://api.openai.com/v1 ；兼容网关填到 /v1" /></div>
+                    <div class="fctrl">
+                      <input class="input" placeholder="空 = https://api.openai.com/v1 ；兼容网关填到 /v1" />
+                    </div>
                     <span class="fhint">留空使用官方地址；自建网关需兼容 /v1/chat/completions 协议。</span>
                   </div>
                 </div>
@@ -1167,11 +1201,13 @@
                     <label>允许打开的仓库</label>
                     <div class="fc">
                       <div class="fctrl">
-                        <textarea class="input" rows="6" placeholder="一行一个本地路径。留空 = 不限制">D://_myproject//git-cockpit
+                        <textarea class="input" rows="6" placeholder="一行一个本地路径。留空 = 不限制">
+D://_myproject//git-cockpit
 D://_myproject//notes</textarea>
                       </div>
                       <span class="fhint"
-                        >非空时，打开路径必须等于其中一条或位于其下。空名单不限制路径，MCP 带的 repoPath 同样不限制。</span
+                        >非空时，打开路径必须等于其中一条或位于其下。空名单不限制路径，MCP 带的 repoPath
+                        同样不限制。</span
                       >
                     </div>
                   </div>
@@ -1179,11 +1215,13 @@ D://_myproject//notes</textarea>
                     <label>本机访问密钥</label>
                     <div class="fc">
                       <div class="fctrl">
-                        <button type="button" class="btn h24"><i class="ico sm" data-icon="copy"></i>复制本机访问密钥</button>
+                        <button type="button" class="btn h24">
+                          <i class="ico sm" data-icon="copy"></i>复制本机访问密钥
+                        </button>
                       </div>
                       <span class="fhint">
-                        HTTP 的 /api 与 /mcp 要带请求头 <code>X-Git-Cockpit-Secret</code>。探活不校验。能读到 config.json
-                        的本机进程不受这道头限制。
+                        HTTP 的 /api 与 /mcp 要带请求头 <code>X-Git-Cockpit-Secret</code>。探活不校验。能读到
+                        config.json 的本机进程不受这道头限制。
                       </span>
                     </div>
                   </div>
@@ -1339,10 +1377,29 @@ D://_myproject//notes</textarea>
         };
         var G = [
           ['查看', ['status', 'log', 'diff', 'show', 'file_content', 'graph', 'branch_graph', 'reflog', 'backup_list']],
-          ['分支', ['branch_list', 'branch_create', 'branch_delete', 'tag_list', 'tag_create', 'remote_list', 'checkout']],
-          ['写入', ['add', 'unstage', 'commit', 'stash', 'stash_list', 'stash_show', 'stash_apply', 'stash_drop', 'stash_pop']],
+          [
+            '分支',
+            ['branch_list', 'branch_create', 'branch_delete', 'tag_list', 'tag_create', 'remote_list', 'checkout']
+          ],
+          [
+            '写入',
+            ['add', 'unstage', 'commit', 'stash', 'stash_list', 'stash_show', 'stash_apply', 'stash_drop', 'stash_pop']
+          ],
           ['同步', ['fetch', 'pull', 'push', 'push_force']],
-          ['合并', ['merge_preview', 'merge_rehearse', 'merge_blame', 'merge_survey', 'merge_order', 'merge', 'merge_abort', 'merge_continue', 'apply_resolve']],
+          [
+            '合并',
+            [
+              'merge_preview',
+              'merge_rehearse',
+              'merge_blame',
+              'merge_survey',
+              'merge_order',
+              'merge',
+              'merge_abort',
+              'merge_continue',
+              'apply_resolve'
+            ]
+          ],
           ['变基', ['rebase', 'rebase_abort', 'rebase_continue']],
           ['MR', ['mr_prepare', 'mr_create']],
           ['任务', ['repo_overview', 'job_list', 'job_get', 'job_cancel']],
