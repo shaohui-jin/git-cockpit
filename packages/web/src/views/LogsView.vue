@@ -102,7 +102,7 @@ onMounted(() => {
       <el-button :disabled="!visible.length" @click="exportCsv">导出 CSV</el-button>
     </div>
 
-    <div class="log-toolbar gc-card">
+    <div class="log-toolbar">
       <div class="log-search">
         <GcIcon name="search" :size="12" />
         <input v-model="searchText" type="text" placeholder="搜索工具 / 参数 / 仓库" />
@@ -189,13 +189,12 @@ onMounted(() => {
 .page-head .spacer {
   flex: 1;
 }
-/* 工具栏：搜索 + 状态 seg-chips + 下拉 + 计数（对齐设计稿 log-toolbar） */
+/* 工具栏：裸行，不加卡片壳（同设置页 gc-chip-tabs 的语言） */
 .log-toolbar {
   flex: none;
   display: flex;
   align-items: center;
   gap: var(--gc-pad);
-  padding: var(--gc-gap) var(--gc-pad);
   flex-wrap: wrap;
 }
 .log-search {

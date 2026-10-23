@@ -297,7 +297,7 @@ async function clearTemplate(): Promise<void> {
         </div>
       </section>
 
-      <section class="pane">
+      <section class="pane preview-pane">
         <div class="pane-head">
           <span>预览</span>
           <el-button
@@ -318,25 +318,19 @@ async function clearTemplate(): Promise<void> {
 </template>
 
 <style scoped>
+/* 根容器：外层 set-card 由 SettingsView 提供，这里只做纵向排布 */
 .tmpl {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
   gap: var(--gc-gap);
-  background: var(--gc-card);
-  border: 1px solid var(--gc-line);
-  border-radius: var(--gc-radius);
-  overflow: hidden;
 }
 .tmpl-head {
   flex: none;
   display: flex;
   flex-direction: column;
   gap: var(--gc-gap);
-  padding: var(--gc-gap) var(--gc-pad);
-  background: var(--gc-page);
-  border-bottom: 1px solid var(--gc-line);
 }
 .tmpl-head-row {
   display: flex;
@@ -370,23 +364,33 @@ async function clearTemplate(): Promise<void> {
   gap: var(--gc-gap);
 }
 /* 结构 / 预览上下堆叠（对齐设计稿单列，不用左右分栏） */
+/* 结构 : 预览 = 5 : 7，高度随视口自适应（设计稿 3.1 / 3.4） */
 .tmpl-split {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--gc-gap);
-  padding: var(--gc-pad);
-  overflow: auto;
+  display: grid;
+  grid-template-columns: minmax(360px, 5fr) minmax(360px, 7fr);
+  gap: var(--gc-s3);
+  height: calc(100vh - 306px);
+  min-height: 380px;
+  min-width: 0;
+}
+@media (max-width: 959px) {
+  .tmpl-split {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+  .pane.preview-pane {
+    max-height: 320px;
+  }
 }
 .pane {
-  flex: none;
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   border: 1px solid var(--gc-line);
   border-radius: var(--gc-radius);
-  background: var(--gc-page);
+  background: var(--gc-card);
+  overflow: hidden;
 }
 .pane-head {
   flex: none;
@@ -394,16 +398,16 @@ async function clearTemplate(): Promise<void> {
   align-items: center;
   justify-content: space-between;
   gap: var(--gc-gap);
-  min-height: var(--gc-row-lg);
+  min-height: var(--gc-row);
   padding: 0 var(--gc-pad);
-  border-bottom: 1px solid var(--el-border-color-lighter);
+  border-bottom: 1px solid var(--gc-line-weak);
   font-size: var(--gc-fs-body);
 }
 .pane-body {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: var(--gc-pad);
+  padding: var(--gc-s2);
 }
 .preview-body {
   margin: 0;
@@ -413,23 +417,28 @@ async function clearTemplate(): Promise<void> {
   color: var(--el-text-color-regular);
 }
 .tmpl-field {
-  padding-bottom: var(--gc-pad);
-  margin-bottom: var(--gc-pad);
-  border-bottom: 1px solid var(--el-border-color-lighter);
+  border: 1px solid var(--gc-line);
+  border-radius: var(--gc-radius);
+  background: var(--gc-card);
   display: flex;
   flex-direction: column;
-  gap: var(--gc-gap);
+  overflow: hidden;
 }
-.tmpl-field:last-child {
-  margin-bottom: 0;
-  padding-bottom: 0;
-  border-bottom: none;
+.tmpl-field + .tmpl-field {
+  margin-top: var(--gc-s2);
 }
 .tmpl-field-head {
   display: flex;
   align-items: center;
-  gap: var(--gc-gap);
-  min-height: var(--gc-row-lg);
+  gap: 6px;
+  padding: var(--gc-s2);
+}
+/* 字段体：控件与列表统一左右内缩，与头行对齐 */
+.tmpl-field > *:not(.tmpl-field-head) {
+  margin: 0 var(--gc-s2) 5px;
+}
+.tmpl-field > *:last-child {
+  margin-bottom: var(--gc-s2);
 }
 .tmpl-type {
   width: 120px;

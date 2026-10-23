@@ -28,6 +28,13 @@ const route = useRoute();
 const router = useRouter();
 const { bump } = useRevision();
 
+/** 顶栏页标题：仅声明了 meta 的页面启用（当前只有设置页），其余页面保留页内 page-head */
+const PAGE_META: Record<string, { title: string; sub: string }> = {
+  '/dashboard': { title: '工作台', sub: '本地 Git 仓库的驾驶舱' },
+  '/settings': { title: '设置', sub: '本机保存，不上传' }
+};
+const pageMeta = computed(() => PAGE_META[route.path] ?? null);
+
 type Frame = { x: number; y: number; w: number; h: number };
 type Grip = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
 
@@ -501,6 +508,10 @@ onUnmounted(() => {
       <div class="brand">
         <span class="brand-mark"><GcIcon name="logo" /></span>
       </div>
+      <div v-if="pageMeta" class="page-meta">
+        <h1 class="pm-title">{{ pageMeta.title }}</h1>
+        <span class="pm-sub">{{ pageMeta.sub }}</span>
+      </div>
       <div class="top-end">
         <button v-if="liveJob" type="button" class="pulse-count" :title="liveJobTitle" @click="goMenu('/jobs')">
           <i /><span>{{ jobs.runningCount }} 进行中</span>
@@ -660,6 +671,31 @@ onUnmounted(() => {
   width: 16px;
   height: 16px;
   color: var(--gc-accent);
+}
+/* 顶栏页标题（仅声明 meta 的页面）：标题 + 副题，与 logo 同排 */
+.page-meta {
+  display: flex;
+  align-items: baseline;
+  gap: var(--gc-gap);
+  flex: none;
+  min-width: 0;
+  margin-left: var(--gc-gap);
+  padding-left: var(--gc-gap);
+  border-left: 1px solid var(--gc-line-weak);
+}
+.page-meta .pm-title {
+  margin: 0;
+  font-size: var(--gc-fs-body);
+  font-weight: 600;
+  color: var(--gc-text);
+  line-height: 1;
+  white-space: nowrap;
+}
+.page-meta .pm-sub {
+  font-size: var(--gc-fs-meta);
+  color: var(--gc-text-3);
+  line-height: 1;
+  white-space: nowrap;
 }
 .top-end {
   display: flex;

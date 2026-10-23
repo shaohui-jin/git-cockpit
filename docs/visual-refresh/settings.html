@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="assets/tokens.css" />
     <link rel="stylesheet" href="assets/chrome.css" />
     <style>
+      /* ============ 页面骨架与 tab 自适应宽度（规范 1） ============ */
       .settings-col {
         width: 100%;
         max-width: 880px;
@@ -22,10 +23,73 @@
         gap: var(--gc-s3);
         padding-bottom: var(--gc-s4);
       }
-
-      .set-card {
+      .settings-col.wide {
+        max-width: 1200px;
+      }
+      .set-alert {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--gc-s2);
+        padding: var(--gc-s2) var(--gc-s3);
+        border: 1px solid rgba(255, 133, 133, 0.35);
+        background: var(--gc-red-weak);
+        border-radius: var(--gc-r);
+        color: var(--gc-red);
+        font-size: var(--gc-fs-meta);
+        line-height: var(--gc-lh-body);
+      }
+      .set-alert .ico {
+        flex: none;
+        margin-top: 1px;
+      }
+      .gc-chip-tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--gc-s2);
+        flex: none;
+      }
+      .gc-chip-tabs button {
+        height: var(--gc-control);
+        padding: 0 var(--gc-s3);
+        border-radius: var(--gc-r);
+        border: 1px solid var(--gc-line);
+        background: var(--gc-overlay);
+        color: var(--gc-text-2);
+        font-size: var(--gc-fs-body);
+        font-weight: 500;
+        line-height: 1;
+        white-space: nowrap;
+        cursor: pointer;
+        transition: background var(--gc-t-micro) var(--gc-ease), border-color var(--gc-t-micro) var(--gc-ease),
+          color var(--gc-t-micro) var(--gc-ease);
+      }
+      .gc-chip-tabs button:hover {
+        background: var(--gc-btn-hover);
+        color: var(--gc-text);
+        border-color: var(--gc-line-strong);
+      }
+      .gc-chip-tabs button.on {
+        background: var(--gc-accent-weak);
+        border-color: rgba(20, 200, 184, 0.28);
+        color: var(--gc-accent-text);
+        font-weight: 600;
+      }
+      .tab-pane {
+        display: none;
+      }
+      .tab-pane.on {
         display: flex;
         flex-direction: column;
+        gap: var(--gc-s3);
+        min-width: 0;
+      }
+
+      /* ============ set-card 框架（规范 2） ============ */
+      .set-card {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
         background: var(--gc-card);
         border: 1px solid var(--gc-line);
         border-radius: var(--gc-r);
@@ -33,23 +97,162 @@
       }
       .set-card > .card-head {
         height: 36px;
+        padding: 0 var(--gc-s3);
         background: var(--gc-page);
         border-bottom: 1px solid var(--gc-line);
-      }
-      .set-card > .card-head h3 {
-        font-size: var(--gc-fs-title);
+        display: flex;
+        align-items: center;
+        gap: var(--gc-s2);
+        flex: none;
       }
       .set-card > .card-head .ico {
         color: var(--gc-text-3);
+      }
+      .set-card > .card-head h3 {
+        font-size: var(--gc-fs-title);
+        font-weight: 600;
+        color: var(--gc-text);
+        line-height: 1;
+      }
+      .set-card > .card-head .spacer {
+        flex: 1;
       }
       .set-body {
         padding: var(--gc-s3);
         display: flex;
         flex-direction: column;
         gap: 10px;
+        min-width: 0;
+      }
+      .card-foot {
+        display: flex;
+        align-items: center;
+        gap: var(--gc-s2);
+        padding: 9px var(--gc-s3);
+        border-top: 1px solid var(--gc-line);
+        background: var(--gc-page);
+        flex: none;
+      }
+      .card-foot .spacer {
+        flex: 1;
+      }
+      .foot-note {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-3);
+        line-height: 1;
+      }
+      .foot-note .ico {
+        width: 11px;
+        height: 11px;
+        color: var(--gc-green);
       }
 
-      /* 表单行：标签 140 + 控件 */
+      /* ============ 分栏规格（规范 3） ============ */
+      .pane-split {
+        display: grid;
+        grid-template-columns: minmax(360px, 5fr) minmax(360px, 7fr);
+        gap: var(--gc-s3);
+        min-height: 0;
+      }
+      .git-ops-split {
+        display: grid;
+        grid-template-columns: minmax(320px, 4fr) minmax(600px, 6fr);
+        gap: var(--gc-s3);
+        align-items: start;
+      }
+      .spec-card {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+      .spec-card .set-body {
+        flex: 1;
+        min-height: 0;
+      }
+      .spec-card .pane-split {
+        height: calc(100vh - 306px);
+        min-height: 380px;
+      }
+      .pane {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        background: var(--gc-card);
+        border: 1px solid var(--gc-line);
+        border-radius: var(--gc-r);
+      }
+      .pane-head {
+        display: flex;
+        align-items: center;
+        gap: var(--gc-s2);
+        height: var(--gc-row);
+        padding: 0 var(--gc-s3);
+        border-bottom: 1px solid var(--gc-line-weak);
+        flex: none;
+      }
+      .pane-head b {
+        font-size: var(--gc-fs-body);
+        font-weight: 600;
+        color: var(--gc-text);
+        line-height: 1;
+      }
+      .pane-head .spacer {
+        flex: 1;
+      }
+      .pane-body {
+        padding: var(--gc-s2);
+        display: flex;
+        flex-direction: column;
+        gap: var(--gc-s2);
+        min-height: 0;
+        overflow-y: auto;
+      }
+      .pane-empty {
+        padding: var(--gc-s4) var(--gc-s2);
+        text-align: center;
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-3);
+        line-height: 1.6;
+      }
+      .preview-box {
+        background: var(--gc-page);
+        border: 1px solid var(--gc-line-weak);
+        border-radius: var(--gc-r);
+        padding: var(--gc-s2);
+      }
+      .preview-box pre {
+        margin: 0;
+        font-family: var(--gc-font-mono);
+        font-size: 11px;
+        line-height: 1.7;
+        color: var(--gc-text-2);
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      @media (max-width: 959px) {
+        .settings-col.wide {
+          max-width: 880px;
+        }
+        .pane-split,
+        .git-ops-split {
+          grid-template-columns: 1fr;
+        }
+        .spec-card .pane-split {
+          height: auto;
+        }
+        .pane.preview {
+          max-height: 320px;
+        }
+        .tool-wall-scroll {
+          max-height: 420px;
+          overflow-y: auto;
+        }
+      }
+
+      /* ============ 表单标签分级（规范 4） ============ */
       .frow {
         display: flex;
         align-items: flex-start;
@@ -58,7 +261,7 @@
       }
       .frow > label {
         flex: none;
-        width: 132px;
+        width: 88px;
         font-size: var(--gc-fs-body);
         color: var(--gc-text-2);
         line-height: var(--gc-control);
@@ -71,13 +274,23 @@
         flex-direction: column;
         gap: 5px;
       }
+      .frow.stack {
+        flex-direction: column;
+        gap: 5px;
+      }
+      .frow.stack > label {
+        width: auto;
+        text-align: left;
+        line-height: var(--gc-lh-body);
+      }
       .fctrl {
         display: flex;
         align-items: center;
         gap: 6px;
         min-width: 0;
       }
-      .fctrl .input {
+      .fctrl .input,
+      .fctrl .select-wrap {
         flex: 1;
         min-width: 0;
       }
@@ -95,68 +308,6 @@
         border-radius: 3px;
         padding: 0 4px;
       }
-
-      .secret {
-        font-family: var(--gc-font-mono);
-        font-size: 11px;
-        letter-spacing: 0.02em;
-      }
-
-      .token-note {
-        display: flex;
-        align-items: flex-start;
-        gap: 6px;
-        margin-left: 144px;
-        padding-top: 9px;
-        border-top: 1px solid var(--gc-line-weak);
-        font-size: var(--gc-fs-meta);
-        color: var(--gc-text-2);
-        line-height: 1.55;
-      }
-      .token-note .ico {
-        flex: none;
-        margin-top: 2px;
-        color: var(--gc-text-3);
-      }
-
-      /* 测试结果三态 */
-      .test-tag {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        height: 20px;
-        padding: 0 7px;
-        border-radius: var(--gc-r-tag);
-        font-size: var(--gc-fs-micro);
-        font-weight: 500;
-        line-height: 1;
-        white-space: nowrap;
-        flex: none;
-      }
-      .test-tag .ico {
-        width: 10px;
-        height: 10px;
-      }
-      .test-tag.ok {
-        color: var(--gc-accent-text);
-        background: var(--gc-accent-weak);
-        border: 1px solid rgba(20, 200, 184, 0.28);
-      }
-      html[data-accent='white'] .test-tag.ok {
-        border-color: rgba(238, 244, 249, 0.3);
-      }
-      .test-tag.idle {
-        color: var(--gc-text-3);
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid var(--gc-line);
-      }
-      .test-tag.err {
-        color: var(--gc-red);
-        background: var(--gc-red-weak);
-        border: 1px solid rgba(255, 133, 133, 0.28);
-      }
-
-      /* ---------- switch ---------- */
       .swrow {
         display: flex;
         align-items: center;
@@ -204,9 +355,7 @@
         height: 14px;
         border-radius: 50%;
         background: var(--gc-knob);
-        transition:
-          transform var(--gc-t-micro) var(--gc-ease),
-          background var(--gc-t-micro) var(--gc-ease);
+        transition: transform var(--gc-t-micro) var(--gc-ease), background var(--gc-t-micro) var(--gc-ease);
       }
       .sw.on {
         background: var(--gc-accent);
@@ -215,87 +364,444 @@
         transform: translateX(14px);
         background: var(--gc-accent-ink);
       }
-      .sw.on.danger {
-        background: var(--gc-red-strong);
-      }
-      .sw.on.danger::after {
-        background: var(--gc-text);
-      }
       .sw.is-disabled {
         opacity: 0.42;
         cursor: not-allowed;
       }
+      html[data-accent='white'] .sw.on {
+        background: var(--gc-accent);
+      }
+      html[data-accent='white'] .sw.on::after {
+        background: var(--gc-accent-ink);
+      }
 
-      /* MR 模板 */
-      .tpl {
+      /* ============ 组件规格（规范 5） ============ */
+      .mr-card {
+        display: block;
         width: 100%;
-        min-height: 132px;
-        padding: 8px 10px;
+        text-align: left;
+        background: var(--gc-card);
+        border: 1px solid var(--gc-line);
         border-radius: var(--gc-r);
-        border: 1px solid var(--gc-line);
-        background: var(--gc-page);
-        color: var(--gc-text-2);
-        font-family: var(--gc-font-mono);
-        font-size: 11px;
-        line-height: 1.7;
-        resize: vertical;
-        outline: none;
+        padding: var(--gc-s2) var(--gc-s3);
+        cursor: pointer;
+        font: inherit;
+        color: inherit;
+        transition: background var(--gc-t-micro) var(--gc-ease), border-color var(--gc-t-micro) var(--gc-ease);
       }
-      .tpl:focus {
+      .mr-card:hover {
+        border-color: var(--gc-line-strong);
+        background: var(--gc-btn-hover);
+      }
+      .mr-card.on {
+        background: var(--gc-accent-weak);
         border-color: var(--gc-accent);
-        box-shadow: var(--gc-focus);
       }
-      .tpl-vars {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 5px;
-        align-items: center;
-      }
-      .tpl-vars .vl {
-        font-size: var(--gc-fs-micro);
-        color: var(--gc-text-3);
-      }
-      .var-chip {
-        height: 18px;
-        padding: 0 6px;
-        border-radius: var(--gc-r-tag);
-        background: var(--gc-overlay);
-        border: 1px solid var(--gc-line);
-        color: var(--gc-purple);
-        font-family: var(--gc-font-mono);
-        font-size: 10px;
-        line-height: 16px;
-      }
-
-      .card-foot {
+      .mr-title {
         display: flex;
         align-items: center;
         gap: var(--gc-s2);
-        padding: 9px var(--gc-s3);
-        border-top: 1px solid var(--gc-line);
-        background: var(--gc-page);
+        min-width: 0;
       }
-      .card-foot .spacer {
-        flex: 1;
-      }
-      .card-foot .saved {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        font-size: var(--gc-fs-meta);
+      .mr-title .ico {
         color: var(--gc-text-3);
       }
-      .card-foot .saved .ico {
-        width: 11px;
-        height: 11px;
+      .mr-title b {
+        font-size: var(--gc-fs-body);
+        font-weight: 600;
+        color: var(--gc-text);
+        line-height: 1;
+      }
+      .mr-title .st {
+        margin-left: auto;
+        flex: none;
+        font-size: var(--gc-fs-meta);
+        font-weight: 500;
+        line-height: 1;
+      }
+      .st.ok {
         color: var(--gc-green);
+      }
+      .st.bad {
+        color: var(--gc-red);
+      }
+      .mr-panel {
+        margin-top: var(--gc-s2);
+        padding-top: var(--gc-s2);
+        border-top: 1px solid var(--gc-line-weak);
+        display: none;
+        flex-direction: column;
+        gap: var(--gc-s2);
+      }
+      .mr-card.on .mr-panel {
+        display: flex;
+      }
+      .cli-row {
+        display: flex;
+        align-items: center;
+        gap: var(--gc-s2);
+        min-width: 0;
+      }
+      .cli-row .name {
+        flex: none;
+        width: 48px;
+        font-family: var(--gc-font-mono);
+        font-size: var(--gc-fs-body);
+        color: var(--gc-text-2);
+      }
+      .cli-st {
+        font-size: var(--gc-fs-meta);
+        line-height: var(--gc-lh-body);
+      }
+      .cli-st.is-missing {
+        color: var(--gc-text-3);
+      }
+      .cli-st.is-out {
+        color: var(--gc-amber);
+      }
+      .cli-st.is-in {
+        color: var(--gc-text-2);
+      }
+      .cli-st.is-ok {
+        color: var(--gc-green);
+      }
+      .cli-st.is-bad {
+        color: var(--gc-red);
+      }
+      .vline {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: var(--gc-fs-meta);
+        line-height: var(--gc-lh-body);
+        min-width: 0;
+      }
+      .vline.is-ok {
+        color: var(--gc-green);
+      }
+      .vline.is-bad {
+        color: var(--gc-red);
+      }
+      .vline.is-wait {
+        color: var(--gc-amber);
+      }
+      .vline.is-idle {
+        color: var(--gc-text-3);
+      }
+      .tool-group + .tool-group {
+        margin-top: var(--gc-s2);
+      }
+      .tg-head {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        height: 20px;
+      }
+      .tg-head b {
+        font-size: var(--gc-fs-meta);
+        font-weight: 600;
+        color: var(--gc-text-2);
+        line-height: 20px;
+      }
+      .tg-head .n {
+        font-size: var(--gc-fs-micro);
+        color: var(--gc-text-3);
+        font-variant-numeric: tabular-nums;
+        line-height: 20px;
+      }
+      .tool-wall {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 6px;
+      }
+      .tool-chip {
+        position: relative;
+        height: var(--gc-btn-mini);
+        padding: 0 8px;
+        border-radius: var(--gc-r-tag);
+        border: 1px solid var(--gc-line);
+        background: var(--gc-overlay);
+        color: var(--gc-text-3);
+        font-family: var(--gc-font-mono);
+        font-size: 11px;
+        line-height: 20px;
+        white-space: nowrap;
+        cursor: pointer;
+        transition: background var(--gc-t-micro) var(--gc-ease), border-color var(--gc-t-micro) var(--gc-ease),
+          color var(--gc-t-micro) var(--gc-ease);
+      }
+      .tool-chip:hover {
+        border-color: var(--gc-line-strong);
+        color: var(--gc-text);
+      }
+      .tool-chip.on {
+        background: var(--gc-accent-weak);
+        border-color: rgba(20, 200, 184, 0.28);
+        color: var(--gc-accent-text);
+      }
+      .tool-chip.risk {
+        border-left: 2px solid var(--gc-red-strong);
+        padding-left: 7px;
+      }
+      .tool-wall-hint {
+        margin-top: 6px;
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-3);
+        line-height: var(--gc-lh-body);
+        min-height: var(--gc-lh-body);
+      }
+      .spec-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        height: 20px;
+        padding: 0 7px;
+        border-radius: var(--gc-r-tag);
+        font-size: var(--gc-fs-micro);
+        font-weight: 500;
+        line-height: 1;
+        white-space: nowrap;
+        flex: none;
+      }
+      .spec-tag.is-on {
+        color: var(--gc-green);
+        background: var(--gc-green-weak);
+        border: 1px solid rgba(86, 217, 122, 0.28);
+      }
+      .spec-tag.is-off {
+        color: var(--gc-text-3);
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--gc-line);
+      }
+      .seg {
+        display: inline-flex;
+        border: 1px solid var(--gc-line);
+        border-radius: var(--gc-r);
+        overflow: hidden;
+        flex: none;
+      }
+      .seg button {
+        height: var(--gc-btn-inline);
+        padding: 0 10px;
+        font-size: var(--gc-fs-meta);
+        font-weight: 500;
+        color: var(--gc-text-3);
+        background: var(--gc-card);
+        border: 0;
+        border-left: 1px solid var(--gc-line);
+        cursor: pointer;
+        line-height: 1;
+        font-family: inherit;
+        transition: background var(--gc-t-micro) var(--gc-ease), color var(--gc-t-micro) var(--gc-ease);
+      }
+      .seg button:first-child {
+        border-left: 0;
+      }
+      .seg button:hover {
+        color: var(--gc-text);
+        background: var(--gc-btn-hover);
+      }
+      .seg button.on {
+        background: var(--gc-accent-weak);
+        color: var(--gc-accent-text);
+        font-weight: 600;
+      }
+      .seg.is-disabled {
+        opacity: 0.42;
+        pointer-events: none;
+      }
+      .paste-bar {
+        border: 1px solid var(--gc-line);
+        border-radius: var(--gc-r);
+        background: var(--gc-page);
+        padding: var(--gc-s2);
+        display: none;
+        flex-direction: column;
+        gap: var(--gc-s2);
+      }
+      .paste-bar.on {
+        display: flex;
+      }
+      .paste-bar textarea {
+        height: 90px;
+      }
+      .fld-card {
+        border: 1px solid var(--gc-line);
+        border-radius: var(--gc-r);
+        background: var(--gc-card);
+      }
+      .fld-card + .fld-card {
+        margin-top: var(--gc-s2);
+      }
+      .fld-head {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: var(--gc-s2);
+      }
+      .fld-head .select {
+        width: 120px;
+        flex: none;
+      }
+      .fld-head .input {
+        flex: 1;
+        min-width: 0;
+      }
+      .fld-id {
+        flex: none;
+        font-family: var(--gc-font-mono);
+        font-size: var(--gc-fs-micro);
+        color: var(--gc-text-3);
+        background: var(--gc-page);
+        border: 1px solid var(--gc-line-weak);
+        border-radius: 3px;
+        padding: 1px 4px;
+      }
+      .fld-body {
+        padding: 0 var(--gc-s2) var(--gc-s2);
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .cbx {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-2);
+        cursor: pointer;
+        user-select: none;
+        line-height: 1;
+      }
+      .cbx .box {
+        width: 13px;
+        height: 13px;
+        border-radius: 3px;
+        border: 1px solid var(--gc-line-strong);
+        background: var(--gc-page);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: none;
+      }
+      .cbx .box svg {
+        width: 9px;
+        height: 9px;
+        color: var(--gc-accent-ink);
+        opacity: 0;
+      }
+      .cbx.on .box {
+        background: var(--gc-accent);
+        border-color: var(--gc-accent);
+      }
+      .cbx.on .box svg {
+        opacity: 1;
+      }
+      .confirm-strip {
+        display: flex;
+        align-items: center;
+        gap: var(--gc-s2);
+        flex-wrap: wrap;
+        padding: var(--gc-s2);
+        border: 1px solid rgba(255, 133, 133, 0.35);
+        background: var(--gc-red-weak);
+        border-radius: var(--gc-r);
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-2);
+      }
+      .tbtn {
+        background: none;
+        border: 0;
+        padding: 0 2px;
+        color: var(--gc-text-3);
+        font-size: var(--gc-fs-meta);
+        line-height: var(--gc-lh-body);
+        cursor: pointer;
+        border-radius: var(--gc-r-tag);
+        white-space: nowrap;
+        font-family: inherit;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        transition: color var(--gc-t-micro) var(--gc-ease), background var(--gc-t-micro) var(--gc-ease);
+      }
+      .tbtn:hover {
+        color: var(--gc-text);
+      }
+      .tbtn:disabled,
+      .tbtn.is-disabled {
+        color: var(--gc-text-disabled);
+        cursor: not-allowed;
+      }
+      .tbtn.danger {
+        color: var(--gc-red);
+      }
+      .tbtn.danger:hover {
+        color: var(--gc-red);
+        background: var(--gc-red-weak);
+      }
+      .tbtn.accent {
+        color: var(--gc-accent-text);
+      }
+      .tbtn.accent:hover {
+        background: var(--gc-accent-weak);
+      }
+      .spin {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        border: 1.5px solid var(--gc-line-strong);
+        border-top-color: var(--gc-accent);
+        animation: gc-spin 800ms linear infinite;
+        flex: none;
+      }
+      @keyframes gc-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .pane-loading {
+        position: absolute;
+        inset: 0;
+        z-index: 5;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--gc-s2);
+        background: var(--gc-glass-bg);
+        -webkit-backdrop-filter: blur(var(--gc-glass-blur));
+        backdrop-filter: blur(var(--gc-glass-blur));
+        border-radius: var(--gc-r);
+        color: var(--gc-text-2);
+        font-size: var(--gc-fs-meta);
+      }
+      .topbar-sub {
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-3);
+        margin-left: var(--gc-s2);
+      }
+      .mr-card[role='button']:focus-visible {
+        outline: 2px solid var(--gc-accent);
+        outline-offset: 2px;
+      }
+      .mono {
+        font-family: var(--gc-font-mono);
+      }
+      .nowrap {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
     </style>
   </head>
+
   <body>
     <div class="app-shell">
       <header class="topbar">
         <span class="brand-mark"><i class="ico" data-icon="logo"></i></span>
+        <span class="topbar-title">设置</span>
+        <span class="topbar-sub">本机保存，不上传</span>
         <div class="topbar-end">
           <span class="conn-tag"><span class="dot"></span>前端 <span class="val">0.1.32</span></span>
           <span class="conn-tag"><span class="dot"></span>后端 <span class="val">0.1.32</span></span>
@@ -308,221 +814,400 @@
       </div>
 
       <main class="page">
-        <div class="page-head" style="width: 100%; max-width: 880px; margin: 0 auto">
-          <h1>设置</h1>
-          <span class="sub">本机保存，不上传</span>
-          <span class="spacer"></span>
-          <span class="chip plain sm mono">~/.git-cockpit/config.json</span>
-        </div>
+        <div class="settings-col" id="settingsCol">
+          <div class="gc-chip-tabs" id="settingsTabs">
+            <button type="button" class="on" data-tab="mr">MR 配置</button>
+            <button type="button" data-tab="spec">正文规范</button>
+            <button type="button" data-tab="model">模型</button>
+            <button type="button" data-tab="git">Git 操作</button>
+          </div>
 
-        <div class="settings-col">
-          <!-- ① 访问密钥 -->
-          <section class="set-card">
-            <div class="card-head">
-              <i class="ico sm" data-icon="key"></i>
-              <h3>访问密钥</h3>
-              <span class="spacer"></span>
-              <span class="chip plain sm">本机回环访问</span>
-            </div>
-            <div class="set-body">
-              <div class="frow">
-                <label for="secret">localSecret</label>
-                <div class="fc">
-                  <div class="fctrl">
-                    <input id="secret" class="input secret" type="text" readonly value="gc_live_9f3a72c4e18b56d0a4f7" />
-                    <button class="btn h24" type="button"><i class="ico sm" data-icon="copy"></i>复制</button>
-                    <button class="btn ghost h24" type="button"><i class="ico sm" data-icon="refresh"></i>重新生成</button>
+          <!-- ================= Tab 1 · MR 配置 ================= -->
+          <section class="tab-pane on" id="pane-mr">
+            <div class="set-card">
+              <div class="card-head">
+                <i class="ico sm" data-icon="remote"></i>
+                <h3>默认远程</h3>
+                <span class="spacer"></span>
+                <span class="chip plain sm">GitHub</span>
+              </div>
+              <div class="set-body">
+                <div class="frow">
+                  <label>远程</label>
+                  <div class="fc">
+                    <div class="fctrl">
+                      <span class="select-wrap" style="flex: 1">
+                        <select class="select">
+                          <option>origin</option>
+                          <option>upstream</option>
+                        </select>
+                      </span>
+                      <span class="mono nowrap" style="flex: 2; font-size: var(--gc-fs-meta); color: var(--gc-text-3)"
+                        >git@github.com:acme/api-gateway.git</span
+                      >
+                    </div>
+                    <span class="fhint">用于 fetch、MR 短名剥前缀、CLI 未传远程时的默认值。切换后立即保存。</span>
                   </div>
-                  <span class="fhint"
-                    >Agent 通过 <code>Authorization: Bearer</code> 携带此密钥调用 MCP 工具。重新生成后需要同步更新 Cursor /
-                    Claude 的 MCP 配置。</span
-                  >
                 </div>
               </div>
             </div>
-          </section>
 
-          <!-- ② Git 托管凭证 -->
-          <section class="set-card">
-            <div class="card-head">
-              <i class="ico sm" data-icon="remote"></i>
-              <h3>Git 托管凭证</h3>
-              <span class="spacer"></span>
-              <span class="test-tag ok"><i class="ico" data-icon="check"></i>测试通过</span>
+            <div class="mr-card on" role="button" tabindex="0" aria-pressed="true">
+              <div class="mr-title">
+                <i class="ico sm" data-icon="terminal"></i>
+                <b>A. 本机已安装的 gh</b>
+                <span class="st ok">可用</span>
+              </div>
+              <div class="mr-panel">
+                <div class="cli-row">
+                  <span class="name">gh</span>
+                  <span class="cli-st is-ok">已登录 · Token 校验通过</span>
+                </div>
+                <span class="fhint">CLI 未登录时会尝试打开浏览器完成 OAuth。</span>
+                <div>
+                  <button type="button" class="btn h24" onclick="event.stopPropagation()">重新检测</button>
+                </div>
+              </div>
             </div>
-            <div class="set-body">
-              <div class="frow">
-                <label for="mr-token">MR Token</label>
-                <div class="fc">
-                  <div class="fctrl">
-                    <input id="mr-token" class="input secret" type="password" value="glpat-8xK2mQ7vR4nT1sL9" />
-                    <button class="btn h24" type="button"><i class="ico sm" data-icon="eye"></i>显示</button>
-                    <button class="btn h24" type="button"><i class="ico sm" data-icon="play"></i>连接测试</button>
-                  </div>
-                  <span class="fhint"
-                    >用于创建与更新合并请求，需要 <code>api</code> 权限。凭证仅存本机，日志中自动脱敏为
-                    <code>glpat-****</code>。</span
-                  >
-                </div>
+
+            <div class="mr-card" role="button" tabindex="0" aria-pressed="false">
+              <div class="mr-title">
+                <i class="ico sm" data-icon="key"></i>
+                <b>B. GitHub Token（github.com）</b>
+                <span class="st ok">可用</span>
               </div>
-              <div class="frow">
-                <label for="gl-host">托管地址</label>
-                <div class="fc">
-                  <div class="fctrl">
-                    <input id="gl-host" class="input mono" type="text" value="https://gitlab.example.com" />
-                    <span class="test-tag idle">未测试</span>
+              <div class="mr-panel">
+                <span class="vline is-ok"><i class="ico sm" data-icon="check"></i>校验通过 · 3 分钟前</span>
+                <div class="frow">
+                  <label>Token</label>
+                  <div class="fc">
+                    <div class="fctrl">
+                      <input class="input" type="password" value="ghp_9f3a72c4e18b56d0a4f7" />
+                      <button type="button" class="tbtn" onclick="event.stopPropagation()">
+                        <i class="ico sm" data-icon="eye"></i>显示
+                      </button>
+                    </div>
+                    <span class="fhint">需 repo 权限。Token 不进工具参数。</span>
                   </div>
                 </div>
+                <div class="frow">
+                  <label></label>
+                  <div class="fc">
+                    <div class="row" style="gap: var(--gc-s3)">
+                      <button type="button" class="tbtn" onclick="event.stopPropagation()">
+                        <i class="ico sm" data-icon="external"></i>打开 GitHub 创建 Token 页面
+                      </button>
+                      <button type="button" class="tbtn" onclick="event.stopPropagation()">自建 / API Base URL</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="row" style="justify-content: flex-end; gap: var(--gc-s2)">
+                  <button type="button" class="btn ghost h24" disabled onclick="event.stopPropagation()">放弃修改</button>
+                  <button type="button" class="btn h24" onclick="event.stopPropagation()">重新校验</button>
+                  <button type="button" class="btn primary h24" disabled onclick="event.stopPropagation()">保存此远程配置</button>
+                </div>
               </div>
-              <div class="token-note">
-                <i class="ico sm" data-icon="info"></i>
-                <span
-                  >此处为全局 Token，用于仪表盘概览与开单。若某个仓库使用独立的仓库级
-                  Token，缺失时只会在任务页提示该仓库失败，不影响其他仓库。</span
+            </div>
+
+            <div class="mr-card" role="button" tabindex="0" aria-pressed="false">
+              <div class="mr-title">
+                <i class="ico sm" data-icon="external"></i>
+                <b>C. 仅打开浏览器创建页</b>
+                <span class="st ok">可用</span>
+              </div>
+              <div class="mr-panel">
+                <span class="fhint">确认后只返回浏览器创建页，不调用 Token 或本机 CLI。</span>
+                <span class="fhint"
+                  >已启用正文规范时，平台创建页不会写入正文，请复制后粘贴，或改用 Token / 本机 CLI。</span
                 >
               </div>
             </div>
-            <div class="card-foot">
-              <span class="saved"><i class="ico" data-icon="check"></i>上次保存 昨天 16:41</span>
-              <span class="spacer"></span>
-              <button class="btn ghost h24" type="button">清除凭证</button>
-              <button class="btn primary h24" type="button">保存</button>
+
+            <div class="set-card">
+              <div class="card-head">
+                <i class="ico sm" data-icon="key"></i>
+                <h3>当前远程凭证</h3>
+                <span class="spacer"></span>
+                <span class="chip plain sm">GitHub</span>
+              </div>
+              <div class="set-body">
+                <span class="fhint">只显示当前选中远程的域名。其它实例上的 Token 不在这里列出。</span>
+                <div class="row" style="gap: var(--gc-s2)">
+                  <span class="mono" style="font-size: var(--gc-fs-body)">github.com</span>
+                  <span class="chip green sm mono">已配置 Token ghp_••••1f3a</span>
+                  <span class="spacer" style="flex: 1"></span>
+                  <button type="button" class="tbtn danger">清除</button>
+                </div>
+              </div>
             </div>
           </section>
 
-          <!-- ③ 模型 -->
-          <section class="set-card">
-            <div class="card-head">
-              <i class="ico sm" data-icon="cpu"></i>
-              <h3>模型</h3>
-              <span class="spacer"></span>
-              <span class="test-tag idle"><i class="ico" data-icon="clock"></i>未测试</span>
-            </div>
-            <div class="set-body">
-              <div class="frow">
-                <label for="api-key">API Key</label>
-                <div class="fc">
-                  <div class="fctrl">
-                    <input id="api-key" class="input secret" type="password" value="sk-ant-api03-7f2c9b1e4d8a" />
-                    <button class="btn h24" type="button"><i class="ico sm" data-icon="eye"></i>显示</button>
+          <!-- ================= Tab 2 · 正文规范 ================= -->
+          <section class="tab-pane" id="pane-spec">
+            <div class="set-card spec-card">
+              <div class="card-head">
+                <i class="ico sm" data-icon="file"></i>
+                <h3>正文规范</h3>
+                <span class="spacer"></span>
+                <span class="chip plain sm mono">pasted.md</span>
+              </div>
+              <div class="set-body">
+                <div class="row" style="flex-wrap: wrap; gap: var(--gc-s3); align-items: center">
+                  <span class="spec-tag is-on">已启用</span>
+                  <span class="swrow" style="flex: none; border: 0; padding: 0; gap: var(--gc-s2)">
+                    <span class="sw-copy" style="flex: none"><b>启用规范</b></span>
+                    <span class="sw on"></span>
+                  </span>
+                  <span class="seg">
+                    <button type="button" class="on">允许 AI 填写</button>
+                    <button type="button">须人工填写</button>
+                  </span>
+                </div>
+                <div class="row" style="gap: var(--gc-s2); flex-wrap: wrap">
+                  <button type="button" class="btn h24"><i class="ico sm" data-icon="file"></i>导入 Markdown</button>
+                  <button type="button" class="btn h24" id="pasteToggle"><i class="ico sm" data-icon="copy"></i>粘贴导入</button>
+                  <span class="spacer" style="flex: 1"></span>
+                  <button type="button" class="btn ghost h24" disabled>放弃修改</button>
+                  <button type="button" class="btn primary h24">保存规范</button>
+                </div>
+                <div class="paste-bar" id="pasteBar">
+                  <textarea placeholder="粘贴 MR 模板 Markdown"></textarea>
+                  <div class="row" style="justify-content: flex-end">
+                    <button type="button" class="btn h24">识别</button>
                   </div>
                 </div>
-              </div>
-              <div class="frow">
-                <label for="base-url">Base URL</label>
-                <div class="fc">
-                  <div class="fctrl">
-                    <input id="base-url" class="input mono" type="text" value="https://api.anthropic.com" />
+                <div class="pane-split">
+                  <div class="pane">
+                    <div class="pane-head">
+                      <b>结构</b>
+                      <span class="spacer"></span>
+                      <button type="button" class="tbtn accent"><i class="ico sm" data-icon="plus"></i>添加</button>
+                    </div>
+                    <div class="pane-body">
+                      <div class="fld-card">
+                        <div class="fld-head">
+                          <span class="select-wrap select">
+                            <select class="select">
+                              <option>多行文本</option>
+                              <option>单选</option>
+                              <option>勾选</option>
+                              <option>说明（不填）</option>
+                            </select>
+                          </span>
+                          <input class="input" value="变更说明" placeholder="标题" />
+                          <label class="cbx on"><span class="box"><i class="ico" data-icon="check"></i></span>必填</label>
+                          <span class="fld-id">change_desc</span>
+                          <button type="button" class="tbtn danger">删除</button>
+                        </div>
+                        <div class="fld-body">
+                          <textarea class="input" rows="2" placeholder="说明（开单时给填写人看）"></textarea>
+                          <input class="input" placeholder="占位" />
+                        </div>
+                      </div>
+                      <div class="fld-card">
+                        <div class="fld-head">
+                          <span class="select-wrap select">
+                            <select class="select">
+                              <option>多行文本</option>
+                              <option selected>单选</option>
+                              <option>勾选</option>
+                              <option>说明（不填）</option>
+                            </select>
+                          </span>
+                          <input class="input" value="影响范围" placeholder="标题" />
+                          <label class="cbx on"><span class="box"><i class="ico" data-icon="check"></i></span>必填</label>
+                          <span class="fld-id">scope</span>
+                          <button type="button" class="tbtn danger">删除</button>
+                        </div>
+                        <div class="fld-body">
+                          <textarea class="input" rows="2" placeholder="说明（开单时给填写人看）"></textarea>
+                          <div class="row" style="gap: 6px">
+                            <input class="input" style="flex: 1" value="低" placeholder="选项" />
+                            <button type="button" class="tbtn danger">删</button>
+                          </div>
+                          <div class="row" style="gap: 6px">
+                            <input class="input" style="flex: 1" value="中" placeholder="选项" />
+                            <button type="button" class="tbtn danger">删</button>
+                          </div>
+                          <div class="row" style="gap: 6px">
+                            <input class="input" style="flex: 1" value="高" placeholder="选项" />
+                            <button type="button" class="tbtn danger">删</button>
+                          </div>
+                          <div><button type="button" class="tbtn accent">添加选项</button></div>
+                        </div>
+                      </div>
+                      <div class="fld-card">
+                        <div class="fld-head">
+                          <span class="select-wrap select">
+                            <select class="select">
+                              <option>多行文本</option>
+                              <option>单选</option>
+                              <option selected>勾选</option>
+                              <option>说明（不填）</option>
+                            </select>
+                          </span>
+                          <input class="input" value="自查清单" placeholder="标题" />
+                          <span class="fld-id">checklist</span>
+                          <button type="button" class="tbtn danger">删除</button>
+                        </div>
+                        <div class="fld-body">
+                          <div class="row" style="gap: 6px">
+                            <input class="input" style="flex: 1" value="本地已验证" placeholder="条目" />
+                            <label class="cbx on"><span class="box"><i class="ico" data-icon="check"></i></span>必勾</label>
+                            <button type="button" class="tbtn danger">删</button>
+                          </div>
+                          <div class="row" style="gap: 6px">
+                            <input class="input" style="flex: 1" value="已补充测试" placeholder="条目" />
+                            <label class="cbx"><span class="box"><i class="ico" data-icon="check"></i></span>必勾</label>
+                            <button type="button" class="tbtn danger">删</button>
+                          </div>
+                          <div class="row" style="gap: 6px">
+                            <input class="input" style="flex: 1" value="已更新文档" placeholder="条目" />
+                            <label class="cbx"><span class="box"><i class="ico" data-icon="check"></i></span>必勾</label>
+                            <button type="button" class="tbtn danger">删</button>
+                          </div>
+                          <div><button type="button" class="tbtn accent">添加条目</button></div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <span class="fhint">留空使用官方地址；自建网关需兼容 <code>/v1/messages</code> 协议。</span>
-                </div>
-              </div>
-              <div class="frow">
-                <label for="model">默认模型</label>
-                <div class="fc">
-                  <div class="fctrl">
-                    <span class="select-wrap" style="flex: 1">
-                      <select id="model" class="select" style="width: 100%">
-                        <option>claude-sonnet-4-5</option>
-                        <option>claude-opus-4-1</option>
-                        <option>claude-haiku-4-5</option>
-                      </select>
-                    </span>
-                    <button class="btn h24" type="button"><i class="ico sm" data-icon="play"></i>测试</button>
-                  </div>
-                  <span class="fhint">对话与工具编排使用该模型；任务执行本身不消耗模型额度。</span>
-                </div>
-              </div>
-            </div>
-            <div class="card-foot">
-              <span class="saved"><i class="ico" data-icon="check"></i>上次保存 2 天前</span>
-              <span class="spacer"></span>
-              <button class="btn primary h24" type="button">保存</button>
-            </div>
-          </section>
+                  <div class="pane preview">
+                    <div class="pane-head">
+                      <b>预览</b>
+                      <span class="spacer"></span>
+                      <button type="button" class="tbtn"><i class="ico sm" data-icon="refresh"></i>刷新</button>
+                    </div>
+                    <div class="pane-body">
+                      <div class="preview-box">
+                        <pre>## 变更说明
 
-          <!-- ④ MR 模板 -->
-          <section class="set-card">
-            <div class="card-head">
-              <i class="ico sm" data-icon="list"></i>
-              <h3>MR 模板</h3>
-              <span class="spacer"></span>
-              <span class="chip plain sm">Markdown</span>
-            </div>
-            <div class="set-body">
-              <textarea class="tpl" spellcheck="false">## 变更说明
-
-{{commits}}
+{{change_desc}}
 
 ## 影响范围
 
 - 目标分支：{{into}}
 - 来源分支：{{from}}
 - 涉及仓库：{{repo}}
+- 影响范围：{{scope}}
 
 ## 自查
 
 - [ ] 本地已验证
 - [ ] 已补充测试
-- [ ] 已更新文档</textarea>
-              <div class="tpl-vars">
-                <span class="vl">可用变量</span>
-                <span class="var-chip">{{into}}</span>
-                <span class="var-chip">{{from}}</span>
-                <span class="var-chip">{{commits}}</span>
-                <span class="var-chip">{{repo}}</span>
+- [ ] 已更新文档</pre>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-            <div class="card-foot">
-              <span class="saved">变量在创建 MR 时按实际分支与提交填充</span>
-              <span class="spacer"></span>
-              <button class="btn ghost h24" type="button">恢复默认</button>
-              <button class="btn primary h24" type="button">保存</button>
             </div>
           </section>
 
-          <!-- ⑤ 安全与审批 -->
-          <section class="set-card">
-            <div class="card-head">
-              <i class="ico sm" data-icon="shield"></i>
-              <h3>安全与审批</h3>
-              <span class="spacer"></span>
-              <span class="chip amber sm">写操作保护</span>
+          <!-- ================= Tab 3 · 模型 ================= -->
+          <section class="tab-pane" id="pane-model">
+            <div class="set-card">
+              <div class="card-head">
+                <i class="ico sm" data-icon="cpu"></i>
+                <h3>聊天模型</h3>
+                <span class="spacer"></span>
+                <span class="chip plain sm">OpenAI 兼容</span>
+              </div>
+              <div class="set-body">
+                <span class="fhint"
+                  >Key 与 MR Token 一样只存在本机设置里，不进 MCP 工具参数，页面不回填明文。浏览器和桌面同一套配置。</span
+                >
+                <div class="frow">
+                  <label>模型名</label>
+                  <div class="fc"><div class="fctrl"><input class="input" value="gpt-4.1" placeholder="gpt-4.1" /></div></div>
+                </div>
+                <div class="frow">
+                  <label>Base URL</label>
+                  <div class="fc">
+                    <div class="fctrl"><input class="input" placeholder="空 = https://api.openai.com/v1 ；兼容网关填到 /v1" /></div>
+                    <span class="fhint">留空使用官方地址；自建网关需兼容 /v1/chat/completions 协议。</span>
+                  </div>
+                </div>
+                <div class="frow">
+                  <label>API Key</label>
+                  <div class="fc">
+                    <div class="fctrl">
+                      <input class="input" type="password" value="sk-9f3a72c4e18b56d0a4f7" />
+                      <button type="button" class="tbtn"><i class="ico sm" data-icon="eye"></i>显示</button>
+                    </div>
+                    <span class="fhint">已保存 sk-••••8b2f，输入新 Key 覆盖</span>
+                  </div>
+                </div>
+              </div>
+              <div class="card-foot">
+                <span class="foot-note"><i class="ico" data-icon="info"></i>任务执行本身不消耗模型额度</span>
+                <span class="spacer"></span>
+                <button type="button" class="btn ghost h24" style="color: var(--gc-red)">清除 Key</button>
+                <button type="button" class="btn primary h24">保存</button>
+              </div>
             </div>
-            <div class="set-body">
-              <div class="swrow">
-                <div class="sw-copy">
-                  <b>强制干跑预览</b>
-                  <span>所有写操作先产出命令预览，人工确认后才执行</span>
+          </section>
+
+          <!-- ================= Tab 4 · Git 操作 ================= -->
+          <section class="tab-pane" id="pane-git">
+            <div class="git-ops-split">
+              <div class="set-card">
+                <div class="card-head">
+                  <i class="ico sm" data-icon="shield"></i>
+                  <h3>默认行为</h3>
                 </div>
-                <span class="sw on" role="switch" aria-checked="true" aria-label="强制干跑预览"></span>
-              </div>
-              <div class="swrow">
-                <div class="sw-copy">
-                  <b>高风险操作人工审批</b>
-                  <span>force push、分支删除、硬重置需要二次确认</span>
+                <div class="set-body">
+                  <div class="swrow">
+                    <div class="sw-copy">
+                      <b>dry-run 默认</b>
+                      <span>开启后写操作（MCP / CLI）默认只生成预览，不真正执行。</span>
+                    </div>
+                    <span class="sw on"></span>
+                  </div>
+                  <div class="frow stack">
+                    <label>允许打开的仓库</label>
+                    <div class="fc">
+                      <div class="fctrl">
+                        <textarea class="input" rows="6" placeholder="一行一个本地路径。留空 = 不限制">D://_myproject//git-cockpit
+D://_myproject//notes</textarea>
+                      </div>
+                      <span class="fhint"
+                        >非空时，打开路径必须等于其中一条或位于其下。空名单不限制路径，MCP 带的 repoPath 同样不限制。</span
+                      >
+                    </div>
+                  </div>
+                  <div class="frow stack">
+                    <label>本机访问密钥</label>
+                    <div class="fc">
+                      <div class="fctrl">
+                        <button type="button" class="btn h24"><i class="ico sm" data-icon="copy"></i>复制本机访问密钥</button>
+                      </div>
+                      <span class="fhint">
+                        HTTP 的 /api 与 /mcp 要带请求头 <code>X-Git-Cockpit-Secret</code>。探活不校验。能读到 config.json
+                        的本机进程不受这道头限制。
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <span class="sw" role="switch" aria-checked="false" aria-label="高风险操作人工审批"></span>
-              </div>
-              <div class="swrow">
-                <div class="sw-copy">
-                  <b>自动升级服务</b>
-                  <span>检测到新版本时自动停服安装并重启</span>
+                <div class="card-foot">
+                  <span class="spacer"></span>
+                  <button type="button" class="btn ghost h24" disabled>放弃</button>
+                  <button type="button" class="btn primary h24">保存</button>
                 </div>
-                <span class="sw" role="switch" aria-checked="false" aria-label="自动升级服务"></span>
               </div>
-              <div class="swrow">
-                <div class="sw-copy">
-                  <b>保留审计日志</b>
-                  <span>记录全部工具调用，保留 30 天。关闭将无法追溯写操作</span>
+
+              <div class="set-card">
+                <div class="card-head">
+                  <i class="ico sm" data-icon="list"></i>
+                  <h3>工具开关</h3>
+                  <span class="spacer"></span>
+                  <span class="chip plain sm">高危左边红条，默认关</span>
                 </div>
-                <span class="sw on is-disabled" role="switch" aria-checked="true" aria-disabled="true" aria-label="保留审计日志"></span>
+                <div class="set-body">
+                  <span class="fhint">点芯片启用或禁用。打开后执行前仍会自动备份。没有审批队列。</span>
+                  <div class="tool-wall-scroll" id="toolWall"></div>
+                  <div class="tool-wall-hint" id="toolHint">悬停芯片查看工具说明，点击切换启用。</div>
+                </div>
               </div>
-            </div>
-            <div class="card-foot">
-              <span class="saved"><i class="ico" data-icon="info"></i>审计日志为安全基线，不可关闭</span>
-              <span class="spacer"></span>
-              <button class="btn primary h24" type="button">保存</button>
             </div>
           </section>
         </div>
@@ -541,5 +1226,161 @@
 
     <script src="assets/icons.js"></script>
     <script src="assets/switch.js"></script>
+    <script>
+      /* ---- tab 切换 + 容器自适应宽度 ---- */
+      (function () {
+        var col = document.getElementById('settingsCol');
+        var tabs = document.querySelectorAll('#settingsTabs button');
+        var wide = { spec: true, git: true };
+        tabs.forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            tabs.forEach(function (b) {
+              b.classList.remove('on');
+            });
+            btn.classList.add('on');
+            var key = btn.dataset.tab;
+            document.querySelectorAll('.tab-pane').forEach(function (p) {
+              p.classList.toggle('on', p.id === 'pane-' + key);
+            });
+            col.classList.toggle('wide', !!wide[key]);
+          });
+        });
+      })();
+
+      /* ---- MR 方式三选卡：单选 + 展开面板 ---- */
+      (function () {
+        var cards = document.querySelectorAll('.mr-card');
+        function select(card) {
+          cards.forEach(function (c) {
+            c.classList.remove('on');
+            c.setAttribute('aria-pressed', 'false');
+          });
+          card.classList.add('on');
+          card.setAttribute('aria-pressed', 'true');
+        }
+        cards.forEach(function (card) {
+          card.addEventListener('click', function () {
+            select(card);
+          });
+          card.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              select(card);
+            }
+          });
+        });
+      })();
+
+      /* ---- 粘贴栏显隐 ---- */
+      (function () {
+        var t = document.getElementById('pasteToggle');
+        var b = document.getElementById('pasteBar');
+        if (t && b)
+          t.addEventListener('click', function () {
+            b.classList.toggle('on');
+          });
+      })();
+
+      /* ---- 工具芯片墙：10 组 52 芯片 ---- */
+      (function () {
+        var D = {
+          status: '查看工作区状态',
+          log: '查看提交历史',
+          diff: '查看差异',
+          show: '查看提交内容',
+          file_content: '读取文件内容',
+          graph: '提交图数据',
+          branch_graph: '分支图数据',
+          reflog: '引用日志',
+          backup_list: '列出自动备份',
+          branch_list: '列出分支',
+          branch_create: '创建分支',
+          branch_delete: '删除分支',
+          tag_list: '列出标签',
+          tag_create: '创建标签',
+          remote_list: '列出远程',
+          checkout: '切换分支',
+          add: '暂存文件',
+          unstage: '取消暂存',
+          commit: '创建提交',
+          stash: '保存进度',
+          stash_list: '列出进度',
+          stash_show: '查看进度',
+          stash_apply: '应用进度',
+          stash_drop: '删除进度',
+          stash_pop: '恢复并删除进度',
+          fetch: '抓取远程',
+          pull: '拉取远程',
+          push: '推送远程',
+          push_force: '强制推送',
+          merge_preview: '预演合并',
+          merge_rehearse: '排练合并',
+          merge_blame: '合并溯源',
+          merge_survey: '矩阵调研',
+          merge_order: '连续干净顺序',
+          merge: '执行合并',
+          merge_abort: '中止合并',
+          merge_continue: '继续合并',
+          apply_resolve: '落盘冲突处理',
+          rebase: '执行变基',
+          rebase_abort: '中止变基',
+          rebase_continue: '继续变基',
+          mr_prepare: '准备 MR 内容',
+          mr_create: '创建 MR',
+          repo_overview: '仓库概览',
+          job_list: '任务列表',
+          job_get: '任务详情',
+          job_cancel: '取消任务',
+          worktree_list: '列出工作树',
+          worktree_add: '添加工作树',
+          worktree_remove: '移除工作树',
+          reset_hard: '硬重置（丢弃改动）',
+          clean: '清理未跟踪文件'
+        };
+        var G = [
+          ['查看', ['status', 'log', 'diff', 'show', 'file_content', 'graph', 'branch_graph', 'reflog', 'backup_list']],
+          ['分支', ['branch_list', 'branch_create', 'branch_delete', 'tag_list', 'tag_create', 'remote_list', 'checkout']],
+          ['写入', ['add', 'unstage', 'commit', 'stash', 'stash_list', 'stash_show', 'stash_apply', 'stash_drop', 'stash_pop']],
+          ['同步', ['fetch', 'pull', 'push', 'push_force']],
+          ['合并', ['merge_preview', 'merge_rehearse', 'merge_blame', 'merge_survey', 'merge_order', 'merge', 'merge_abort', 'merge_continue', 'apply_resolve']],
+          ['变基', ['rebase', 'rebase_abort', 'rebase_continue']],
+          ['MR', ['mr_prepare', 'mr_create']],
+          ['任务', ['repo_overview', 'job_list', 'job_get', 'job_cancel']],
+          ['Worktree', ['worktree_list', 'worktree_add', 'worktree_remove']],
+          ['高风险', ['reset_hard', 'clean']]
+        ];
+        var wall = document.getElementById('toolWall');
+        var hint = document.getElementById('toolHint');
+        G.forEach(function (g) {
+          var wrap = document.createElement('div');
+          wrap.className = 'tool-group';
+          var head = document.createElement('div');
+          head.className = 'tg-head';
+          head.innerHTML = '<b>' + g[0] + '</b><span class="n">' + g[1].length + '</span>';
+          wrap.appendChild(head);
+          var chips = document.createElement('div');
+          chips.className = 'tool-wall';
+          g[1].forEach(function (name) {
+            var c = document.createElement('button');
+            c.type = 'button';
+            c.className = 'tool-chip' + (g[0] === '高风险' ? ' risk' : ' on');
+            c.textContent = name;
+            c.title = name + ' — ' + D[name];
+            c.addEventListener('click', function () {
+              c.classList.toggle('on');
+            });
+            c.addEventListener('mouseenter', function () {
+              hint.textContent = name + ' — ' + D[name];
+            });
+            c.addEventListener('mouseleave', function () {
+              hint.textContent = '悬停芯片查看工具说明，点击切换启用。';
+            });
+            chips.appendChild(c);
+          });
+          wrap.appendChild(chips);
+          wall.appendChild(wrap);
+        });
+      })();
+    </script>
   </body>
 </html>

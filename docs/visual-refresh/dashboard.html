@@ -13,568 +13,605 @@
     <link rel="stylesheet" href="assets/tokens.css" />
     <link rel="stylesheet" href="assets/chrome.css" />
     <style>
-      /* ---------- 需要关注 ---------- */
-      .attention {
-        flex: none;
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: var(--gc-s2);
+      /* ===== 容器 ===== */
+      .dash-col {
+        width: 100%;
+        max-width: 1280px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: var(--gc-s3);
+        padding-bottom: var(--gc-s4);
       }
-      .att-item {
+      .topbar-sub {
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-3);
+        margin-left: var(--gc-s2);
+      }
+
+      /* ===== 当前仓条（单行，跟随网格选中） ===== */
+      .current-bar {
         display: flex;
         align-items: center;
         gap: var(--gc-s2);
-        padding: 9px var(--gc-s3);
-        border-radius: var(--gc-r);
+        min-width: 0;
+        padding: 7px var(--gc-s3);
         background: var(--gc-card);
         border: 1px solid var(--gc-line);
-        border-left-width: 2px;
-        min-width: 0;
+        border-left: 2px solid var(--gc-accent);
+        border-radius: var(--gc-r);
       }
-      .att-item.red {
-        border-left-color: var(--gc-red);
-      }
-      .att-item.amber {
-        border-left-color: var(--gc-amber);
-      }
-      .att-item.accent {
-        border-left-color: var(--gc-accent);
-      }
-      .att-item .ico {
+      .current-bar .ico {
         flex: none;
+        color: var(--gc-text-3);
       }
-      .att-item.red .ico {
-        color: var(--gc-red);
-      }
-      .att-item.amber .ico {
-        color: var(--gc-amber);
-      }
-      .att-item.accent .ico {
-        color: var(--gc-accent-text);
-      }
-      .att-copy {
-        min-width: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 1px;
-      }
-      .att-copy b {
+      .cb-name {
+        flex: none;
+        font-family: var(--gc-font-mono);
         font-size: var(--gc-fs-body);
         font-weight: 600;
         color: var(--gc-text);
-        line-height: 1.3;
-        font-family: var(--gc-font-mono);
+        white-space: nowrap;
+      }
+      .cb-path {
+        flex: 0 1 auto;
+        min-width: 0;
+        max-width: 340px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-      }
-      .att-copy span {
-        font-size: var(--gc-fs-meta);
-        color: var(--gc-text-3);
-        line-height: 1.35;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      .att-item .icon-btn {
-        margin-left: auto;
-      }
-
-      /* ---------- 仓库卡网格 3×2 ---------- */
-      .repo-grid {
-        flex: none;
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: var(--gc-s3);
-      }
-      .repo {
-        display: flex;
-        flex-direction: column;
-        gap: var(--gc-s2);
-        padding: var(--gc-s3);
-        min-width: 0;
-        position: relative;
-        transition: border-color var(--gc-t-micro) var(--gc-ease);
-      }
-      .repo:hover {
-        border-color: var(--gc-line-strong);
-      }
-      .repo-top {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        min-width: 0;
-      }
-      .repo-top .ico {
-        color: var(--gc-text-3);
-        flex: none;
-      }
-      .repo-name {
-        font-family: var(--gc-font-mono);
-        font-size: var(--gc-fs-title);
-        font-weight: 600;
-        color: var(--gc-text);
-        line-height: 1.2;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        min-width: 0;
-      }
-      .repo-top .chip {
-        margin-left: auto;
-        flex: none;
-      }
-      .repo-path {
         font-family: var(--gc-font-mono);
         font-size: var(--gc-fs-meta);
         color: var(--gc-text-3);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        line-height: 1.4;
       }
-      .repo-stats {
-        display: flex;
-        align-items: center;
-        gap: var(--gc-s2);
-        font-size: var(--gc-fs-meta);
-        font-variant-numeric: tabular-nums;
-        color: var(--gc-text-3);
-        font-family: var(--gc-font-mono);
-      }
-      .repo-stats .up.on {
-        color: var(--gc-green);
-      }
-      .repo-stats .down.on {
-        color: var(--gc-red);
-      }
-      .repo-stats .dirty.on {
-        color: var(--gc-amber);
-      }
-      .repo-stats .ico {
-        width: 11px;
-        height: 11px;
-        vertical-align: -1px;
-      }
-      .repo-stats .sep {
-        width: 1px;
-        height: 9px;
-        background: var(--gc-line);
-      }
-      .repo-commit {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-        padding-top: var(--gc-s2);
-        border-top: 1px solid var(--gc-line-weak);
-        min-width: 0;
-      }
-      .repo-commit .msg {
+      .cb-branch {
+        flex: none;
         font-family: var(--gc-font-mono);
         font-size: var(--gc-fs-meta);
         color: var(--gc-text-2);
-        line-height: 1.45;
+        max-width: 200px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
-      .repo-commit .meta {
-        display: flex;
-        align-items: center;
-        gap: 6px;
+      .cb-stats {
+        flex: none;
         font-family: var(--gc-font-mono);
-        font-size: var(--gc-fs-micro);
+        font-size: var(--gc-fs-meta);
         color: var(--gc-text-3);
         font-variant-numeric: tabular-nums;
       }
-      .repo-commit .hash {
-        color: var(--gc-purple);
-      }
-      /* 注意力提示条 */
-      .repo-note {
-        display: flex;
-        align-items: center;
-        gap: 5px;
-        height: 22px;
-        padding: 0 7px;
-        border-radius: var(--gc-r-tag);
-        font-size: var(--gc-fs-meta);
-        font-weight: 500;
-        line-height: 1;
-        margin-top: auto;
-      }
-      .repo-note.red {
-        color: var(--gc-red);
-        background: var(--gc-red-weak);
-      }
-      .repo-note.amber {
+      .cb-stats b.on {
         color: var(--gc-amber);
-        background: var(--gc-amber-weak);
       }
-      .repo-note.accent {
-        color: var(--gc-accent-text);
-        background: var(--gc-accent-weak);
-      }
-      .repo-note.ok {
-        color: var(--gc-green);
-        background: var(--gc-green-weak);
-      }
-      .repo-note .ico {
-        width: 12px;
-        height: 12px;
-      }
-
-      /* ---------- 热力图 ---------- */
-      .heat-card {
-        flex: none;
-        padding: var(--gc-s3);
-        display: flex;
-        flex-direction: column;
-        gap: var(--gc-s3);
-      }
-      .heat-head {
-        display: flex;
-        align-items: center;
-        gap: var(--gc-s2);
-        min-width: 0;
-      }
-      .heat-head h3 {
-        font-size: var(--gc-fs-title);
-        font-weight: 600;
-        color: var(--gc-text);
-        line-height: 1;
-      }
-      .heat-head .spacer {
+      .cb-spacer {
         flex: 1;
       }
-      .heat-stat {
+      /* 当前仓迷你热力：12 周周聚合 */
+      .cb-heat {
+        flex: none;
+        display: inline-flex;
+        align-items: flex-end;
+        gap: 2px;
+        height: 14px;
+      }
+      .cb-heat i {
+        width: 4px;
+        border-radius: 1px;
+        background: var(--gc-line);
+      }
+      .cb-heat i.lv0 {
+        height: 2px;
+      }
+      .cb-heat i.lv1 {
+        height: 4px;
+        background: rgba(20, 200, 184, 0.35);
+      }
+      .cb-heat i.lv2 {
+        height: 7px;
+        background: rgba(20, 200, 184, 0.6);
+      }
+      .cb-heat i.lv3 {
+        height: 10px;
+        background: var(--gc-accent);
+      }
+      .cb-heat i.lv4 {
+        height: 13px;
+        background: var(--gc-accent);
+        box-shadow: var(--gc-glow-sm);
+      }
+      /* 当前仓迷你热力：12 周周聚合 */
+      .cb-heat {
+        flex: none;
+        display: inline-flex;
+        align-items: flex-end;
+        gap: 2px;
+        height: 14px;
+      }
+      .cb-heat i {
+        width: 4px;
+        border-radius: 1px;
+        background: var(--gc-line);
+      }
+      .cb-heat i.lv0 {
+        height: 2px;
+      }
+      .cb-heat i.lv1 {
+        height: 4px;
+        background: rgba(20, 200, 184, 0.35);
+      }
+      .cb-heat i.lv2 {
+        height: 7px;
+        background: rgba(20, 200, 184, 0.6);
+      }
+      .cb-heat i.lv3 {
+        height: 10px;
+        background: var(--gc-accent);
+      }
+      .cb-heat i.lv4 {
+        height: 13px;
+        background: var(--gc-accent);
+        box-shadow: var(--gc-glow-sm);
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        height: 18px;
+        padding: 0 7px;
+        border-radius: var(--gc-r-tag);
+        font-size: var(--gc-fs-micro);
+        font-weight: 500;
+        line-height: 1;
+        white-space: nowrap;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--gc-line);
+        color: var(--gc-text-3);
+      }
+      .chip.red {
+        background: var(--gc-red-weak);
+        border-color: rgba(255, 133, 133, 0.28);
+        color: var(--gc-red);
+      }
+      .chip.amber {
+        background: var(--gc-amber-weak);
+        border-color: rgba(242, 201, 76, 0.28);
+        color: var(--gc-amber);
+      }
+      .chip.accent {
+        background: var(--gc-accent-weak);
+        border-color: rgba(20, 200, 184, 0.28);
+        color: var(--gc-accent-text);
+      }
+      .chip.green {
+        background: var(--gc-green-weak);
+        border-color: rgba(86, 217, 122, 0.28);
+        color: var(--gc-green);
+      }
+
+      /* ===== 工具栏：筛选分段 + 打开输入 ===== */
+      .toolbar {
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: var(--gc-s2);
+        min-width: 0;
+        padding: 7px var(--gc-s3);
+        background: var(--gc-card);
+        border: 1px solid var(--gc-line);
+        border-radius: var(--gc-r);
+        flex: none;
+      }
+      .seg {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        padding: 2px;
+        border-radius: var(--gc-radius);
+        background: var(--gc-page);
+        border: 1px solid var(--gc-line);
+        flex: none;
+      }
+      .seg button {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        height: 24px;
+        padding: 0 9px;
+        border: 0;
+        border-radius: var(--gc-r-tag);
+        background: transparent;
+        color: var(--gc-text-3);
+        font: inherit;
+        font-size: var(--gc-fs-meta);
+        cursor: pointer;
+        white-space: nowrap;
+        transition: background var(--gc-t-micro) var(--gc-ease), color var(--gc-t-micro) var(--gc-ease);
+      }
+      .seg button:hover {
+        color: var(--gc-text-2);
+      }
+      .seg button.on {
+        background: var(--gc-accent-weak);
+        color: var(--gc-accent-text);
+      }
+      .seg .n {
+        font-family: var(--gc-font-mono);
+        font-size: var(--gc-fs-micro);
+        font-variant-numeric: tabular-nums;
+        opacity: 0.85;
+      }
+      .seg button.lost-tab .n {
+        color: var(--gc-text-3);
+      }
+      .seg button.lost-tab.on {
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--gc-text-2);
+      }
+      .toolbar .grow {
+        flex: 1;
+      }
+      .open-input {
+        width: 320px;
+        height: var(--gc-control);
+        padding: 0 9px;
+        border-radius: var(--gc-r);
+        border: 1px solid var(--gc-line);
+        background: var(--gc-page);
+        color: var(--gc-text);
+        font: inherit;
+        font-size: var(--gc-fs-meta);
+      }
+      .open-input::placeholder {
+        color: var(--gc-text-placeholder);
+      }
+      .open-input:focus {
+        outline: none;
+        border-color: var(--gc-accent);
+      }
+
+      /* ===== 分区 ===== */
+      .section {
+        display: flex;
+        flex-direction: column;
+        gap: var(--gc-s2);
+        flex: none;
+      }
+      .sec-head {
+        display: flex;
+        align-items: center;
+        gap: var(--gc-s2);
+        min-width: 0;
+      }
+      .sec-head .t {
+        font-size: var(--gc-fs-body);
+        font-weight: 600;
+        color: var(--gc-text);
+        white-space: nowrap;
+      }
+      .sec-head .n {
+        font-family: var(--gc-font-mono);
         font-size: var(--gc-fs-meta);
         color: var(--gc-text-3);
         font-variant-numeric: tabular-nums;
+      }
+      .sec-head .line {
+        flex: 1;
+        height: 1px;
+        background: var(--gc-line-weak);
+      }
+      .sec-head .hint {
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-3);
         white-space: nowrap;
       }
-      .heat-stat b {
-        font-weight: 600;
-        color: var(--gc-text-2);
+      .sec-head .btn {
+        height: 22px;
+        padding: 0 8px;
+        font-size: var(--gc-fs-meta);
       }
-      .heat-body {
-        display: flex;
-        gap: 8px;
-        align-items: flex-start;
-        overflow-x: auto;
-        padding-bottom: 2px;
-      }
-      .heat-days {
+
+      /* ===== 仓库卡：两行 / 72px 级密度 ===== */
+      .grid {
         display: grid;
-        grid-template-rows: repeat(7, 10px);
-        gap: 3px;
-        padding-top: 15px;
-        flex: none;
+        grid-template-columns: repeat(auto-fill, minmax(236px, 1fr));
+        gap: var(--gc-s2);
       }
-      .heat-days span {
-        font-size: 10px;
-        line-height: 10px;
-        color: var(--gc-text-3);
-        text-align: right;
-        width: 12px;
+      .grid[hidden] {
+        display: none;
       }
-      .heat-main {
+      .repo-card {
+        position: relative;
         display: flex;
         flex-direction: column;
-        gap: 5px;
-        min-width: 0;
-      }
-      .heat-months {
-        display: flex;
-        height: 10px;
-      }
-      .heat-months span {
-        width: 39px;
-        font-size: 10px;
-        line-height: 10px;
-        color: var(--gc-text-3);
-        white-space: nowrap;
-        overflow: hidden;
-      }
-      .heat-grid {
-        display: grid;
-        grid-auto-flow: column;
-        grid-template-rows: repeat(7, 10px);
         gap: 3px;
+        padding: 9px 11px;
+        background: var(--gc-card);
+        border: 1px solid var(--gc-line);
+        border-left: 2px solid var(--gc-line);
+        border-radius: var(--gc-r);
+        cursor: pointer;
+        min-width: 0;
+        transition: background var(--gc-t-micro) var(--gc-ease), border-color var(--gc-t-micro) var(--gc-ease);
       }
-      .heat-cell {
-        width: 10px;
-        height: 10px;
-        border-radius: 2px;
-        background: var(--gc-heat-0);
+      .repo-card:hover {
+        background: var(--gc-btn-hover);
+        border-color: var(--gc-line-strong);
       }
-      .heat-cell.l1 {
-        background: var(--gc-heat-1);
+      .repo-card.is-current {
+        background: var(--gc-accent-weak);
+        border-left-color: var(--gc-accent);
       }
-      .heat-cell.l2 {
-        background: var(--gc-heat-2);
+      .repo-card.stuck {
+        border-left-color: var(--gc-red);
       }
-      .heat-cell.l3 {
-        background: var(--gc-heat-3);
+      .repo-card.dirty {
+        border-left-color: var(--gc-amber);
       }
-      .heat-cell.l4 {
-        background: var(--gc-heat-4);
+      .repo-card.sync {
+        border-left-color: var(--gc-accent);
       }
-      .heat-foot {
+      .repo-card.lost {
+        opacity: 0.58;
+        border-left-color: var(--gc-line);
+      }
+      .repo-card.lost:hover {
+        opacity: 0.85;
+      }
+      .r1 {
         display: flex;
         align-items: center;
         gap: 6px;
-        margin-left: auto;
+        min-width: 0;
       }
-      .heat-foot .legend {
+      .r-name {
+        flex: 1;
+        min-width: 0;
+        font-family: var(--gc-font-mono);
+        font-size: var(--gc-fs-body);
+        font-weight: 600;
+        color: var(--gc-text);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .r-more {
+        flex: none;
+        width: 20px;
+        height: 20px;
+        border: 0;
+        border-radius: var(--gc-r-tag);
+        background: transparent;
+        color: var(--gc-text-3);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity var(--gc-t-micro) var(--gc-ease);
+      }
+      .repo-card:hover .r-more {
+        opacity: 1;
+      }
+      .r-more:hover {
+        background: var(--gc-btn-hover);
+        color: var(--gc-text);
+      }
+      .r2 {
         display: flex;
         align-items: center;
-        gap: 3px;
-        font-size: 10px;
+        gap: var(--gc-s2);
+        min-width: 0;
+        font-family: var(--gc-font-mono);
+        font-size: var(--gc-fs-meta);
         color: var(--gc-text-3);
+        font-variant-numeric: tabular-nums;
       }
-      .heat-foot .legend i {
-        width: 10px;
-        height: 10px;
-        border-radius: 2px;
+      .r-branch {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: var(--gc-text-2);
       }
-
-      @media (max-width: 1180px) {
-        .repo-grid {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
+      .r-stats {
+        flex: none;
+        display: flex;
+        align-items: center;
+        gap: var(--gc-s2);
+        white-space: nowrap;
       }
-      @media (max-width: 900px) {
-        .attention {
-          grid-template-columns: 1fr;
-        }
-        .repo-grid {
-          grid-template-columns: 1fr;
-        }
+      .r-stats b.on {
+        color: var(--gc-amber);
+        font-weight: 600;
+      }
+      .r-stats .danger {
+        color: var(--gc-red);
+      }
+      .r-stats .quiet {
+        color: var(--gc-green);
+      }
+      .lost .r-branch {
+        color: var(--gc-text-3);
       }
     </style>
   </head>
+
   <body>
     <div class="app-shell">
-      <!-- 顶栏：只放符号 + 连接 tag -->
       <header class="topbar">
         <span class="brand-mark"><i class="ico" data-icon="logo"></i></span>
+        <span class="topbar-title">工作台</span>
+        <span class="topbar-sub">本地 Git 仓库的驾驶舱</span>
         <div class="topbar-end">
           <span class="conn-tag"><span class="dot"></span>前端 <span class="val">0.1.32</span></span>
           <span class="conn-tag"><span class="dot"></span>后端 <span class="val">0.1.32</span></span>
-          <span class="conn-tag is-connecting"><span class="dot"></span>桌面 <span class="val">连接中</span></span>
+          <span class="conn-tag"><span class="dot"></span>桌面 <span class="val">0.1.32</span></span>
         </div>
       </header>
 
-      <!-- 脉冲条：演示运行中 -->
       <div class="pulsebar">
-        <div class="fill" style="width: 68%"></div>
-        <div class="scan"></div>
+        <div class="fill done" style="width: 100%"></div>
       </div>
 
       <main class="page">
-        <div class="page-head">
-          <h1>工作台</h1>
-          <span class="sub">6 个仓库 · 最近同步 2 分钟前</span>
-          <span class="pulse-count" style="margin-left: 6px"><i></i>3 进行中</span>
-          <span class="spacer"></span>
-          <button class="btn h24" type="button"><i class="ico sm" data-icon="refresh"></i>刷新概览</button>
-          <button class="btn primary h24" type="button"><i class="ico sm" data-icon="plus"></i>打开仓库</button>
+        <div class="dash-col">
+          <!-- 当前仓条：跟随网格选中，替代旧 hero -->
+          <div class="current-bar">
+            <i class="ico sm" data-icon="repo"></i>
+            <span class="cb-name">git-cockpit</span>
+            <span class="cb-path">D:////_myproject////git-cockpit</span>
+            <span class="chip red">雷雨</span>
+            <span class="cb-branch">master</span>
+            <span class="cb-stats"><b class="on">0</b>↑ <b>0</b>↓</span>
+            <span class="chip amber">10 更改</span>
+            <span class="chip red">2 冲突</span>
+            <span class="cb-spacer"></span>
+            <span class="cb-heat" title="近 12 周提交 46 次" aria-label="近 12 周提交趋势">
+              <i class="lv1"></i><i class="lv0"></i><i class="lv2"></i><i class="lv3"></i><i class="lv2"></i><i class="lv0"></i>
+              <i class="lv3"></i><i class="lv4"></i><i class="lv2"></i><i class="lv1"></i><i class="lv3"></i><i class="lv2"></i>
+            </span>
+            <span class="cb-heat" title="近 12 周提交 46 次" aria-label="近 12 周提交趋势">
+              <i class="lv1"></i><i class="lv0"></i><i class="lv2"></i><i class="lv3"></i><i class="lv2"></i><i class="lv0"></i>
+              <i class="lv3"></i><i class="lv4"></i><i class="lv2"></i><i class="lv1"></i><i class="lv3"></i><i class="lv2"></i>
+            </span>
+            <button type="button" class="btn primary h24">进入工作区</button>
+            <button type="button" class="btn h24">预演合并</button>
+          </div>
+
+          <!-- 工具栏：状态筛选（含失效独立档）+ 打开/克隆/刷新 -->
+          <div class="toolbar">
+            <div class="seg" id="seg">
+              <button type="button" class="on">全部<span class="n">20</span></button>
+              <button type="button">雷雨<span class="n">2</span></button>
+              <button type="button">薄雾<span class="n">1</span></button>
+              <button type="button">刮风<span class="n">0</span></button>
+              <button type="button">晴天<span class="n">3</span></button>
+              <button type="button" class="lost-tab">失效<span class="n">14</span></button>
+            </div>
+            <span class="grow"></span>
+            <input class="open-input" placeholder="输入本地 Git 仓库路径，例如 D:////project////repo" />
+            <button type="button" class="btn primary h24">打开</button>
+            <button type="button" class="btn h24">克隆到本地</button>
+            <button type="button" class="btn h24"><i class="ico sm" data-icon="refresh"></i>刷新</button>
+          </div>
+
+          <!-- 需要处理：真卡住 + 脏区 + 待同步 -->
+          <section class="section">
+            <div class="sec-head">
+              <span class="t">需要处理</span>
+              <span class="n">3</span>
+              <span class="line"></span>
+              <span class="hint">冲突 / 操作未完成 / 未提交改动</span>
+            </div>
+            <div class="grid">
+              <article class="repo-card stuck is-current" title="D:////_myproject////git-cockpit">
+                <div class="r1">
+                  <span class="r-name">git-cockpit</span>
+                  <span class="chip red">雷雨</span>
+                  <button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button>
+                </div>
+                <div class="r2">
+                  <span class="r-branch">master</span>
+                  <span class="r-stats"><b class="on">0</b>↑ <b>0</b>↓ <span>10 更改</span> <span class="danger">2 冲突</span></span>
+                </div>
+              </article>
+
+              <article class="repo-card stuck" title="D:////_myproject////dryTools">
+                <div class="r1">
+                  <span class="r-name">dryTools</span>
+                  <span class="chip red">雷雨</span>
+                  <button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button>
+                </div>
+                <div class="r2">
+                  <span class="r-branch">feature/cli</span>
+                  <span class="r-stats"><b class="on">1</b>↑ <b>0</b>↓ <span class="danger">rebase</span></span>
+                </div>
+              </article>
+
+              <article class="repo-card dirty" title="D:////_myproject////git-insight">
+                <div class="r1">
+                  <span class="r-name">git-insight</span>
+                  <span class="chip amber">薄雾</span>
+                  <button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button>
+                </div>
+                <div class="r2">
+                  <span class="r-branch">master</span>
+                  <span class="r-stats"><b class="on">2</b>↑ <b>0</b>↓ <span>3 更改</span></span>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <!-- 干净：零彩色装饰 -->
+          <section class="section">
+            <div class="sec-head">
+              <span class="t">干净</span>
+              <span class="n">3</span>
+              <span class="line"></span>
+              <span class="hint">可直接开工</span>
+            </div>
+            <div class="grid">
+              <article class="repo-card" title="D:////_myproject////why-css-insight">
+                <div class="r1">
+                  <span class="r-name">why-css-insight</span>
+                  <button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button>
+                </div>
+                <div class="r2">
+                  <span class="r-branch">master</span>
+                  <span class="r-stats"><b>0</b>↑ <b>0</b>↓ <span>0 更改</span></span>
+                </div>
+              </article>
+              <article class="repo-card" title="D:////_myproject////comp-insight">
+                <div class="r1">
+                  <span class="r-name">comp-insight</span>
+                  <button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button>
+                </div>
+                <div class="r2">
+                  <span class="r-branch">master</span>
+                  <span class="r-stats"><b>0</b>↑ <b>0</b>↓ <span>0 更改</span></span>
+                </div>
+              </article>
+              <article class="repo-card" title="D:////_myproject////game-demo">
+                <div class="r1">
+                  <span class="r-name">game-demo</span>
+                  <button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button>
+                </div>
+                <div class="r2">
+                  <span class="r-branch">main</span>
+                  <span class="r-stats"><b>0</b>↑ <b>0</b>↓ <span>0 更改</span></span>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <!-- 失效：折叠区，独立计数，批量移除 -->
+          <section class="section">
+            <div class="sec-head">
+              <span class="t">失效</span>
+              <span class="n">14</span>
+              <span class="line"></span>
+              <span class="hint">路径不存在或不是 Git 仓库</span>
+              <button type="button" class="btn ghost h22" id="toggleLost">展开</button>
+              <button type="button" class="btn ghost h22">批量移除</button>
+            </div>
+            <div class="grid" id="lostGrid" hidden>
+              <article class="repo-card lost"><div class="r1"><span class="r-name">PropStudio</span><span class="chip">丢失</span><button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button></div><div class="r2"><span class="r-branch">不可用</span></div></article>
+              <article class="repo-card lost"><div class="r1"><span class="r-name">LayoutStudio</span><span class="chip">丢失</span><button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button></div><div class="r2"><span class="r-branch">不可用</span></div></article>
+              <article class="repo-card lost"><div class="r1"><span class="r-name">UIModule</span><span class="chip">丢失</span><button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button></div><div class="r2"><span class="r-branch">不可用</span></div></article>
+              <article class="repo-card lost"><div class="r1"><span class="r-name">AppCommon</span><span class="chip">丢失</span><button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button></div><div class="r2"><span class="r-branch">不可用</span></div></article>
+              <article class="repo-card lost"><div class="r1"><span class="r-name">XTCommon</span><span class="chip">丢失</span><button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button></div><div class="r2"><span class="r-branch">不可用</span></div></article>
+              <article class="repo-card lost"><div class="r1"><span class="r-name">SchemaStudio</span><span class="chip">丢失</span><button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button></div><div class="r2"><span class="r-branch">不可用</span></div></article>
+              <article class="repo-card lost"><div class="r1"><span class="r-name">ParamStudio</span><span class="chip">丢失</span><button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button></div><div class="r2"><span class="r-branch">不可用</span></div></article>
+              <article class="repo-card lost"><div class="r1"><span class="r-name">HarvestStudio</span><span class="chip">丢失</span><button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button></div><div class="r2"><span class="r-branch">不可用</span></div></article>
+              <article class="repo-card lost"><div class="r1"><span class="r-name">DramStudio</span><span class="chip">丢失</span><button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button></div><div class="r2"><span class="r-branch">不可用</span></div></article>
+              <article class="repo-card lost"><div class="r1"><span class="r-name">CustomStudio</span><span class="chip">丢失</span><button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button></div><div class="r2"><span class="r-branch">不可用</span></div></article>
+              <article class="repo-card lost"><div class="r1"><span class="r-name">Application</span><span class="chip">丢失</span><button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button></div><div class="r2"><span class="r-branch">不可用</span></div></article>
+              <article class="repo-card lost"><div class="r1"><span class="r-name">domain</span><span class="chip">丢失</span><button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button></div><div class="r2"><span class="r-branch">不可用</span></div></article>
+              <article class="repo-card lost"><div class="r1"><span class="r-name">XtHubForWin</span><span class="chip">丢失</span><button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button></div><div class="r2"><span class="r-branch">不可用</span></div></article>
+              <article class="repo-card lost"><div class="r1"><span class="r-name">XtHubLibs</span><span class="chip">丢失</span><button type="button" class="r-more" aria-label="更多"><i class="ico sm" data-icon="more"></i></button></div><div class="r2"><span class="r-branch">不可用</span></div></article>
+            </div>
+          </section>
         </div>
-
-        <!-- 需要关注 -->
-        <section class="attention">
-          <div class="att-item red">
-            <i class="ico" data-icon="conflict"></i>
-            <div class="att-copy">
-              <b>ml-pipeline</b>
-              <span>2 个冲突未解决，合并已暂停</span>
-            </div>
-            <button class="icon-btn" type="button" aria-label="前往合并">
-              <i class="ico sm" data-icon="chevron"></i>
-            </button>
-          </div>
-          <div class="att-item amber">
-            <i class="ico" data-icon="key"></i>
-            <div class="att-copy">
-              <b>billing-service</b>
-              <span>未配置 MR 凭证，无法创建合并请求</span>
-            </div>
-            <button class="icon-btn" type="button" aria-label="前往设置">
-              <i class="ico sm" data-icon="chevron"></i>
-            </button>
-          </div>
-          <div class="att-item accent">
-            <i class="ico" data-icon="pull"></i>
-            <div class="att-copy">
-              <b>infra-deploy</b>
-              <span>落后 origin/main 12 个提交</span>
-            </div>
-            <button class="icon-btn" type="button" aria-label="前往状态">
-              <i class="ico sm" data-icon="chevron"></i>
-            </button>
-          </div>
-        </section>
-
-        <!-- 仓库卡 3×2 -->
-        <section class="repo-grid">
-          <article class="repo glass-card">
-            <div class="repo-top">
-              <i class="ico" data-icon="repo"></i>
-              <span class="repo-name">api-gateway</span>
-              <span class="chip sm mono">main</span>
-            </div>
-            <div class="repo-path">~/code/api-gateway</div>
-            <div class="repo-stats">
-              <span class="up"><i class="ico" data-icon="arrow-up"></i>0</span>
-              <span class="sep"></span>
-              <span class="down"><i class="ico" data-icon="arrow-down"></i>0</span>
-              <span class="sep"></span>
-              <span class="dirty">0 个改动</span>
-            </div>
-            <div class="repo-commit">
-              <span class="msg">chore: bump fastify to 4.28</span>
-              <span class="meta"><span class="hash">a1b2c3d</span>·张伟·2 小时前</span>
-            </div>
-            <div class="repo-note ok"><i class="ico" data-icon="check"></i>工作区干净，可以开工</div>
-          </article>
-
-          <article class="repo glass-card">
-            <div class="repo-top">
-              <i class="ico" data-icon="repo"></i>
-              <span class="repo-name">web-frontend</span>
-              <span class="chip sm mono">feature/payment-retry</span>
-            </div>
-            <div class="repo-path">~/code/web-frontend</div>
-            <div class="repo-stats">
-              <span class="up on"><i class="ico" data-icon="arrow-up"></i>2</span>
-              <span class="sep"></span>
-              <span class="down"><i class="ico" data-icon="arrow-down"></i>0</span>
-              <span class="sep"></span>
-              <span class="dirty on">3 个改动</span>
-            </div>
-            <div class="repo-commit">
-              <span class="msg">feat: 支付重试超时处理</span>
-              <span class="meta"><span class="hash">7f3e9b1</span>·李娜·37 分钟前</span>
-            </div>
-            <div class="repo-note amber"><i class="ico" data-icon="file"></i>3 个文件未提交</div>
-          </article>
-
-          <article class="repo glass-card">
-            <div class="repo-top">
-              <i class="ico" data-icon="repo"></i>
-              <span class="repo-name">infra-deploy</span>
-              <span class="chip sm mono">main</span>
-            </div>
-            <div class="repo-path">~/code/infra-deploy</div>
-            <div class="repo-stats">
-              <span class="up"><i class="ico" data-icon="arrow-up"></i>0</span>
-              <span class="sep"></span>
-              <span class="down on"><i class="ico" data-icon="arrow-down"></i>12</span>
-              <span class="sep"></span>
-              <span class="dirty">0 个改动</span>
-            </div>
-            <div class="repo-commit">
-              <span class="msg">ci: 收敛 staging 部署超时</span>
-              <span class="meta"><span class="hash">2c8d4af</span>·王磊·昨天 14:32</span>
-            </div>
-            <div class="repo-note accent"><i class="ico" data-icon="pull"></i>落后 origin/main 12 个提交</div>
-          </article>
-
-          <article class="repo glass-card">
-            <div class="repo-top">
-              <i class="ico" data-icon="repo"></i>
-              <span class="repo-name">billing-service</span>
-              <span class="chip sm mono">develop</span>
-            </div>
-            <div class="repo-path">~/code/billing-service</div>
-            <div class="repo-stats">
-              <span class="up"><i class="ico" data-icon="arrow-up"></i>0</span>
-              <span class="sep"></span>
-              <span class="down"><i class="ico" data-icon="arrow-down"></i>0</span>
-              <span class="sep"></span>
-              <span class="dirty">0 个改动</span>
-            </div>
-            <div class="repo-commit">
-              <span class="msg">refactor: 拆出对账任务调度器</span>
-              <span class="meta"><span class="hash">b90f12e</span>·陈晨·昨天 09:18</span>
-            </div>
-            <div class="repo-note amber"><i class="ico" data-icon="key"></i>未配置 MR Token</div>
-          </article>
-
-          <article class="repo glass-card">
-            <div class="repo-top">
-              <i class="ico" data-icon="repo"></i>
-              <span class="repo-name">ml-pipeline</span>
-              <span class="chip sm mono">release/2.4</span>
-            </div>
-            <div class="repo-path">~/code/ml-pipeline</div>
-            <div class="repo-stats">
-              <span class="up"><i class="ico" data-icon="arrow-up"></i>1</span>
-              <span class="sep"></span>
-              <span class="down on"><i class="ico" data-icon="arrow-down"></i>3</span>
-              <span class="sep"></span>
-              <span class="dirty on">6 个改动</span>
-            </div>
-            <div class="repo-commit">
-              <span class="msg">merge: 合入 feature/payment-retry</span>
-              <span class="meta"><span class="hash">e41c7d2</span>·李娜·11 分钟前</span>
-            </div>
-            <div class="repo-note red"><i class="ico" data-icon="conflict"></i>2 个冲突未解决</div>
-          </article>
-
-          <article class="repo glass-card">
-            <div class="repo-top">
-              <i class="ico" data-icon="repo"></i>
-              <span class="repo-name">docs-site</span>
-              <span class="chip sm mono">main</span>
-            </div>
-            <div class="repo-path">~/code/docs-site</div>
-            <div class="repo-stats">
-              <span class="up"><i class="ico" data-icon="arrow-up"></i>0</span>
-              <span class="sep"></span>
-              <span class="down"><i class="ico" data-icon="arrow-down"></i>0</span>
-              <span class="sep"></span>
-              <span class="dirty">0 个改动</span>
-            </div>
-            <div class="repo-commit">
-              <span class="msg">docs: 补充 MCP 工具清单</span>
-              <span class="meta"><span class="hash">5d6a8f0</span>·张伟·昨天 17:05</span>
-            </div>
-            <div class="repo-note ok"><i class="ico" data-icon="check"></i>工作区干净，可以开工</div>
-          </article>
-        </section>
-
-        <!-- 12 周热力图 -->
-        <section class="heat-card card">
-          <div class="heat-head">
-            <i class="ico" data-icon="calendar"></i>
-            <h3>最近 12 周提交</h3>
-            <span class="spacer"></span>
-            <span class="heat-stat"><b>128</b> 次提交 · <b>5</b> 个活跃仓库 · 最长连续 <b>9</b> 天</span>
-          </div>
-          <div class="heat-body">
-            <div class="heat-days">
-              <span>一</span><span></span><span>三</span><span></span><span>五</span><span></span><span>日</span>
-            </div>
-            <div class="heat-main">
-              <div class="heat-months" id="heat-months"></div>
-              <div class="heat-grid" id="heat-grid"></div>
-            </div>
-          </div>
-          <div class="heat-foot">
-            <span class="legend">少</span>
-            <i style="background: var(--gc-heat-0)"></i>
-            <i style="background: var(--gc-heat-1)"></i>
-            <i style="background: var(--gc-heat-2)"></i>
-            <i style="background: var(--gc-heat-3)"></i>
-            <i style="background: var(--gc-heat-4)"></i>
-            <span class="legend">多</span>
-          </div>
-        </section>
       </main>
 
       <nav class="dock">
@@ -591,40 +628,28 @@
     <script src="assets/icons.js"></script>
     <script src="assets/switch.js"></script>
     <script>
-      /* 热力图：12 周 × 7 天，固定伪随机保证每次一致 */
+      /* 筛选分段：单选 */
       (function () {
-        var WEEKS = 12;
-        var grid = document.getElementById('heat-grid');
-        var months = document.getElementById('heat-months');
-        if (!grid) return;
-
-        function level(i) {
-          /* 确定性散列，产出 0–4 档，工作日更活跃 */
-          var n = (i * 2654435761) % 4294967296;
-          n = (n ^ (n >>> 13)) >>> 0;
-          var v = n % 100;
-          var weekday = i % 7;
-          if (weekday === 5 || weekday === 6) v = v * 0.45;
-          if (v < 26) return 0;
-          if (v < 48) return 1;
-          if (v < 68) return 2;
-          if (v < 86) return 3;
-          return 4;
-        }
-
-        var html = '';
-        for (var i = 0; i < WEEKS * 7; i++) {
-          var lv = level(i);
-          html += '<span class="heat-cell' + (lv ? ' l' + lv : '') + '"></span>';
-        }
-        grid.innerHTML = html;
-
-        var labels = ['八月', '九月', '十月', '十一月'];
-        var mh = '';
-        for (var m = 0; m < 4; m++) {
-          mh += '<span>' + labels[m] + '</span>';
-        }
-        months.innerHTML = mh;
+        var btns = document.querySelectorAll('#seg button');
+        btns.forEach(function (b) {
+          b.addEventListener('click', function () {
+            btns.forEach(function (x) {
+              x.classList.remove('on');
+            });
+            b.classList.add('on');
+          });
+        });
+      })();
+      /* 失效区展开/收起 */
+      (function () {
+        var t = document.getElementById('toggleLost');
+        var g = document.getElementById('lostGrid');
+        t.addEventListener('click', function () {
+          var open = g.hasAttribute('hidden');
+          if (open) g.removeAttribute('hidden');
+          else g.setAttribute('hidden', '');
+          t.textContent = open ? '收起' : '展开';
+        });
       })();
     </script>
   </body>

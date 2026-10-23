@@ -187,9 +187,9 @@ function toolEnabled(t: ToolSummary): boolean {
 }
 
 const methodOptions = computed(() => [
-  { id: 'cli' as const, title: cliCardTitle(), ready: cliReady.value },
-  { id: 'token' as const, title: tokenCardTitle(), ready: tokenReady.value },
-  { id: 'browser' as const, title: 'C. 仅打开浏览器创建页', ready: true }
+  { id: 'cli' as const, title: cliCardTitle(), ready: cliReady.value, icon: 'terminal' },
+  { id: 'token' as const, title: tokenCardTitle(), ready: tokenReady.value, icon: 'key' },
+  { id: 'browser' as const, title: 'C. 仅打开浏览器创建页', ready: true, icon: 'external' }
 ]);
 
 const tokenHint = computed(() => {
@@ -534,14 +534,7 @@ async function clearLlmKey(): Promise<void> {
   <div class="page settings-page">
     <el-alert v-if="settings.error" :title="settings.error" type="error" :closable="false" show-icon class="mb" />
 
-    <div class="settings-scope">
-      <div class="page-head">
-        <h1>设置</h1>
-        <span class="sub">本机保存，不上传</span>
-        <span class="spacer" />
-        <span v-if="repos.serverVersion" class="chip plain mono">服务 {{ repos.serverVersion }}</span>
-      </div>
-
+    <div class="settings-col" :class="{ wide: activeTab === 'template' || activeTab === 'git' }">
       <div class="gc-chip-tabs">
         <button
           v-for="t in settingTabs"
@@ -554,8 +547,7 @@ async function clearLlmKey(): Promise<void> {
         </button>
       </div>
 
-      <div class="settings-col" :class="{ fill: activeTab === 'template' || activeTab === 'git' }">
-      <section v-show="activeTab === 'mr'" class="stack">
+      <section v-show="activeTab === 'mr'" class="tab-pane">
         <div class="set-card">
           <header class="card-head">
             <GcIcon name="remote" :size="14" />
@@ -600,6 +592,7 @@ async function clearLlmKey(): Promise<void> {
           @keydown.enter.prevent="selectMethod(opt.id)"
         >
           <header class="opt-head">
+            <GcIcon :name="opt.icon" :size="14" class="opt-ico" />
             <strong>{{ opt.title }}</strong>
             <span :class="opt.ready ? 'ok' : 'bad'">{{ opt.ready ? '可用' : '未就绪' }}</span>
           </header>
@@ -736,11 +729,21 @@ async function clearLlmKey(): Promise<void> {
         </div>
       </section>
 
-      <section v-show="activeTab === 'template'" class="template-pane">
-        <MrTemplateSettings />
+      <section v-show="activeTab === 'template'" class="tab-pane">
+        <div class="set-card spec-card">
+          <header class="card-head">
+            <GcIcon name="file" :size="14" />
+            <h3>正文规范</h3>
+            <span class="spacer" />
+            <span class="chip plain">Markdown</span>
+          </header>
+          <div class="set-body">
+            <MrTemplateSettings />
+          </div>
+        </div>
       </section>
 
-      <section v-show="activeTab === 'llm'" class="stack">
+      <section v-show="activeTab === 'llm'" class="tab-pane">
         <div class="set-card">
           <header class="card-head">
             <GcIcon name="cpu" :size="14" />
@@ -793,23 +796,22 @@ async function clearLlmKey(): Promise<void> {
         </div>
       </section>
 
-      <section v-show="activeTab === 'git'" class="git-split">
-        <aside class="set-card git-side">
+      <section v-show="activeTab === 'git'" class="tab-pane">
+        <div class="git-ops-split">
+        <div class="set-card">
           <header class="card-head">
             <GcIcon name="shield" :size="14" />
             <h3>默认行为</h3>
           </header>
           <div class="set-body">
-            <div class="frow">
-              <label>dry-run 默认</label>
-              <div class="fc">
-                <div class="fctrl">
-                  <el-switch v-model="gitDraft.dryRunDefault" />
-                </div>
-                <span class="fhint">开启后写操作（MCP / CLI）默认只生成预览，不真正执行。</span>
+            <div class="swrow">
+              <div class="sw-copy">
+                <b>dry-run 默认</b>
+                <span>开启后写操作（MCP / CLI）默认只生成预览，不真正执行。</span>
               </div>
+              <el-switch v-model="gitDraft.dryRunDefault" />
             </div>
-            <div class="frow">
+            <div class="frow stack">
               <label>允许打开的仓库</label>
               <div class="fc">
                 <div class="fctrl">
@@ -825,7 +827,7 @@ async function clearLlmKey(): Promise<void> {
                 </span>
               </div>
             </div>
-            <div class="frow">
+            <div class="frow stack">
               <label>本机访问密钥</label>
               <div class="fc">
                 <div class="fctrl">
@@ -843,8 +845,8 @@ async function clearLlmKey(): Promise<void> {
             <el-button :disabled="!gitDirty" @click="syncGitDraft">放弃</el-button>
             <el-button type="primary" :loading="settings.saving" :disabled="!gitDirty" @click="saveGit">保存</el-button>
           </footer>
-        </aside>
-        <div class="set-card git-main" v-loading="settings.loading">
+        </div>
+        <div class="set-card" v-loading="settings.loading">
           <header class="card-head">
             <GcIcon name="list" :size="14" />
             <h3>工具开关</h3>
@@ -873,8 +875,8 @@ async function clearLlmKey(): Promise<void> {
             </div>
           </div>
         </div>
+        </div>
       </section>
-      </div>
     </div>
   </div>
 </template>
@@ -886,64 +888,48 @@ async function clearLlmKey(): Promise<void> {
   flex-direction: column;
   overflow: hidden;
 }
-.page-head {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: var(--gc-gap);
-  min-width: 0;
-}
-.page-head h1 {
-  margin: 0;
-  font-size: var(--gc-fs-page);
-  font-weight: 600;
-  line-height: var(--gc-lh-page);
-  color: var(--gc-text);
-  letter-spacing: -0.01em;
-}
-.page-head .sub {
-  font-size: var(--gc-fs-body);
-  color: var(--gc-text-3);
-}
-.page-head .spacer {
-  flex: 1;
-}
-.page-head .chip {
-  height: 20px;
-  padding: 0 8px;
-  border-radius: var(--gc-r-tag);
-  background: var(--el-fill-color);
-  color: var(--gc-text-3);
-  font-size: var(--gc-fs-meta);
-  display: inline-flex;
-  align-items: center;
-}
-.settings-page > .el-alert,
-.gc-chip-tabs {
+.settings-page > .el-alert {
   flex: none;
 }
-/* 设置主体：页头 + tab + 内容同宽居中（对齐设计稿 880px 单列） */
-.settings-scope {
+/* 设置主体：tab + 内容同容器居中；双 pane tab 加宽到 1200（对齐设计稿 1.2） */
+.settings-col {
   flex: 1;
   min-height: 0;
   width: 100%;
   max-width: 880px;
   margin: 0 auto;
+  overflow: auto;
   display: flex;
   flex-direction: column;
   gap: var(--gc-gap);
   padding-bottom: var(--gc-pad);
 }
-.settings-col {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
+.settings-col.wide {
+  max-width: 1200px;
+}
+.gc-chip-tabs {
+  flex: none;
+}
+.tab-pane {
   display: flex;
   flex-direction: column;
-  gap: var(--gc-pad);
+  gap: var(--gc-s3);
+  min-width: 0;
 }
-.settings-col.fill {
-  overflow: hidden;
+/* 双 pane 栅格（设计稿 3.1）：表单 : 工具墙 = 4 : 6 */
+.git-ops-split {
+  display: grid;
+  grid-template-columns: minmax(320px, 4fr) minmax(600px, 6fr);
+  gap: var(--gc-s3);
+  align-items: start;
+}
+@media (max-width: 959px) {
+  .settings-col.wide {
+    max-width: 880px;
+  }
+  .git-ops-split {
+    grid-template-columns: 1fr;
+  }
 }
 /* set-card 框架：card-head（36px page 底）+ set-body + card-foot */
 .set-card {
@@ -1004,11 +990,59 @@ async function clearLlmKey(): Promise<void> {
 }
 .frow > label {
   flex: none;
-  width: 140px;
-  padding-top: 6px;
+  width: 88px;
   font-size: var(--gc-fs-body);
-  color: var(--gc-text-3);
+  color: var(--gc-text-2);
+  line-height: var(--gc-control);
   text-align: right;
+}
+.frow.stack {
+  flex-direction: column;
+  gap: 5px;
+}
+.frow.stack > label {
+  width: auto;
+  text-align: left;
+  line-height: var(--gc-lh-body);
+}
+/* swrow：标题 + 说明 + 右侧开关（设计稿 4.3） */
+.swrow {
+  display: flex;
+  align-items: center;
+  gap: var(--gc-s3);
+  padding: 7px 0;
+  border-bottom: 1px solid var(--gc-line-weak);
+}
+.swrow:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.swrow .sw-copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.swrow .sw-copy b {
+  font-size: var(--gc-fs-body);
+  font-weight: 500;
+  color: var(--gc-text);
+  line-height: 1.35;
+}
+.swrow .sw-copy span {
+  font-size: var(--gc-fs-meta);
+  color: var(--gc-text-3);
+  line-height: 1.45;
+}
+.spec-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.spec-card > .set-body {
+  flex: 1;
+  min-height: 0;
 }
 .frow > .fc {
   flex: 1;
@@ -1133,16 +1167,22 @@ async function clearLlmKey(): Promise<void> {
   padding: var(--gc-pad);
 }
 .opt {
-  padding: var(--gc-pad);
+  padding: var(--gc-s2) var(--gc-pad);
   text-align: left;
   color: inherit;
   cursor: pointer;
   font: inherit;
   width: 100%;
+  transition:
+    background var(--gc-t-micro) var(--gc-ease),
+    border-color var(--gc-t-micro) var(--gc-ease);
+}
+.opt:hover {
+  border-color: var(--gc-line-strong);
 }
 .opt.on {
   background: var(--gc-accent-weak);
-  box-shadow: 0 0 0 1px var(--gc-accent) inset;
+  border-color: var(--gc-accent);
 }
 .opt.disabled {
   cursor: default;
@@ -1150,12 +1190,19 @@ async function clearLlmKey(): Promise<void> {
 .opt-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  min-height: var(--gc-control);
   gap: var(--gc-gap);
+  min-height: var(--gc-control);
+}
+.opt-head .opt-ico {
+  flex: none;
+  color: var(--gc-text-3);
 }
 .opt-head strong {
+  flex: 1;
+  min-width: 0;
   font-size: var(--gc-fs-body);
+  font-weight: 600;
+  color: var(--gc-text);
 }
 .ok {
   color: var(--gc-green);
@@ -1236,9 +1283,8 @@ async function clearLlmKey(): Promise<void> {
   flex-direction: column;
   gap: var(--gc-gap);
   margin-top: var(--gc-gap);
-  padding: var(--gc-pad);
-  border-radius: var(--gc-radius);
-  background: var(--el-fill-color-light);
+  padding-top: var(--gc-gap);
+  border-top: 1px solid var(--gc-line-weak);
 }
 .mr-stack {
   display: flex;

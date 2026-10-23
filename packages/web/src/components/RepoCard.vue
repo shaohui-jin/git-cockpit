@@ -2,7 +2,6 @@
 import { nextTick, onMounted, onUnmounted, reactive, ref } from 'vue';
 import type { OpenedRepo, RepoOverview } from '@/api/types';
 import { attentionOf, weatherOf } from '@/utils/repoAttention';
-import ActivityHeatmap from '@/components/ActivityHeatmap.vue';
 
 const props = defineProps<{
   repo: OpenedRepo;
@@ -41,12 +40,6 @@ const missing = () => props.overview?.available === false;
 const moreBtn = ref<HTMLButtonElement | null>(null);
 const menuEl = ref<HTMLUListElement | null>(null);
 const menu = reactive({ open: false, x: 0, y: 0 });
-
-function formatOpened(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString(undefined, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-}
 
 function onDragStart(e: DragEvent): void {
   const t = e.target as HTMLElement | null;
@@ -130,9 +123,10 @@ onUnmounted(() => {
     @dragend="emit('dragend')"
   >
     <div class="card-top">
-      <GcIcon name="repo" :size="14" class="card-ico" />
       <span class="card-name mono">{{ overview?.name || repo.path.split(/[\\/]/).pop() }}</span>
-      <em class="wx" :class="attentionOf(overview)">{{ missing() ? '丢失' : weatherOf(attentionOf(overview)) }}</em>
+      <em v-if="attentionOf(overview) !== 'quiet'" class="wx" :class="attentionOf(overview)">{{
+        weatherOf(attentionOf(overview))
+      }}</em>
       <button
         ref="moreBtn"
         type="button"
@@ -146,21 +140,15 @@ onUnmounted(() => {
     </div>
     <div class="card-meta">
       <span class="card-branch mono">{{ missing() ? '不可用' : overview?.current || '…' }}</span>
-      <template v-if="overview && !missing()">
-        <span class="card-stat mono">
-          <span class="stat-ahead" :class="{ on: overview.ahead > 0 }">{{ overview.ahead }}↑</span>
-          <span class="stat-behind" :class="{ on: overview.behind > 0 }">{{ overview.behind }}↓</span>
-        </span>
+      <span v-if="overview && !missing()" class="card-stats mono">
+        <span class="stat-ahead" :class="{ on: overview.ahead > 0 }">{{ overview.ahead }}↑</span>
+        <span class="stat-behind" :class="{ on: overview.behind > 0 }">{{ overview.behind }}↓</span>
         <span class="stat-dirty" :class="{ on: overview.dirtyCount > 0 }">{{ overview.dirtyCount }} 更改</span>
         <span v-if="overview.tempMergeBranchCount > 0" class="stat-draft"
-          >{{ overview.tempMergeBranchCount }} 合并草稿</span
+          >{{ overview.tempMergeBranchCount }} 草稿</span
         >
-      </template>
-      <span v-for="b in extraBadges()" :key="b" class="card-badge">{{ b }}</span>
-    </div>
-    <div class="card-foot">
-      <ActivityHeatmap :days="overview?.activity" :start="overview?.activityStart" :total="overview?.activityTotal" />
-      <span class="card-opened" :title="repo.lastOpenedAt">打开 {{ formatOpened(repo.lastOpenedAt) }}</span>
+        <span v-for="b in extraBadges()" :key="b" class="card-badge">{{ b }}</span>
+      </span>
     </div>
   </div>
 
@@ -190,8 +178,8 @@ onUnmounted(() => {
 .repo-card {
   display: flex;
   flex-direction: column;
-  gap: var(--gc-gap);
-  padding: var(--gc-pad);
+  gap: 3px;
+  padding: 9px 11px;
   border: 1px solid var(--gc-line);
   border-radius: var(--gc-radius);
   border-left-width: 2px;
@@ -207,13 +195,9 @@ onUnmounted(() => {
 }
 .repo-card.current {
   background: var(--gc-accent-weak);
-  box-shadow: var(--gc-shadow-menu);
 }
 .repo-card.muted {
-  opacity: 0.42;
-}
-.repo-card.muted:hover {
-  opacity: 0.72;
+  opacity: 1;
 }
 .repo-card.dragging {
   opacity: 0.45;
@@ -228,19 +212,27 @@ onUnmounted(() => {
   border-left-color: var(--gc-accent);
 }
 .repo-card.quiet {
-  border-left-color: var(--gc-green);
+  border-left-color: var(--gc-line);
+}
+.repo-card.lost {
+  opacity: 0.58;
+  border-left-color: var(--gc-line);
+}
+.repo-card.lost:hover {
+  opacity: 0.85;
 }
 .card-top,
 .card-meta {
   display: flex;
   align-items: center;
-  gap: var(--gc-gap);
+  gap: 6px;
   min-width: 0;
 }
 .card-name {
   flex: 1;
   min-width: 0;
-  font-size: var(--el-font-size-extra-large);
+  font-family: var(--gc-font-mono);
+  font-size: var(--gc-fs-body);
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -249,10 +241,17 @@ onUnmounted(() => {
 .wx {
   flex: none;
   font-style: normal;
-  font-size: var(--gc-fs-body);
-  padding: 0 var(--gc-gap);
+  height: 18px;
+  padding: 0 7px;
   border-radius: var(--gc-r-tag);
-  background: var(--el-fill-color-light);
+  font-size: var(--gc-fs-micro);
+  font-weight: 500;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--gc-line);
+  color: var(--gc-text-3);
 }
 .wx.stuck {
   color: var(--gc-red);
@@ -269,6 +268,10 @@ onUnmounted(() => {
 .wx.quiet {
   color: var(--gc-green);
   background: var(--gc-green-weak);
+}
+.wx.lost {
+  color: var(--gc-text-3);
+  background: rgba(255, 255, 255, 0.05);
 }
 .more-btn {
   flex: none;
@@ -297,28 +300,23 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
+  color: var(--gc-text-2);
+  font-size: var(--gc-fs-meta);
+}
+.card-stats {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--gc-s2);
+  white-space: nowrap;
 }
 .card-stat,
 .stat-dirty,
 .stat-draft,
 .card-badge {
   flex: none;
-  font-size: 11px;
-  color: var(--el-text-color-secondary);
-  white-space: nowrap;
-}
-.card-foot {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--gc-gap);
-}
-.card-opened {
-  flex: none;
-  font-size: 11px;
-  color: var(--el-text-color-secondary);
+  font-size: var(--gc-fs-meta);
+  color: var(--gc-text-3);
   white-space: nowrap;
 }
 .stat-ahead.on {
