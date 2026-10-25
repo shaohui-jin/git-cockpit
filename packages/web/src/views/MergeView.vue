@@ -454,15 +454,9 @@ watch([pairInto, pairFrom], () => {
 <template>
   <div class="page merge-page">
     <div class="page-head">
-      <h2 class="page-title">合并</h2>
-      <div class="head-actions">
-        <div class="gc-chip-tabs">
-          <button type="button" :class="{ on: mode === 'pair' }" @click="mode = 'pair'">单对预演</button>
-          <button type="button" :class="{ on: mode === 'matrix' }" @click="mode = 'matrix'">矩阵</button>
-        </div>
-        <el-button v-if="mode === 'pair' && canRun" :loading="loading" type="primary" @click="runPreview"
-          >预演</el-button
-        >
+      <div class="gc-chip-tabs">
+        <button type="button" :class="{ on: mode === 'pair' }" @click="mode = 'pair'">单对预演</button>
+        <button type="button" :class="{ on: mode === 'matrix' }" @click="mode = 'matrix'">矩阵</button>
       </div>
     </div>
 
@@ -509,37 +503,38 @@ watch([pairInto, pairFrom], () => {
 
     <template v-else>
       <div class="pair-col">
-        <section class="gc-card river">
-          <div class="lane theirs">
-            <small>我的 from</small>
-            <BranchTreeSelect v-model="pairFrom" exclude-merge-temp placeholder="选择我的分支" />
-          </div>
-          <div class="flow">
-            <svg viewBox="0 0 200 80" preserveAspectRatio="none" aria-hidden="true">
-              <path class="p-from" d="M0 20 C 80 20, 80 40, 200 40" />
-              <path d="M0 60 C 80 60, 80 40, 200 40" />
-            </svg>
-            <span class="stamp" :class="stampClass">{{ stampText }}</span>
-          </div>
-          <div class="lane ours">
-            <small>合入 into</small>
-            <BranchTreeSelect v-model="pairInto" remote-first exclude-merge-temp placeholder="选择合入目标" />
+        <section class="gc-card river set-card">
+          <header class="card-head">
+            <GcIcon name="eye" :size="14" />
+            <h3>合并预演</h3>
+            <span class="spacer" />
+            <span class="chip">只读 · 不改动工作区</span>
+          </header>
+          <div class="set-body">
+            <div class="sel-row">
+              <span class="sel-label from">from</span>
+              <BranchTreeSelect v-model="pairFrom" exclude-merge-temp placeholder="选择我的分支" />
+              <span class="sel-arrow"><GcIcon name="chevron" :size="12" /></span>
+              <span class="sel-label into">into</span>
+              <BranchTreeSelect v-model="pairInto" remote-first exclude-merge-temp placeholder="选择合入目标" />
+              <label class="fetch">
+                先 fetch
+                <el-switch v-model="fetchRemote" />
+              </label>
+              <el-button :loading="loading" type="primary" size="small" @click="runPreview">预演</el-button>
+              <span class="grow" />
+              <span class="stamp" :class="stampClass">{{ stampText }}</span>
+            </div>
+            <p class="tip">
+              <template v-if="fromMatrix">
+                从矩阵进来：选边后点「完成冲突处理」，只记到本地临时分支（不推送、不改工作区当前分支），然后回矩阵统一看。
+              </template>
+              <template v-else>
+                预演使用 <span class="mono">git merge-tree</span>，不会改工作区。方向：把「我的分支」合入「合入目标」。
+              </template>
+            </p>
           </div>
         </section>
-        <div class="river-tools">
-          <label class="fetch">
-            先 fetch
-            <el-switch v-model="fetchRemote" />
-          </label>
-          <p class="tip">
-            <template v-if="fromMatrix">
-              从矩阵进来：选边后点「完成冲突处理」，只记到本地临时分支（不推送、不改工作区当前分支），然后回矩阵统一看。
-            </template>
-            <template v-else>
-              预演使用 <span class="mono">git merge-tree</span>，不会改工作区。方向：把「我的分支」合入「合入目标」。
-            </template>
-          </p>
-        </div>
 
         <section v-if="showRecorded" class="gc-card pad next-pane">
           <p class="gc-eyebrow">已记入本地</p>
@@ -717,14 +712,6 @@ watch([pairInto, pairFrom], () => {
   justify-content: space-between;
   flex-shrink: 0;
 }
-.page-title {
-  margin: 0;
-}
-.head-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--gc-gap);
-}
 .trail {
   display: flex;
   flex-wrap: wrap;
@@ -755,57 +742,88 @@ watch([pairInto, pairFrom], () => {
   flex: 1;
   min-width: 8px;
 }
-.river {
+/* 合并预演卡片（与设置页 set-card 同构；.river 类名保留供 e2e 定位） */
+.set-card {
   flex: none;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(120px, 1.1fr) minmax(0, 1fr);
-  align-items: center;
-  padding: var(--gc-pad);
-  gap: var(--gc-gap);
-}
-.lane {
-  padding: var(--gc-gap);
-  border-radius: var(--gc-radius);
-  background: var(--el-fill-color-light);
-  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--gc-gap);
+  background: var(--gc-card);
+  border: 1px solid var(--gc-line);
+  border-radius: var(--gc-radius);
+  overflow: hidden;
 }
-.lane small {
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 var(--gc-pad);
+  background: var(--gc-page);
+  border-bottom: 1px solid var(--gc-line);
+  color: var(--gc-text-2);
+}
+.card-head h3 {
+  margin: 0;
   font-size: var(--gc-fs-body);
-  color: var(--el-text-color-secondary);
+  font-weight: 600;
+  color: var(--gc-text);
 }
-.lane.theirs {
-  border-left: 2px solid var(--gc-purple);
+.card-head .spacer {
+  flex: 1;
 }
-.lane.ours {
-  border-left: 2px solid var(--gc-accent);
+.card-head .chip {
+  height: 20px;
+  padding: 0 8px;
+  border-radius: var(--gc-r-tag);
+  background: var(--el-fill-color);
+  color: var(--gc-text-3);
+  font-size: var(--gc-fs-meta);
+  display: inline-flex;
+  align-items: center;
 }
-.flow {
-  position: relative;
-  height: 80px;
-  min-width: 0;
+.set-body {
+  padding: var(--gc-pad);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
-.flow svg {
-  width: 100%;
-  height: 100%;
+/* 选择行：from → into + fetch + 预演 + 状态 stamp */
+.sel-row {
+  display: flex;
+  align-items: center;
+  gap: var(--gc-gap);
+  flex-wrap: wrap;
 }
-.flow path {
-  fill: none;
-  stroke: var(--gc-accent);
-  stroke-width: 2;
-  opacity: 0.55;
+.sel-label {
+  flex: none;
+  font-size: var(--gc-fs-body);
+  font-weight: 500;
+  color: var(--gc-text-3);
 }
-/* 两路分流：from（紫）汇入 into（青） */
-.flow .p-from {
-  stroke: var(--gc-purple);
+.sel-label.from {
+  color: var(--gc-purple);
+}
+.sel-label.into {
+  color: var(--gc-accent-text);
+}
+.sel-arrow {
+  flex: none;
+  display: inline-flex;
+  color: var(--gc-text-3);
+}
+.sel-row .grow {
+  flex: 1;
+  min-width: 8px;
+}
+.sel-row .fetch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gc-gap);
+  font-size: var(--gc-fs-body);
+  color: var(--gc-text-3);
 }
 .stamp {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
+  flex: none;
   padding: 0 var(--gc-gap);
   height: var(--gc-control);
   display: inline-flex;
@@ -826,19 +844,6 @@ watch([pairInto, pairFrom], () => {
 }
 .stamp.info {
   color: var(--gc-accent-text);
-}
-.river-tools {
-  flex: none;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--gc-pad);
-}
-.fetch {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--gc-gap);
-  font-size: var(--gc-fs-body);
 }
 .pad {
   padding: var(--gc-pad);

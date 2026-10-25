@@ -240,9 +240,24 @@ function isActive(cell: MergeSurveyCell): boolean {
 </script>
 
 <template>
-  <div class="matrix-panel">
-    <section class="gc-card pad filter-card">
-      <p class="gc-eyebrow">矩阵 · into × from</p>
+  <section class="matrix-panel set-card">
+    <header class="card-head">
+      <GcIcon name="layers" :size="14" />
+      <h3>分支矩阵</h3>
+      <span class="spacer" />
+      <span class="legend">
+        <span class="lg"><i class="sw is-clean" />干净</span>
+        <span class="lg"><i class="sw is-conflicts" />冲突</span>
+        <span class="lg"><i class="sw is-unrelated" />无共祖</span>
+        <span class="lg"><i class="sw is-same" />同名</span>
+        <span class="lg-sep" />
+        <span class="lg"><i class="sw is-stage-local" />本地临时枝</span>
+        <span class="lg"><i class="sw is-stage-resolved" />已处理</span>
+        <span class="lg"><i class="sw is-stage-page" />已开 MR</span>
+      </span>
+    </header>
+    <div class="set-body">
+      <p class="gc-eyebrow">矩阵 · INTO × FROM</p>
       <div class="filter-bar">
         <div class="field">
           <span class="field-label">合入目标 into（可多选）</span>
@@ -287,115 +302,105 @@ function isActive(cell: MergeSurveyCell): boolean {
         每对只跑 merge-tree，不改工作区。点「去预演」选边后只记到本地临时分支（不推送）。格子同时显示预演结果和进度：tip
         没变时预演仍是冲突。 矩阵上再统一：先清剩余冲突，再推送临时分支、申请 MR。不切换当前工作区。
       </p>
-    </section>
 
-    <div v-if="survey" class="matrix-body">
-      <div class="gc-card pad matrix-table-wrap">
-        <el-alert
-          v-if="surveyStale"
-          title="仓库刚有过写操作，矩阵可能过期"
-          type="warning"
-          show-icon
-          :closable="false"
-          class="stale-alert"
-        >
-          <el-button type="primary" :loading="loading" :disabled="!session.canSurvey" @click="runSurvey"
-            >重新跑矩阵</el-button
+      <div v-if="survey" class="matrix-body">
+        <div class="matrix-table-wrap">
+          <el-alert
+            v-if="surveyStale"
+            title="仓库刚有过写操作，矩阵可能过期"
+            type="warning"
+            show-icon
+            :closable="false"
+            class="stale-alert"
           >
-        </el-alert>
-        <div class="summary">
-          <span>{{ summary.total }} 组</span>
-          <span class="ok">干净 {{ summary.clean }}</span>
-          <span class="bad">冲突 {{ summary.conflicts }}</span>
-          <template v-if="orderPill">
-            <span>建议可连续干净 {{ orderPill.cleanPrefix }}/{{ orderPill.total }}</span>
-            <span v-if="orderPill.improved">原顺序 {{ orderPill.baseline }}</span>
-            <el-radio-group v-if="orderMatches" v-model="orderView" size="small">
-              <el-radio-button value="best">建议顺序</el-radio-button>
-              <el-radio-button value="original">原顺序</el-radio-button>
-            </el-radio-group>
-          </template>
-          <span class="summary-spacer" />
-          <el-button v-if="nextActionText" type="primary" :disabled="!canRun || loading" @click="nextMatrixAction">{{
-            nextActionText
-          }}</el-button>
-        </div>
-        <div class="legend">
-          <span class="lg"><i class="sw is-clean" />干净</span>
-          <span class="lg"><i class="sw is-conflicts" />冲突</span>
-          <span class="lg"><i class="sw is-unrelated" />无共祖</span>
-          <span class="lg"><i class="sw is-same" />同名</span>
-          <span class="lg-sep" />
-          <span class="lg"><i class="sw is-stage-local" />本地临时枝</span>
-          <span class="lg"><i class="sw is-stage-resolved" />已处理</span>
-          <span class="lg"><i class="sw is-stage-page" />已开 MR</span>
-        </div>
-        <table class="grid">
-          <thead>
-            <tr>
-              <th class="corner">from \ into</th>
-              <th v-for="intoCol in resultIntos" :key="intoCol" class="mono">{{ intoCol }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <template v-for="(row, idx) in displayRows" :key="row.kind === 'divider' ? `d-${idx}` : row.from">
-              <tr v-if="row.kind === 'divider'">
-                <td :colspan="resultIntos.length + 1" class="divider">{{ row.reason }}</td>
-              </tr>
-              <tr v-else>
-                <th class="mono row-head">
-                  <span v-if="row.ord" class="ord">{{ row.ord }}</span>
-                  {{ row.from }}
-                </th>
-                <td v-for="col in row.cells" :key="col.into">
-                  <button
-                    v-if="col.cell"
-                    type="button"
-                    class="cell"
-                    :class="[
-                      `is-${col.cell.outcome}`,
-                      `is-stage-${session.stageOf(col.cell)}`,
-                      { active: isActive(col.cell) }
-                    ]"
-                    :title="cellTitle(col.cell)"
-                    @click="session.active = col.cell"
-                  >
-                    <GcIcon v-if="col.cell.outcome === 'clean'" name="check" :size="12" class="cell-ico" />
-                    <GcIcon v-else-if="col.cell.outcome === 'conflicts'" name="close" :size="12" class="cell-ico" />
-                    <GcIcon v-else-if="col.cell.outcome === 'unrelated'" name="minus" :size="12" class="cell-ico" />
-                    <span class="cell-text">{{ cellLabel(col.cell) }}</span>
-                  </button>
-                </td>
-              </tr>
+            <el-button type="primary" :loading="loading" :disabled="!session.canSurvey" @click="runSurvey"
+              >重新跑矩阵</el-button
+            >
+          </el-alert>
+          <div class="summary">
+            <span>{{ summary.total }} 组</span>
+            <span class="ok">干净 {{ summary.clean }}</span>
+            <span class="bad">冲突 {{ summary.conflicts }}</span>
+            <template v-if="orderPill">
+              <span>建议可连续干净 {{ orderPill.cleanPrefix }}/{{ orderPill.total }}</span>
+              <span v-if="orderPill.improved">原顺序 {{ orderPill.baseline }}</span>
+              <el-radio-group v-if="orderMatches" v-model="orderView" size="small">
+                <el-radio-button value="best">建议顺序</el-radio-button>
+                <el-radio-button value="original">原顺序</el-radio-button>
+              </el-radio-group>
             </template>
-          </tbody>
-        </table>
+            <span class="summary-spacer" />
+            <el-button v-if="nextActionText" type="primary" :disabled="!canRun || loading" @click="nextMatrixAction">{{
+              nextActionText
+            }}</el-button>
+          </div>
+          <table class="grid">
+            <thead>
+              <tr>
+                <th class="corner">from \ into</th>
+                <th v-for="intoCol in resultIntos" :key="intoCol" class="mono">{{ intoCol }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template v-for="(row, idx) in displayRows" :key="row.kind === 'divider' ? `d-${idx}` : row.from">
+                <tr v-if="row.kind === 'divider'">
+                  <td :colspan="resultIntos.length + 1" class="divider">{{ row.reason }}</td>
+                </tr>
+                <tr v-else>
+                  <th class="mono row-head">
+                    <span v-if="row.ord" class="ord">{{ row.ord }}</span>
+                    {{ row.from }}
+                  </th>
+                  <td v-for="col in row.cells" :key="col.into">
+                    <button
+                      v-if="col.cell"
+                      type="button"
+                      class="cell"
+                      :class="[
+                        `is-${col.cell.outcome}`,
+                        `is-stage-${session.stageOf(col.cell)}`,
+                        { active: isActive(col.cell) }
+                      ]"
+                      :title="cellTitle(col.cell)"
+                      @click="session.active = col.cell"
+                    >
+                      <GcIcon v-if="col.cell.outcome === 'clean'" name="check" :size="12" class="cell-ico" />
+                      <GcIcon v-else-if="col.cell.outcome === 'conflicts'" name="close" :size="12" class="cell-ico" />
+                      <GcIcon v-else-if="col.cell.outcome === 'unrelated'" name="minus" :size="12" class="cell-ico" />
+                      <span class="cell-text">{{ cellLabel(col.cell) }}</span>
+                    </button>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+        <aside v-if="active" class="detail">
+          <h3 class="mono">{{ active.from }} → {{ active.into }}</h3>
+          <p>{{ OUTCOME_TEXT[active.outcome] }}{{ active.error ? ` · ${active.error}` : '' }}</p>
+          <p v-if="active.tempBranch" class="tip">
+            临时分支 {{ active.tempBranch.name }} （{{ active.tempBranch.local ? '本地' : ''
+            }}{{ active.tempBranch.local && active.tempBranch.remote ? ' / ' : ''
+            }}{{ active.tempBranch.remote ? '远程' : '' }}）
+          </p>
+          <ul v-if="active.conflictPaths.length" class="paths">
+            <li v-for="p in active.conflictPaths" :key="p" class="mono">{{ p }}</li>
+          </ul>
+          <p v-else-if="active.outcome === 'clean'" class="hint">没有冲突文件</p>
+          <el-button
+            v-if="active.outcome === 'conflicts' || active.outcome === 'clean'"
+            type="primary"
+            @click="goPreview(active)"
+            >去预演</el-button
+          >
+          <el-button v-if="session.stageOf(active) === 'local'" :disabled="loading" @click="pushTemp(active)"
+            >推送临时分支</el-button
+          >
+          <el-button v-if="session.canCreateMr(active)" :disabled="loading" @click="requestMr(active)">申请 MR</el-button>
+        </aside>
       </div>
-      <aside v-if="active" class="gc-card pad detail">
-        <h3 class="mono">{{ active.from }} → {{ active.into }}</h3>
-        <p>{{ OUTCOME_TEXT[active.outcome] }}{{ active.error ? ` · ${active.error}` : '' }}</p>
-        <p v-if="active.tempBranch" class="tip">
-          临时分支 {{ active.tempBranch.name }} （{{ active.tempBranch.local ? '本地' : ''
-          }}{{ active.tempBranch.local && active.tempBranch.remote ? ' / ' : ''
-          }}{{ active.tempBranch.remote ? '远程' : '' }}）
-        </p>
-        <ul v-if="active.conflictPaths.length" class="paths">
-          <li v-for="p in active.conflictPaths" :key="p" class="mono">{{ p }}</li>
-        </ul>
-        <p v-else-if="active.outcome === 'clean'" class="hint">没有冲突文件</p>
-        <el-button
-          v-if="active.outcome === 'conflicts' || active.outcome === 'clean'"
-          type="primary"
-          @click="goPreview(active)"
-          >去预演</el-button
-        >
-        <el-button v-if="session.stageOf(active) === 'local'" :disabled="loading" @click="pushTemp(active)"
-          >推送临时分支</el-button
-        >
-        <el-button v-if="session.canCreateMr(active)" :disabled="loading" @click="requestMr(active)">申请 MR</el-button>
-      </aside>
     </div>
-  </div>
+  </section>
 </template>
 
 <style scoped>
@@ -403,15 +408,48 @@ function isActive(cell: MergeSurveyCell): boolean {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: var(--gc-gap);
   flex: 1;
   min-height: 0;
+  background: var(--gc-card);
+  border: 1px solid var(--gc-line);
+  border-radius: var(--gc-radius);
 }
-.filter-card {
+/* 卡片框架（与设置页 set-card / 合并页同构） */
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 var(--gc-pad);
+  background: var(--gc-page);
+  border-bottom: 1px solid var(--gc-line);
+  color: var(--gc-text-2);
   flex: none;
 }
-.pad {
+.card-head h3 {
+  margin: 0;
+  font-size: var(--gc-fs-body);
+  font-weight: 600;
+  color: var(--gc-text);
+}
+.card-head .spacer {
+  flex: 1;
+}
+.card-head .legend {
+  margin-bottom: 0;
+}
+.set-body {
   padding: var(--gc-pad);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.set-body .chips,
+.set-body .tip {
+  margin-top: 0;
 }
 .filter-bar {
   display: flex;
@@ -632,6 +670,10 @@ function isActive(cell: MergeSurveyCell): boolean {
   width: 280px;
   flex: none;
   overflow: auto;
+  padding: var(--gc-gap);
+  background: var(--gc-page);
+  border: 1px solid var(--gc-line-weak);
+  border-radius: var(--gc-radius);
 }
 .detail h3 {
   margin: 0 0 var(--gc-gap);

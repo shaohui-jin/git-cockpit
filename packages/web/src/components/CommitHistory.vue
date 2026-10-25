@@ -526,6 +526,22 @@ defineExpose({ refresh: loadLog, loading });
   padding: 6px var(--gc-pad) 10px;
   border-bottom: 1px solid var(--gc-line-weak);
 }
+/* 展开/收起正文：文字按钮，不要默认按钮壳 */
+.tbtn {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--gc-accent-text);
+  font: inherit;
+  font-size: var(--gc-fs-meta);
+  cursor: pointer;
+}
+.tbtn:hover {
+  color: var(--gc-accent);
+  text-decoration: underline;
+}
 .cd-body b {
   display: block;
   font-size: var(--gc-fs-body);

@@ -601,7 +601,10 @@ body,
   color: var(--el-color-danger);
   background-color: color-mix(in srgb, var(--el-color-danger) 14%, transparent);
 }
-.gc-branch-menu {
+/* 浮动右键/卡片菜单：Teleport 到 body + 内联 left/top 定位。
+   EP 的 .el-dropdown-menu{position:relative;top:0;left:0} 在懒加载 chunk 里晚于本文件加载，
+   同特异性会覆盖这里的 fixed（分支右键菜单曾因此跑到视口外）。用双类名提高特异性锁死定位。 */
+.el-dropdown-menu.gc-branch-menu {
   position: fixed;
   z-index: 4000;
   width: var(--gc-ctx-menu);
@@ -611,7 +614,7 @@ body,
   margin: 0;
   list-style: none;
 }
-.gc-card-menu {
+.el-dropdown-menu.gc-card-menu {
   position: fixed;
   z-index: 4000;
   width: auto;
@@ -740,6 +743,32 @@ body,
 .gc-chip-tabs button.on {
   background: color-mix(in srgb, var(--el-color-primary) 22%, transparent);
   color: var(--el-color-primary);
+}
+/* 图标按钮（卡片头 / 工具栏）：透明底，hover 才出底色；与设计稿 .icon-btn 同规格 */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--gc-btn-mini);
+  height: var(--gc-btn-mini);
+  padding: 0;
+  border: 0;
+  border-radius: var(--gc-r-tag);
+  background: transparent;
+  color: var(--gc-text-3);
+  cursor: pointer;
+  transition:
+    background var(--gc-t-micro) var(--gc-ease),
+    color var(--gc-t-micro) var(--gc-ease);
+}
+.icon-btn:hover {
+  background: var(--gc-btn-hover);
+  color: var(--gc-text);
+}
+.icon-btn:active {
+  background: var(--gc-accent-weak);
+  color: var(--gc-accent-text);
 }
 .mb {
   margin-bottom: var(--gc-gap);

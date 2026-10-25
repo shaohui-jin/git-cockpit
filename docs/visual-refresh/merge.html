@@ -35,6 +35,64 @@
         gap: var(--gc-s3);
       }
 
+      /* ---------- 顶栏标题（与其他页一致） ---------- */
+      .topbar-sub {
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-3);
+        margin-left: var(--gc-s2);
+      }
+
+      /* ---------- 模式切换（单对预演 / 矩阵） ---------- */
+      .gc-chip-tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--gc-s2);
+        flex: none;
+      }
+      .gc-chip-tabs button {
+        height: var(--gc-control);
+        padding: 0 var(--gc-s3);
+        border-radius: var(--gc-r);
+        border: 1px solid var(--gc-line);
+        background: var(--gc-overlay);
+        color: var(--gc-text-2);
+        font-size: var(--gc-fs-body);
+        font-weight: 500;
+        line-height: 1;
+        white-space: nowrap;
+        cursor: pointer;
+        transition:
+          background var(--gc-t-micro) var(--gc-ease),
+          border-color var(--gc-t-micro) var(--gc-ease),
+          color var(--gc-t-micro) var(--gc-ease);
+      }
+      .gc-chip-tabs button:hover {
+        background: var(--gc-btn-hover);
+        color: var(--gc-text);
+        border-color: var(--gc-line-strong);
+      }
+      .gc-chip-tabs button.on {
+        background: var(--gc-accent-weak);
+        border-color: var(--gc-accent);
+        color: var(--gc-accent-text);
+      }
+
+      /* ---------- 矩阵连线 trail 条（从矩阵进入时） ---------- */
+      .trail-bar {
+        flex: none;
+        display: flex;
+        align-items: center;
+        gap: var(--gc-s2);
+        flex-wrap: wrap;
+        padding: 7px var(--gc-s3);
+      }
+      .trail-bar .pair-mini .mine {
+        color: var(--gc-purple);
+      }
+      .trail-bar .pair-mini .online {
+        color: var(--gc-accent-text);
+      }
+
       /* ---------- 预演选择行 ---------- */
       .sel-row {
         display: flex;
@@ -75,6 +133,27 @@
         background: var(--gc-green-weak);
         border-color: rgba(86, 217, 122, 0.3);
         color: var(--gc-green);
+      }
+
+      /* ---------- 预演结果头（outcome + sha 对 + 动作） ---------- */
+      .result-head {
+        display: flex;
+        align-items: center;
+        gap: var(--gc-s2);
+        flex-wrap: wrap;
+      }
+      .result-head .sha {
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-3);
+      }
+      .tip-inline {
+        margin: 0;
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-3);
+        line-height: 1.6;
+      }
+      .tip-inline .mono {
+        color: var(--gc-text-2);
       }
 
       /* ---------- 预演文件列表 ---------- */
@@ -137,63 +216,298 @@
         width: 64px;
         text-align: right;
       }
-      .weblink-row {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        padding: 5px 10px;
-        background: var(--gc-card);
-        border-bottom: 1px solid var(--gc-line-weak);
-        font-size: var(--gc-fs-micro);
+      /* ---------- 冲突选边（多文件平铺 · 五列，对齐生产 ConflictResolvePanel） ---------- */
+      .cf-hint {
+        font-size: var(--gc-fs-meta);
         color: var(--gc-text-3);
       }
-      .weblink-row .ico {
-        width: 11px;
-        height: 11px;
-      }
-      .weblink-row a {
-        color: var(--gc-accent-text);
-        font-family: var(--gc-font-mono);
-      }
-
-      /* ---------- 冲突区 ---------- */
-      .conflict-toolbar {
+      /* 顶栏工具簇：冲突导航 + 活跃冲突采纳 */
+      .cf-head-nav,
+      .cf-head-pick {
         display: flex;
         align-items: center;
-        gap: var(--gc-s2);
+        gap: 2px;
+        flex: none;
       }
-      .conflict-toolbar .spacer {
-        flex: 1;
+      .cf-nav-pos {
+        margin: 0 var(--gc-s2);
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-3);
+        font-variant-numeric: tabular-nums;
       }
-      .conflict-file-head {
-        display: flex;
-        align-items: center;
-        gap: var(--gc-s2);
-        height: 26px;
-        padding: 0 10px;
+      .cf-file {
+        border: 1px solid var(--gc-line);
+        border-radius: var(--gc-r);
+        overflow: hidden;
         background: var(--gc-page);
+      }
+      .cf-file + .cf-file,
+      .cf-file + .cf-auto {
+        margin-top: var(--gc-s2);
+      }
+      .cf-file-head {
+        display: flex;
+        align-items: center;
+        gap: var(--gc-s2);
+        flex-wrap: wrap;
+        min-height: 30px;
+        padding: 4px 10px;
+        background: var(--gc-card);
         border-bottom: 1px solid var(--gc-line-weak);
-        font-family: var(--gc-font-mono);
         font-size: var(--gc-fs-meta);
         color: var(--gc-text-2);
       }
-      .conflict-file-head .spacer {
-        flex: 1;
+      .cf-file-head .ico {
+        width: 12px;
+        height: 12px;
+        color: var(--gc-text-3);
+        flex: none;
       }
-      .conflict-foot {
+      .cf-path {
+        flex: 1;
+        min-width: 120px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-family: var(--gc-font-mono);
+      }
+      .cf-prog {
+        flex: none;
+        color: var(--gc-text-3);
+        font-variant-numeric: tabular-nums;
+      }
+      .cf-file-head .btn {
+        flex: none;
+      }
+      /* 五列网格：OURS | 选 | 结果 | 选 | THEIRS */
+      .cf-cols,
+      .cf-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 44px minmax(0, 1fr) 44px minmax(0, 1fr);
+        align-items: stretch;
+      }
+      .cf-cols {
+        background: var(--gc-page);
+        border-bottom: 1px solid var(--gc-line-weak);
+        min-height: 26px;
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-3);
+      }
+      .cf-cols > div {
+        display: flex;
+        align-items: center;
+        padding: 0 10px;
+      }
+      .cf-row {
+        border-bottom: 1px solid var(--gc-line-weak);
+      }
+      .cf-row:last-child {
+        border-bottom: 0;
+      }
+      .cf-row .pane {
+        min-width: 0;
+        overflow: hidden;
+        padding: 2px 10px;
+        font-family: var(--gc-font-mono);
+        font-size: var(--gc-fs-meta);
+        line-height: 1.7;
+        color: var(--gc-text-2);
+      }
+      .cf-row .pane pre {
+        margin: 0;
+        white-space: pre;
+      }
+      .cf-row .pane.result {
+        color: var(--gc-text);
+      }
+      .cf-row .pane.result .pending {
+        color: var(--gc-red);
+      }
+      .cf-row .gutter {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-left: 1px solid var(--gc-line-weak);
+        border-right: 1px solid var(--gc-line-weak);
+        background: var(--gc-card);
+      }
+      .pick-btn {
+        width: 22px;
+        height: 22px;
+        border: 0;
+        border-radius: var(--gc-r-tag);
+        background: transparent;
+        color: var(--gc-text-3);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+      }
+      .pick-btn:hover {
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--gc-text-2);
+      }
+      .pick-btn.ours.picked {
+        background: var(--gc-ours-bg);
+        color: var(--gc-ours-text);
+      }
+      .pick-btn.theirs.picked {
+        background: var(--gc-purple-weak);
+        color: var(--gc-purple);
+      }
+      /* 未决行：整行红弱底 + 左 2px 红边；已决行：左 2px 绿边 */
+      .cf-row.is-open {
+        background: var(--gc-red-weak);
+        box-shadow: inset 2px 0 0 var(--gc-red);
+      }
+      .cf-row.is-resolved {
+        box-shadow: inset 2px 0 0 var(--gc-green);
+      }
+      .cf-auto {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 28px;
+        padding: 0 10px;
+        margin-top: var(--gc-s2);
+        border: 1px solid var(--gc-line-weak);
+        border-radius: var(--gc-r);
+        background: var(--gc-page);
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-3);
+      }
+      .cf-auto .ico {
+        width: 12px;
+        height: 12px;
+        flex: none;
+      }
+      .cf-auto .t3 {
+        font-size: var(--gc-fs-micro);
+        color: var(--gc-text-disabled);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      /* ---------- 预演结果态变体（situation 画廊） ---------- */
+      .state-row {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--gc-s2);
+        padding: 9px 10px;
+        background: var(--gc-page);
+        border: 1px solid var(--gc-line-weak);
+        border-radius: var(--gc-r);
+      }
+      .state-row .state-name {
+        flex: none;
+        width: 96px;
+        font-size: var(--gc-fs-meta);
+        font-weight: 500;
+        color: var(--gc-text-2);
+        line-height: 1.6;
+      }
+      .state-row .state-body {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .state-row .file-list {
+        background: var(--gc-card);
+      }
+
+      /* ---------- 落盘与开单结果区 ---------- */
+      .res-pane {
+        display: flex;
+        flex-direction: column;
+        gap: var(--gc-s2);
+        padding: 10px;
+        background: var(--gc-page);
+        border: 1px solid var(--gc-line-weak);
+        border-radius: var(--gc-r);
+      }
+      .res-pane > header {
         display: flex;
         align-items: center;
         gap: var(--gc-s2);
-        padding: 8px 10px;
-        border-top: 1px solid var(--gc-line);
-        background: var(--gc-page);
+        flex-wrap: wrap;
       }
-      .conflict-foot .spacer {
-        flex: 1;
-      }
-      .conflict-foot .hint {
+      .res-pane .sha {
         font-size: var(--gc-fs-meta);
         color: var(--gc-text-3);
+      }
+      .res-pane .grow {
+        flex: 1;
+      }
+      .apply-meta {
+        display: flex;
+        gap: var(--gc-s3);
+        margin: 0;
+        font-size: var(--gc-fs-meta);
+      }
+      .apply-meta dt {
+        color: var(--gc-text-3);
+        font-size: var(--gc-fs-micro);
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        margin-bottom: 2px;
+      }
+      .apply-meta dd {
+        margin: 0;
+        color: var(--gc-text-2);
+      }
+      .apply-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        margin: 0;
+        font-size: var(--gc-fs-meta);
+      }
+      .apply-link a {
+        color: var(--gc-accent-text);
+      }
+      .apply-link .ico {
+        width: 11px;
+        height: 11px;
+      }
+      .res-actions {
+        display: flex;
+        gap: var(--gc-s2);
+        flex-wrap: wrap;
+      }
+      .pr-body {
+        border: 1px solid var(--gc-line);
+        border-radius: var(--gc-r);
+        overflow: hidden;
+        background: var(--gc-card);
+      }
+      .pr-body header {
+        display: flex;
+        align-items: center;
+        gap: var(--gc-s2);
+        height: 28px;
+        padding: 0 10px;
+        background: var(--gc-page);
+        border-bottom: 1px solid var(--gc-line-weak);
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-2);
+      }
+      .pr-body header .grow {
+        flex: 1;
+      }
+      .pr-body pre {
+        margin: 0;
+        padding: 10px;
+        max-height: 180px;
+        overflow: auto;
+        font-family: var(--gc-font-mono);
+        font-size: var(--gc-fs-meta);
+        line-height: 1.6;
+        color: var(--gc-text-2);
+        white-space: pre-wrap;
+        word-break: break-word;
       }
 
       /* ---------- 分支矩阵 ---------- */
@@ -237,6 +551,20 @@
         font-size: 10px;
         margin-left: 4px;
       }
+      .matrix tbody th .ord {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        margin-right: 6px;
+        border-radius: var(--gc-r-tag);
+        background: var(--gc-accent-weak);
+        color: var(--gc-accent-text);
+        font-family: var(--gc-font-ui);
+        font-size: 10px;
+        font-weight: 600;
+      }
       .matrix td .cellv {
         display: inline-flex;
         align-items: center;
@@ -265,12 +593,38 @@
         width: 12px;
         height: 12px;
       }
+      .matrix td .cell-text {
+        font-family: var(--gc-font-ui);
+        font-size: 10px;
+        color: inherit;
+        opacity: 0.85;
+      }
+      .matrix td.stage-local {
+        box-shadow: inset 0 0 0 1px var(--gc-amber);
+      }
+      .matrix td.stage-resolved::after {
+        content: "";
+        display: inline-block;
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--gc-green);
+      }
+      .matrix td.stage-page::after {
+        content: "";
+        display: inline-block;
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--gc-accent);
+      }
       .matrix-legend {
         display: flex;
         align-items: center;
         gap: var(--gc-s3);
         font-size: var(--gc-fs-meta);
         color: var(--gc-text-3);
+        flex-wrap: wrap;
       }
       .matrix-legend span {
         display: inline-flex;
@@ -281,6 +635,127 @@
         width: 10px;
         height: 10px;
         border-radius: 2px;
+      }
+      .matrix-legend .lg-sep {
+        width: 1px;
+        height: 12px;
+        background: var(--gc-line-strong);
+        padding: 0;
+      }
+
+      /* ---------- 矩阵表单 / 汇总 / 详情栏 ---------- */
+      .mx-form {
+        display: flex;
+        align-items: flex-end;
+        gap: var(--gc-s2);
+        flex-wrap: wrap;
+      }
+      .mx-form .field {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .mx-form .field-label {
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-3);
+      }
+      .mx-chips {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+        font-size: var(--gc-fs-meta);
+      }
+      .mx-chips .chip-label {
+        color: var(--gc-text-3);
+        font-size: var(--gc-fs-micro);
+        letter-spacing: 0.04em;
+      }
+      .mx-chips .sel-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        height: 22px;
+        padding: 0 4px 0 8px;
+        border-radius: var(--gc-r-tag);
+        border: 1px solid var(--gc-line-strong);
+        background: var(--gc-overlay);
+        color: var(--gc-text-2);
+        font-family: var(--gc-font-mono);
+        font-size: var(--gc-fs-micro);
+      }
+      .mx-chips .sel-chip .x {
+        color: var(--gc-text-3);
+        cursor: pointer;
+        line-height: 1;
+      }
+      .mx-summary {
+        display: flex;
+        align-items: center;
+        gap: var(--gc-s3);
+        flex-wrap: wrap;
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-2);
+        font-variant-numeric: tabular-nums;
+      }
+      .mx-summary .ok {
+        color: var(--gc-green);
+      }
+      .mx-summary .bad {
+        color: var(--gc-red);
+      }
+      .mx-summary .grow {
+        flex: 1;
+      }
+      .stale-alert {
+        display: flex;
+        align-items: center;
+        gap: var(--gc-s2);
+        flex-wrap: wrap;
+        padding: 8px 10px;
+        border-radius: var(--gc-r);
+        background: var(--gc-amber-weak);
+        border: 1px solid rgba(245, 180, 90, 0.3);
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-amber);
+      }
+      .stale-alert .grow {
+        flex: 1;
+      }
+      .matrix-body {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 280px;
+        gap: var(--gc-s3);
+        align-items: start;
+      }
+      .mx-detail {
+        display: flex;
+        flex-direction: column;
+        gap: var(--gc-s2);
+        padding: 10px;
+        background: var(--gc-page);
+        border: 1px solid var(--gc-line-weak);
+        border-radius: var(--gc-r);
+        font-size: var(--gc-fs-meta);
+      }
+      .mx-detail h3 {
+        margin: 0;
+        font-size: var(--gc-fs-meta);
+        font-weight: 600;
+        color: var(--gc-text);
+      }
+      .mx-detail p {
+        margin: 0;
+        color: var(--gc-text-2);
+        line-height: 1.6;
+      }
+      .mx-detail .paths {
+        margin: 0;
+        padding-left: 16px;
+        color: var(--gc-text-3);
+        font-family: var(--gc-font-mono);
+        font-size: var(--gc-fs-micro);
+        line-height: 1.8;
       }
 
       /* ---------- 落盘执行弹层（静态展开态） ---------- */
@@ -299,6 +774,9 @@
         border-radius: var(--gc-r);
         box-shadow: var(--gc-shadow-menu);
         overflow: hidden;
+      }
+      .modal-card.wide {
+        width: 920px;
       }
       .modal-head {
         display: flex;
@@ -350,12 +828,158 @@
       .modal-foot .spacer {
         flex: 1;
       }
+      .modal-foot .missing {
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-red);
+      }
+
+      /* ---------- 申请 MR 弹层（表单 + 预览分栏） ---------- */
+      .mr-split {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(240px, 0.85fr);
+        gap: var(--gc-s3);
+      }
+      .mr-form {
+        display: flex;
+        flex-direction: column;
+        gap: var(--gc-s2);
+        min-width: 0;
+      }
+      .mr-form .fld-label {
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-2);
+        margin-bottom: 4px;
+      }
+      .mr-form .fld-label .req {
+        color: var(--gc-red);
+      }
+      .mr-form .md-block {
+        padding: 8px 10px;
+        border-radius: var(--gc-r);
+        background: var(--gc-page);
+        border: 1px solid var(--gc-line-weak);
+      }
+      .mr-form .md-block pre {
+        margin: 0;
+        font-family: var(--gc-font-mono);
+        font-size: var(--gc-fs-micro);
+        line-height: 1.6;
+        color: var(--gc-text-3);
+        white-space: pre-wrap;
+      }
+      .mr-form .rev-chips {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .mr-preview {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        border: 1px solid var(--gc-line);
+        border-radius: var(--gc-r);
+        overflow: hidden;
+        background: var(--gc-card);
+      }
+      .mr-preview header {
+        display: flex;
+        align-items: center;
+        gap: var(--gc-s2);
+        height: 28px;
+        padding: 0 10px;
+        background: var(--gc-page);
+        border-bottom: 1px solid var(--gc-line-weak);
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-2);
+      }
+      .mr-preview header .grow {
+        flex: 1;
+      }
+      .mr-preview pre {
+        margin: 0;
+        padding: 10px;
+        max-height: 300px;
+        overflow: auto;
+        font-family: var(--gc-font-mono);
+        font-size: var(--gc-fs-meta);
+        line-height: 1.6;
+        color: var(--gc-text-2);
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      /* ---------- 空态 ---------- */
+      .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--gc-s2);
+        padding: var(--gc-s4) var(--gc-s3);
+        text-align: center;
+      }
+      .empty-state .ico {
+        width: 22px;
+        height: 22px;
+        color: var(--gc-text-3);
+      }
+      .empty-state strong {
+        font-size: var(--gc-fs-title);
+        font-weight: 600;
+        color: var(--gc-text);
+      }
+      .empty-state p {
+        margin: 0;
+        font-size: var(--gc-fs-meta);
+        color: var(--gc-text-3);
+      }
+
+      /* ---------- 开关（与设置页一致） ---------- */
+      .sw {
+        flex: none;
+        position: relative;
+        width: 32px;
+        height: 18px;
+        border-radius: 9px;
+        background: var(--gc-sw-off);
+        transition: background var(--gc-t-micro) var(--gc-ease);
+      }
+      .sw::after {
+        content: '';
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--gc-knob);
+        transition:
+          transform var(--gc-t-micro) var(--gc-ease),
+          background var(--gc-t-micro) var(--gc-ease);
+      }
+      .sw.on {
+        background: var(--gc-accent);
+      }
+      .sw.on::after {
+        transform: translateX(14px);
+        background: var(--gc-accent-ink);
+      }
+
+      @media (max-width: 1100px) {
+        .matrix-body {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .mr-split {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
     </style>
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
         <span class="brand-mark"><i class="ico" data-icon="logo"></i></span>
+        <span class="topbar-title">合并</span>
+        <span class="topbar-sub">预演与矩阵 · 只读合并不碰工作区</span>
         <div class="topbar-end">
           <span class="conn-tag"><span class="dot"></span>前端 <span class="val">0.1.32</span></span>
           <span class="conn-tag"><span class="dot"></span>后端 <span class="val">0.1.32</span></span>
@@ -369,313 +993,726 @@
 
       <main class="page">
         <div class="page-head">
-          <h1>合并</h1>
-          <span class="sub">ml-pipeline · release/2.4</span>
-          <span class="spacer"></span>
+          <div class="gc-chip-tabs" id="mode-tabs">
+            <button type="button" class="on" data-mode="pair">单对预演</button>
+            <button type="button" data-mode="matrix">矩阵</button>
+          </div>
+          <span class="spacer" style="flex: 1"></span>
           <span class="chip red"><i></i>2 处冲突待处理</span>
           <button class="btn h24" type="button"><i class="ico sm" data-icon="abort"></i>放弃本次合并</button>
         </div>
 
-        <!-- ============ 合并预演 ============ -->
-        <section class="sec-block">
-          <div class="card-head">
-            <i class="ico sm" data-icon="eye" style="color: var(--gc-text-3)"></i>
-            <h3>合并预演</h3>
-            <span class="spacer"></span>
-            <span class="chip plain sm">只读 · 不改动工作区</span>
-          </div>
-          <div class="sec-body">
-            <div class="sel-row">
-              <span class="sel-label">from</span>
-              <span class="select-wrap">
-                <select class="select" style="min-width: 200px">
-                  <option>feature/payment-retry</option>
-                  <option>develop</option>
-                  <option>hotfix/login-timeout</option>
-                </select>
-              </span>
-              <span class="sel-arrow"><i class="ico sm" data-icon="chevron"></i></span>
-              <span class="sel-label">into</span>
-              <span class="select-wrap">
-                <select class="select" style="min-width: 160px">
-                  <option>release/2.4</option>
-                  <option>main</option>
-                  <option>develop</option>
-                </select>
-              </span>
-              <button class="btn primary" type="button"><i class="ico sm" data-icon="play"></i>预演</button>
-              <span class="spacer"></span>
-              <span class="result-chip"><i class="ico sm" data-icon="conflict"></i>存在 2 处冲突</span>
-            </div>
-
-            <div class="file-list">
-              <div class="file-row">
-                <span class="stat conflict"
-                  ><i class="ico" data-icon="conflict" style="width: 10px; height: 10px"></i>冲突</span
-                >
-                <span class="fp">src/pay/retry.ts</span>
-                <span class="num">3 块 · 2 未决</span>
-              </div>
-              <div class="weblink-row">
-                <i class="ico" data-icon="external"></i>
-                远端已存在关联合并请求
-                <a href="#">!128 · release/2.4 ← feature/payment-retry</a>
-              </div>
-              <div class="file-row">
-                <span class="stat conflict"
-                  ><i class="ico" data-icon="conflict" style="width: 10px; height: 10px"></i>冲突</span
-                >
-                <span class="fp">src/pay/timeout.ts</span>
-                <span class="num">1 块 · 1 未决</span>
-              </div>
-              <div class="file-row">
-                <span class="stat clean"
-                  ><i class="ico" data-icon="check" style="width: 10px; height: 10px"></i>干净</span
-                >
-                <span class="fp">src/api/client.ts</span>
-                <span class="num">+8 −3</span>
-              </div>
-              <div class="file-row">
-                <span class="stat clean"
-                  ><i class="ico" data-icon="check" style="width: 10px; height: 10px"></i>干净</span
-                >
-                <span class="fp">src/config/defaults.ts</span>
-                <span class="num">+2 −2</span>
-              </div>
-              <div class="file-row">
-                <span class="stat unrelated"
-                  ><i class="ico" data-icon="minus" style="width: 10px; height: 10px"></i>不相关</span
-                >
-                <span class="fp">docs/legacy-migration.md</span>
-                <span class="num">仅 into 侧</span>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- ============ 冲突选边 ============ -->
-        <section class="sec-block">
-          <div class="card-head">
-            <i class="ico sm" data-icon="conflict" style="color: var(--gc-red)"></i>
-            <h3>冲突选边</h3>
-            <span class="chip red sm">2 未决</span>
-            <span class="spacer"></span>
-            <span class="conflict-toolbar">
-              <button class="btn ghost h24" type="button"><i class="ico sm" data-icon="abort"></i>全部取 OURS</button>
-              <button class="btn ghost h24" type="button">全部取 THEIRS</button>
+        <!-- ==================== 单对预演 ==================== -->
+        <div id="mode-pair" style="display: flex; flex-direction: column; gap: var(--gc-s3)">
+          <!-- 矩阵连线 trail（从矩阵进入 pair 时显示） -->
+          <div class="trail-bar gc-card">
+            <span class="chip plain sm">从矩阵进入</span>
+            <button class="btn ghost h24" type="button"><i class="ico sm" data-icon="layers"></i>返回矩阵</button>
+            <span class="mono" style="font-size: var(--gc-fs-meta); color: var(--gc-text-3)">2 / 5</span>
+            <span class="pair-mini mono" style="font-size: var(--gc-fs-meta)">
+              <span class="mine">feature/payment-retry</span>
+              <span style="color: var(--gc-text-3)"> → </span>
+              <span class="online">release/2.4</span>
             </span>
+            <span class="chip amber sm">剩 3 条待处理</span>
+            <span class="spacer" style="flex: 1"></span>
+            <button class="btn h24" type="button" disabled>上一条</button>
+            <button class="btn h24" type="button">下一条</button>
+            <button class="btn primary h24" type="button">处理下一条</button>
           </div>
 
-          <div class="conflict-file-head">
-            <i class="ico sm" data-icon="file"></i>
-            src/pay/retry.ts
-            <span class="spacer"></span>
-            <span class="chip amber sm">1 / 3 块</span>
-          </div>
-
-          <div class="conflict-list mat-flat-cell">
-            <div class="conflict-hunk">
-              <span>@@ -42,7 +42,9 @@</span>
-              <span class="range">function retryDelay(attempt: number)</span>
+          <!-- ============ 合并预演 ============ -->
+          <section class="sec-block">
+            <div class="card-head">
+              <i class="ico sm" data-icon="eye" style="color: var(--gc-text-3)"></i>
+              <h3>合并预演</h3>
+              <span class="spacer" style="flex: 1"></span>
+              <span class="chip plain sm">只读 · 不改动工作区</span>
             </div>
-            <div class="conflict-row is-open">
-              <span class="ln">42</span>
-              <div class="side">
-                <span class="side-chip ours">OURS<i class="ico sm check" data-icon="check"></i></span>
-                <span class="code">const MAX = 3;</span>
-              </div>
-              <div class="side">
-                <span class="side-chip theirs">THEIRS<i class="ico sm check" data-icon="check"></i></span>
-                <span class="code">const MAX = 5;</span>
-              </div>
-            </div>
-            <div class="conflict-row is-open">
-              <span class="ln">43</span>
-              <div class="side">
-                <span class="side-chip ours">OURS<i class="ico sm check" data-icon="check"></i></span>
-                <span class="code">return attempt * 1000;</span>
-              </div>
-              <div class="side">
-                <span class="side-chip theirs">THEIRS<i class="ico sm check" data-icon="check"></i></span>
-                <span class="code">return 2 ** attempt * 500;</span>
-              </div>
-            </div>
-            <div class="conflict-row is-resolved">
-              <span class="ln">44</span>
-              <div class="side is-picked">
-                <span class="side-chip ours">OURS<i class="ico sm check" data-icon="check"></i></span>
-                <span class="code">if (attempt &gt;= MAX) throw e;</span>
-              </div>
-              <div class="side">
-                <span class="side-chip theirs">THEIRS<i class="ico sm check" data-icon="check"></i></span>
-                <span class="code">if (attempt &gt; 5) throw e;</span>
-              </div>
-            </div>
-            <div class="conflict-row is-resolved">
-              <span class="ln">45</span>
-              <div class="side">
-                <span class="side-chip ours">OURS<i class="ico sm check" data-icon="check"></i></span>
-                <span class="code">await sleep(delay);</span>
-              </div>
-              <div class="side is-picked">
-                <span class="side-chip theirs">THEIRS<i class="ico sm check" data-icon="check"></i></span>
-                <span class="code">await sleep(delay, signal);</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="conflict-foot">
-            <span class="hint">点击行内 OURS / THEIRS 选边，或使用上方批量操作</span>
-            <span class="spacer"></span>
-            <button class="btn h24" type="button">保存当前文件</button>
-            <button class="btn primary h24" type="button"><i class="ico sm" data-icon="check"></i>标记已解决</button>
-          </div>
-        </section>
-
-        <!-- ============ 分支矩阵 ============ -->
-        <section class="sec-block">
-          <div class="card-head">
-            <i class="ico sm" data-icon="layers" style="color: var(--gc-text-3)"></i>
-            <h3>分支矩阵</h3>
-            <span class="spacer"></span>
-            <span class="matrix-legend">
-              <span><i style="background: var(--gc-accent-weak)"></i>干净</span>
-              <span><i style="background: var(--gc-red-weak)"></i>冲突</span>
-              <span><i style="background: var(--gc-amber-weak)"></i>无关</span>
-            </span>
-          </div>
-          <div class="sec-body">
-            <div class="matrix-wrap">
-              <table class="matrix">
-                <thead>
-                  <tr>
-                    <th style="text-align: left; width: 220px">from ＼ into</th>
-                    <th>main</th>
-                    <th>develop</th>
-                    <th>release/2.4</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <th>main</th>
-                    <td class="self">
-                      <span class="cellv"><i class="ico" data-icon="minus"></i></span>
-                    </td>
-                    <td class="clean">
-                      <span class="cellv"><i class="ico" data-icon="check"></i></span>
-                    </td>
-                    <td class="clean">
-                      <span class="cellv"><i class="ico" data-icon="check"></i></span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <th>develop</th>
-                    <td class="clean">
-                      <span class="cellv"><i class="ico" data-icon="check"></i></span>
-                    </td>
-                    <td class="self">
-                      <span class="cellv"><i class="ico" data-icon="minus"></i></span>
-                    </td>
-                    <td class="conflict">
-                      <span class="cellv"><i class="ico" data-icon="close"></i></span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <th>feature/payment-retry</th>
-                    <td class="conflict">
-                      <span class="cellv"><i class="ico" data-icon="close"></i></span>
-                    </td>
-                    <td class="clean">
-                      <span class="cellv"><i class="ico" data-icon="check"></i></span>
-                    </td>
-                    <td class="conflict">
-                      <span class="cellv"><i class="ico" data-icon="close"></i></span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <th>release/2.4</th>
-                    <td class="clean">
-                      <span class="cellv"><i class="ico" data-icon="check"></i></span>
-                    </td>
-                    <td class="unrelated">
-                      <span class="cellv"><i class="ico" data-icon="minus"></i></span>
-                    </td>
-                    <td class="self">
-                      <span class="cellv"><i class="ico" data-icon="minus"></i></span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <th>hotfix/login-timeout</th>
-                    <td class="unrelated">
-                      <span class="cellv"><i class="ico" data-icon="minus"></i></span>
-                    </td>
-                    <td class="unrelated">
-                      <span class="cellv"><i class="ico" data-icon="minus"></i></span>
-                    </td>
-                    <td class="clean">
-                      <span class="cellv"><i class="ico" data-icon="check"></i></span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <span class="t3" style="font-size: 11px"
-              >矩阵为只读预演缓存，点击单元格可跳到对应 from/into 的预演结果。行高
-              28px，符号与底色双编码，不依赖颜色单一通道。</span
-            >
-          </div>
-        </section>
-
-        <!-- ============ 落盘执行（弹层变体，静态展开） ============ -->
-        <section class="sec-block">
-          <div class="card-head">
-            <i class="ico sm" data-icon="dry-run" style="color: var(--gc-amber)"></i>
-            <h3>落盘执行</h3>
-            <span class="spacer"></span>
-            <span class="chip plain sm">弹层变体 · 静态展开态</span>
-          </div>
-          <div class="modal-stage">
-            <div class="modal-card">
-              <div class="modal-head">
-                <i class="ico sm" data-icon="git-merge" style="color: var(--gc-purple)"></i>
-                <b>执行合并落盘</b>
+            <div class="sec-body">
+              <div class="sel-row">
+                <span class="sel-label">from</span>
+                <span class="select-wrap">
+                  <select class="select" style="min-width: 200px">
+                    <option>feature/payment-retry</option>
+                    <option>develop</option>
+                    <option>hotfix/login-timeout</option>
+                  </select>
+                </span>
+                <span class="sel-arrow"><i class="ico sm" data-icon="chevron"></i></span>
+                <span class="sel-label">into</span>
+                <span class="select-wrap">
+                  <select class="select" style="min-width: 160px">
+                    <option>release/2.4</option>
+                    <option>main</option>
+                    <option>develop</option>
+                  </select>
+                </span>
+                <button class="btn primary" type="button"><i class="ico sm" data-icon="play"></i>预演</button>
+                <label class="fetch" style="display: inline-flex; align-items: center; gap: 6px; font-size: var(--gc-fs-meta); color: var(--gc-text-3)">
+                  先 fetch
+                  <span class="sw"></span>
+                </label>
                 <span class="spacer"></span>
-                <button class="icon-btn" type="button" aria-label="关闭">
-                  <i class="ico sm" data-icon="close"></i>
-                </button>
+                <span class="result-chip"><i class="ico sm" data-icon="conflict"></i>存在 2 处冲突</span>
               </div>
-              <div class="modal-body">
-                <div class="dryrun is-pending">
-                  <div class="dryrun-head">
-                    <i class="ico" data-icon="dry-run"></i>
-                    <span class="title">写操作干跑预览</span>
-                    <span class="chip amber sm">待确认</span>
-                  </div>
-                  <div class="dryrun-cmd">
-                    git merge --no-ff feature/payment-retry -m "merge: 支付重试超时处理 → release/2.4"
-                  </div>
-                  <div class="dryrun-files">
-                    <span class="f">src/pay/retry.ts</span>
-                    <span class="f">src/pay/timeout.ts</span>
-                    <span class="f">src/api/client.ts</span>
-                    <span class="f">src/config/defaults.ts</span>
+
+              <!-- 结果头：outcome + sha 对 + 动作 -->
+              <div class="result-head">
+                <span class="gc-eyebrow" style="color: var(--gc-red)">存在冲突</span>
+                <span class="sha mono">release/2.4 (a1b2c3d) ← feature/payment-retry (e4f5g6h)</span>
+                <span class="chip amber sm">远程未更新</span>
+                <span class="grow"></span>
+                <button class="btn primary h24" type="button"><i class="ico sm" data-icon="commit"></i>落盘并推送</button>
+                <button class="btn h24" type="button"><i class="ico sm" data-icon="push"></i>推送临时分支</button>
+                <button class="btn h24" type="button"><i class="ico sm" data-icon="send"></i>申请 MR</button>
+              </div>
+              <p class="tip-inline">
+                红块选边后点「完成冲突处理」：写入本地临时分支，不推送，随后回矩阵。
+              </p>
+            </div>
+          </section>
+
+          <!-- ============ 预演结果态（situation 变体） ============ -->
+          <section class="sec-block">
+            <div class="card-head">
+              <i class="ico sm" data-icon="info" style="color: var(--gc-text-3)"></i>
+              <h3>预演结果态</h3>
+              <span class="spacer" style="flex: 1"></span>
+              <span class="chip plain sm">同一结果区的 6 种提示变体</span>
+            </div>
+            <div class="sec-body">
+              <div class="state-row">
+                <span class="state-name">可干净合并</span>
+                <div class="state-body">
+                  <p class="tip-inline">
+                    可干净合并。落盘会在独立 worktree 提交到临时分支，主工作区保持不变。
+                  </p>
+                  <div class="file-list">
+                    <div class="file-row">
+                      <span class="stat clean"
+                        ><i class="ico" data-icon="check" style="width: 10px; height: 10px"></i>干净</span
+                      >
+                      <span class="fp">src/api/client.ts</span>
+                      <span class="num">+8 −3</span>
+                    </div>
+                    <div class="file-row">
+                      <span class="stat clean"
+                        ><i class="ico" data-icon="check" style="width: 10px; height: 10px"></i>干净</span
+                      >
+                      <span class="fp">src/config/defaults.ts</span>
+                      <span class="num">+2 −2</span>
+                    </div>
                   </div>
                 </div>
-                <div class="modal-note">
-                  <i class="ico" data-icon="alert"></i>
-                  将在 release/2.4 上创建合并提交。冲突已在选边面板全部解决，执行后不可通过撤销恢复原分支指针。
+              </div>
+              <div class="state-row">
+                <span class="state-name">已包含</span>
+                <div class="state-body">
+                  <p class="tip-inline">
+                    「我的分支」已经包含在合入目标里，没有可合并的新提交，无需操作。
+                  </p>
                 </div>
               </div>
-              <div class="modal-foot">
-                <span class="spacer"></span>
-                <button class="btn h24" type="button">取消</button>
-                <button class="btn h24" type="button">完整 diff</button>
-                <button class="btn primary h24" type="button">确认执行</button>
+              <div class="state-row">
+                <span class="state-name">无共同祖先</span>
+                <div class="state-body">
+                  <p class="tip-inline">
+                    两条历史没有共同祖先，不能当作干净合并落盘。
+                  </p>
+                </div>
+              </div>
+              <div class="state-row">
+                <span class="state-name">看临时枝</span>
+                <div class="state-body">
+                  <p class="tip-inline">
+                    合入目标是上次 worktree 落盘留下的临时分支，不是线上目标。原方向：feature/payment-retry →
+                    release/2.4。已推送则可申请 MR；不要再落盘。
+                  </p>
+                </div>
+              </div>
+              <div class="state-row">
+                <span class="state-name">远程临时枝</span>
+                <div class="state-body">
+                  <p class="tip-inline">
+                    这对分支已有远程临时分支
+                    <span class="mono">merge/feature-payment-retry-into-release-2-4</span>
+                    ，无需再落盘，直接申请 MR。
+                  </p>
+                </div>
+              </div>
+              <div class="state-row">
+                <span class="state-name">本地临时枝</span>
+                <div class="state-body">
+                  <p class="tip-inline">
+                    选边已记在本地临时分支
+                    <span class="mono">merge/feature-payment-retry-into-release-2-4</span>
+                    。推送后即可申请 MR，无需再落盘。
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-        </section>
-      </main>
+          </section>
+          <!-- ============ 冲突选边（多文件平铺 · 五列） ============ -->
+          <section class="sec-block">
+            <div class="card-head">
+              <i class="ico sm" data-icon="conflict" style="color: var(--gc-red)"></i>
+              <h3>冲突选边</h3>
+              <span class="chip red sm">2 处未决</span>
+              <span class="spacer" style="flex: 1"></span>
+              <span class="cf-hint">冲突 3/5 · 红块选 线上 或 我的，绿=新增 紫=修改（自动进结果）</span>
+              <span class="cf-head-nav">
+                <button class="btn ghost h24" type="button">上一处</button>
+                <span class="cf-nav-pos">2/5</span>
+                <button class="btn ghost h24" type="button">下一处</button>
+              </span>
+              <span class="cf-head-pick">
+                <button class="btn ghost h24" type="button">采用 OURS</button>
+                <button class="btn ghost h24" type="button">采用 THEIRS</button>
+              </span>
+            </div>
+            <div class="sec-body">
+              <!-- 文件一：有未决冲突 -->
+              <div class="cf-file">
+                <div class="cf-file-head">
+                  <i class="ico" data-icon="file"></i>
+                  <span class="cf-path">packages/extension/webview/package.json</span>
+                  <span class="cf-prog">已决 1 / 2</span>
+                  <button class="btn ghost h24" type="button">采用 OURS</button>
+                  <button class="btn ghost h24" type="button">采用 THEIRS</button>
+                  <button class="btn ghost h24" type="button">重置本文件</button>
+                </div>
+                <div class="cf-cols">
+                  <div><span class="side-chip ours">OURS · 线上</span></div>
+                  <div class="gutter-head"></div>
+                  <div>结果</div>
+                  <div class="gutter-head"></div>
+                  <div><span class="side-chip theirs">THEIRS · 我的</span></div>
+                </div>
+                <div class="cf-row is-open">
+                  <div class="pane">
+                    <pre>"marked": "18.0.6",</pre>
+                  </div>
+                  <div class="gutter">
+                    <button class="pick-btn ours" type="button" aria-label="采用线上" title="采用线上">
+                      <i class="ico sm" data-icon="chevron"></i>
+                    </button>
+                  </div>
+                  <div class="pane result">
+                    <pre><span class="pending">"marked": "18.0.6",</span></pre>
+                  </div>
+                  <div class="gutter">
+                    <button class="pick-btn theirs" type="button" aria-label="采用我的" title="采用我的">
+                      <i class="ico sm" data-icon="chevron" style="transform: rotate(180deg)"></i>
+                    </button>
+                  </div>
+                  <div class="pane">
+                    <pre>"marked": "9.0.0",</pre>
+                  </div>
+                </div>
+                <div class="cf-row is-resolved chose-left">
+                  <div class="pane">
+                    <pre>"vue": "^3.5.13",</pre>
+                  </div>
+                  <div class="gutter">
+                    <button class="pick-btn ours picked" type="button" aria-label="已采用线上" title="已采用线上">
+                      <i class="ico sm" data-icon="check"></i>
+                    </button>
+                  </div>
+                  <div class="pane result">
+                    <pre>"vue": "^3.5.13",</pre>
+                  </div>
+                  <div class="gutter">
+                    <button class="pick-btn theirs" type="button" aria-label="采用我的" title="采用我的">
+                      <i class="ico sm" data-icon="chevron" style="transform: rotate(180deg)"></i>
+                    </button>
+                  </div>
+                  <div class="pane">
+                    <pre>"vue": "^3.6.0",</pre>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 文件二：有未决冲突 -->
+              <div class="cf-file">
+                <div class="cf-file-head">
+                  <i class="ico" data-icon="file"></i>
+                  <span class="cf-path">pnpm-lock.yaml</span>
+                  <span class="cf-prog">已决 0 / 1</span>
+                  <button class="btn ghost h24" type="button">采用 OURS</button>
+                  <button class="btn ghost h24" type="button">采用 THEIRS</button>
+                  <button class="btn ghost h24" type="button">重置本文件</button>
+                </div>
+                <div class="cf-cols">
+                  <div><span class="side-chip ours">OURS · 线上</span></div>
+                  <div class="gutter-head"></div>
+                  <div>结果</div>
+                  <div class="gutter-head"></div>
+                  <div><span class="side-chip theirs">THEIRS · 我的</span></div>
+                </div>
+                <div class="cf-row is-open">
+                  <div class="pane">
+                    <pre>marked: 18.0.6</pre>
+                  </div>
+                  <div class="gutter">
+                    <button class="pick-btn ours" type="button" aria-label="采用线上" title="采用线上">
+                      <i class="ico sm" data-icon="chevron"></i>
+                    </button>
+                  </div>
+                  <div class="pane result">
+                    <pre><span class="pending">marked: 18.0.6</span></pre>
+                  </div>
+                  <div class="gutter">
+                    <button class="pick-btn theirs" type="button" aria-label="采用我的" title="采用我的">
+                      <i class="ico sm" data-icon="chevron" style="transform: rotate(180deg)"></i>
+                    </button>
+                  </div>
+                  <div class="pane">
+                    <pre>marked: 9.0.0</pre>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 自动合并文件（折叠） -->
+              <div class="cf-auto">
+                <i class="ico sm" data-icon="chevron"></i>
+                仅自动合并（3）· 无冲突，自动进结果
+                <span class="spacer" style="flex: 1"></span>
+                <span class="t3">src/api/client.ts · src/config/defaults.ts · docs/legacy-migration.md</span>
+              </div>
+            </div>
+          </section>
+
+          <!-- ============ 落盘与开单结果 ============ -->
+          <section class="sec-block">
+            <div class="card-head">
+              <i class="ico sm" data-icon="commit" style="color: var(--gc-text-3)"></i>
+              <h3>落盘与开单结果</h3>
+              <span class="spacer" style="flex: 1"></span>
+              <span class="chip plain sm">写操作完成后的结果区变体</span>
+            </div>
+            <div class="sec-body">
+              <!-- 已记入本地（矩阵连线选边后） -->
+              <div class="res-pane">
+                <header>
+                  <span class="gc-eyebrow">已记入本地</span>
+                  <span class="grow"></span>
+                  <span class="chip plain sm">选边写回 · 未推送</span>
+                </header>
+                <p class="tip-inline">
+                  选边已写到临时分支
+                  <span class="mono">merge/feature-payment-retry-into-release-2-4</span>
+                  （未推送）。原始 from / into 的预演仍可能是冲突，这是正常的。回矩阵看「冲突 · 本地临时枝」，再统一处理。
+                </p>
+                <div class="res-actions">
+                  <button class="btn primary h24" type="button"><i class="ico sm" data-icon="layers"></i>返回矩阵</button>
+                  <button class="btn h24" type="button"><i class="ico sm" data-icon="refresh"></i>重新预演</button>
+                </div>
+              </div>
+
+              <!-- 已落盘（worktree 落盘后） -->
+              <div class="res-pane">
+                <header>
+                  <span class="gc-eyebrow">已落盘 · 仅本地</span>
+                  <span class="sha mono">merge/feature-payment-retry-into-release-2-4</span>
+                  <span class="grow"></span>
+                </header>
+                <dl class="apply-meta">
+                  <div>
+                    <dt>提交</dt>
+                    <dd class="mono">b7c8d9e</dd>
+                  </div>
+                  <div>
+                    <dt>目录</dt>
+                    <dd class="mono">../git-cockpit-wt/merge-2-4</dd>
+                  </div>
+                </dl>
+                <p class="apply-link">
+                  <i class="ico" data-icon="external"></i>
+                  <a href="#">打开创建 MR/PR 页面</a>
+                </p>
+                <div class="res-actions">
+                  <button class="btn primary h24" type="button"><i class="ico sm" data-icon="send"></i>创建 PR/MR</button>
+                  <button class="btn h24" type="button"><i class="ico sm" data-icon="refresh"></i>重新预演</button>
+                </div>
+              </div>
+
+              <!-- MR 结果 · 浏览器创建页 -->
+              <div class="res-pane">
+                <header>
+                  <span class="gc-eyebrow">MR 正文 · 浏览器创建页</span>
+                  <span class="sha mono">feature/payment-retry → release/2.4</span>
+                  <span class="grow"></span>
+                </header>
+                <p class="tip-inline">已按正文规范生成 MR 正文，浏览器创建页不会写入，请复制后粘贴。</p>
+                <p class="apply-link">
+                  <i class="ico" data-icon="external"></i>
+                  <a href="#">打开创建页</a>
+                </p>
+                <div class="pr-body">
+                  <header>
+                    <i class="ico sm" data-icon="file" style="color: var(--gc-text-3)"></i>
+                    待粘贴正文
+                    <span class="grow"></span>
+                    <button class="btn ghost h24" type="button"><i class="ico sm" data-icon="copy"></i>复制正文</button>
+                  </header>
+                  <pre>## 变更说明
+修复支付重试超时：重试间隔改为指数退避，最大 5 次。
+
+## 影响范围
+- src/pay/retry.ts：重试策略
+- src/pay/timeout.ts：超时判定
+
+## 验证
+- [x] 单测通过
+- [x] 预演合并无冲突</pre>
+                </div>
+              </div>
+
+              <!-- MR 结果 · 已开单 -->
+              <div class="res-pane">
+                <header>
+                  <span class="gc-eyebrow">已开单</span>
+                  <span class="sha mono">feature/payment-retry → release/2.4</span>
+                  <span class="grow"></span>
+                </header>
+                <p class="apply-link">
+                  <i class="ico" data-icon="external"></i>
+                  <a href="#">已创建 !129 · 在浏览器中打开</a>
+                </p>
+              </div>
+            </div>
+          </section>
+          <!-- ============ 申请 MR（弹层变体，静态展开） ============ -->
+          <section class="sec-block">
+            <div class="card-head">
+              <i class="ico sm" data-icon="send" style="color: var(--gc-text-3)"></i>
+              <h3>申请 MR</h3>
+              <span class="spacer" style="flex: 1"></span>
+              <span class="chip plain sm">弹层变体 · 静态展开态</span>
+            </div>
+            <div class="modal-stage">
+              <div class="modal-card wide">
+                <div class="modal-head">
+                  <i class="ico sm" data-icon="git-merge" style="color: var(--gc-purple)"></i>
+                  <b>申请 MR</b>
+                  <span class="spacer"></span>
+                  <button class="icon-btn" type="button" aria-label="关闭">
+                    <i class="ico sm" data-icon="close"></i>
+                  </button>
+                </div>
+                <div class="modal-body">
+                  <p class="mono" style="margin: 0; font-size: var(--gc-fs-meta); color: var(--gc-text-3)">
+                    release/2.4 ← feature/payment-retry
+                  </p>
+                  <div class="stale-alert" style="color: var(--gc-amber)">
+                    <i class="ico sm" data-icon="alert"></i>
+                    浏览器创建页不会写入这段正文，请复制预览后粘贴。
+                  </div>
+                  <div class="mr-split">
+                    <div class="mr-form">
+                      <div>
+                        <div class="fld-label">标题 <span class="req">*</span></div>
+                        <span class="input" style="display: block; width: 100%">fix(pay): 支付重试指数退避</span>
+                      </div>
+                      <div class="md-block">
+                        <div class="fld-label" style="color: var(--gc-text-3)">模板说明</div>
+                        <pre>## 变更说明
+（描述改了什么、为什么）
+
+## 验证
+- [ ] 单测通过</pre>
+                      </div>
+                      <div>
+                        <div class="fld-label">正文（可选）</div>
+                        <span class="input" style="display: block; width: 100%; min-height: 56px; color: var(--gc-text-3)"
+                          >未启用正文规范时，可直接写正文</span
+                        >
+                      </div>
+                      <div>
+                        <div class="fld-label">审核人</div>
+                        <div class="rev-chips">
+                          <span class="sel-chip">zhangwei<span class="x">×</span></span>
+                          <span class="sel-chip">liting<span class="x">×</span></span>
+                          <span class="sel-chip" style="color: var(--gc-text-3)">回车添加…</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="mr-preview">
+                      <header>
+                        <i class="ico sm" data-icon="file" style="color: var(--gc-text-3)"></i>
+                        预览
+                        <span class="grow"></span>
+                        <button class="btn ghost h24" type="button"><i class="ico sm" data-icon="copy"></i>复制正文</button>
+                      </header>
+                      <pre>fix(pay): 支付重试指数退避
+
+release/2.4 ← feature/payment-retry
+
+## 变更说明
+修复支付重试超时：重试间隔改为指数退避，最大 5 次。
+
+## 验证
+- [x] 单测通过
+- [x] 预演合并无冲突</pre>
+                    </div>
+                  </div>
+                </div>
+                <div class="modal-foot">
+                  <span class="missing">还缺：变更说明</span>
+                  <span class="spacer"></span>
+                  <button class="btn h24" type="button">取消</button>
+                  <button class="btn primary h24" type="button">打开创建页</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ============ 落盘执行（弹层变体，静态展开） ============ -->
+          <section class="sec-block">
+            <div class="card-head">
+              <i class="ico sm" data-icon="dry-run" style="color: var(--gc-amber)"></i>
+              <h3>落盘执行</h3>
+              <span class="spacer" style="flex: 1"></span>
+              <span class="chip plain sm">弹层变体 · 静态展开态</span>
+            </div>
+            <div class="modal-stage">
+              <div class="modal-card">
+                <div class="modal-head">
+                  <i class="ico sm" data-icon="git-merge" style="color: var(--gc-purple)"></i>
+                  <b>执行合并落盘</b>
+                  <span class="spacer"></span>
+                  <button class="icon-btn" type="button" aria-label="关闭">
+                    <i class="ico sm" data-icon="close"></i>
+                  </button>
+                </div>
+                <div class="modal-body">
+                  <div class="dryrun is-pending">
+                    <div class="dryrun-head">
+                      <i class="ico" data-icon="dry-run"></i>
+                      <span class="title">写操作干跑预览</span>
+                      <span class="chip amber sm">待确认</span>
+                    </div>
+                    <div class="dryrun-cmd">
+                      git merge --no-ff feature/payment-retry -m "merge: 支付重试超时处理 → release/2.4"
+                    </div>
+                    <div class="dryrun-files">
+                      <span class="f">src/pay/retry.ts</span>
+                      <span class="f">src/pay/timeout.ts</span>
+                      <span class="f">src/api/client.ts</span>
+                      <span class="f">src/config/defaults.ts</span>
+                    </div>
+                  </div>
+                  <div class="modal-note">
+                    <i class="ico" data-icon="alert"></i>
+                    将在 release/2.4 上创建合并提交。冲突已在选边面板全部解决，执行后不可通过撤销恢复原分支指针。
+                  </div>
+                </div>
+                <div class="modal-foot">
+                  <span class="spacer"></span>
+                  <button class="btn h24" type="button">取消</button>
+                  <button class="btn h24" type="button">完整 diff</button>
+                  <button class="btn primary h24" type="button">确认执行</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ============ 空态 ============ -->
+          <section class="sec-block">
+            <div class="card-head">
+              <i class="ico sm" data-icon="info" style="color: var(--gc-text-3)"></i>
+              <h3>空态</h3>
+              <span class="spacer" style="flex: 1"></span>
+              <span class="chip plain sm">未选仓库时</span>
+            </div>
+            <div class="sec-body">
+              <div class="empty-state">
+                <i class="ico" data-icon="repo"></i>
+                <strong>还没选仓库</strong>
+                <p>请先在工作台打开仓库再预演。</p>
+                <button class="btn primary h24" type="button"><i class="ico sm" data-icon="gauge"></i>去工作台</button>
+              </div>
+            </div>
+          </section>
+        </div>
+        <!-- ==================== 矩阵 ==================== -->
+        <div id="mode-matrix" style="display: none; flex-direction: column; gap: var(--gc-s3)">
+          <section class="sec-block">
+            <div class="card-head">
+              <i class="ico sm" data-icon="layers" style="color: var(--gc-text-3)"></i>
+              <h3>分支矩阵</h3>
+              <span class="spacer" style="flex: 1"></span>
+              <span class="matrix-legend">
+                <span><i style="background: var(--gc-accent-weak)"></i>干净</span>
+                <span><i style="background: var(--gc-red-weak)"></i>冲突</span>
+                <span><i style="background: var(--gc-amber-weak)"></i>无共祖</span>
+                <span><i style="background: var(--gc-page); border: 1px solid var(--gc-line-strong)"></i>同名</span>
+                <span class="lg-sep"></span>
+                <span><i style="background: var(--gc-amber-weak); box-shadow: inset 0 0 0 1px var(--gc-amber)"></i>本地临时枝</span>
+                <span><i style="background: var(--gc-green-weak); box-shadow: inset 0 0 0 1px var(--gc-green)"></i>已处理</span>
+                <span><i style="background: var(--gc-accent-weak); box-shadow: inset 0 0 0 1px var(--gc-accent)"></i>已开 MR</span>
+              </span>
+            </div>
+            <div class="sec-body">
+              <!-- 表单：into × from 多选 + fetch + 动作 -->
+              <div class="mx-form">
+                <span class="gc-eyebrow" style="align-self: center">矩阵 · INTO × FROM</span>
+                <div class="field">
+                  <span class="field-label">合入目标 into（可多选）</span>
+                  <span class="select-wrap">
+                    <select class="select" style="min-width: 180px">
+                      <option>选择线上目标</option>
+                      <option>release/2.4</option>
+                      <option>main</option>
+                      <option>develop</option>
+                    </select>
+                  </span>
+                </div>
+                <div class="field">
+                  <span class="field-label">我的分支 from（可多选）</span>
+                  <span class="select-wrap">
+                    <select class="select" style="min-width: 180px">
+                      <option>选择待合入分支</option>
+                      <option>feature/payment-retry</option>
+                      <option>develop</option>
+                      <option>hotfix/login-timeout</option>
+                    </select>
+                  </span>
+                </div>
+                <div class="field">
+                  <span class="field-label">先 fetch</span>
+                  <span class="sw"></span>
+                </div>
+                <div class="field" style="flex-direction: row; gap: var(--gc-s2)">
+                  <button class="btn primary h24" type="button"><i class="ico sm" data-icon="play"></i>跑矩阵</button>
+                  <button class="btn h24" type="button"><i class="ico sm" data-icon="list"></i>建议顺序</button>
+                </div>
+              </div>
+
+              <div class="mx-chips">
+                <span class="chip-label">INTO</span>
+                <span class="sel-chip">release/2.4<span class="x">×</span></span>
+                <span class="sel-chip">main<span class="x">×</span></span>
+                <span class="sel-chip">develop<span class="x">×</span></span>
+              </div>
+              <div class="mx-chips">
+                <span class="chip-label">FROM</span>
+                <span class="sel-chip">feature/payment-retry<span class="x">×</span></span>
+                <span class="sel-chip">develop<span class="x">×</span></span>
+                <span class="sel-chip">hotfix/login-timeout<span class="x">×</span></span>
+              </div>
+
+              <!-- 汇总 + 过期提示 -->
+              <div class="stale-alert">
+                <i class="ico sm" data-icon="alert"></i>
+                仓库刚有过写操作，矩阵可能过期
+                <span class="grow"></span>
+                <button class="btn ghost h24" type="button"><i class="ico sm" data-icon="refresh"></i>重新跑矩阵</button>
+              </div>
+              <div class="mx-summary">
+                <span>9 组</span>
+                <span class="ok">干净 4</span>
+                <span class="bad">冲突 3</span>
+                <span>建议可连续干净 6/9</span>
+                <span style="color: var(--gc-text-3)">原顺序 4</span>
+                <span class="grow"></span>
+                <button class="btn primary h24" type="button">处理下一条冲突</button>
+              </div>
+
+              <!-- 表格 + 选中详情 -->
+              <div class="matrix-body">
+                <div class="matrix-wrap">
+                  <table class="matrix">
+                    <thead>
+                      <tr>
+                        <th style="text-align: left; width: 220px">from ＼ into</th>
+                        <th>main</th>
+                        <th>develop</th>
+                        <th>release/2.4</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <th><span class="ord">1</span>feature/payment-retry</th>
+                        <td class="conflict stage-local">
+                          <span class="cellv"
+                            ><i class="ico" data-icon="close"></i><span class="cell-text">本地临时枝</span></span
+                          >
+                        </td>
+                        <td class="clean">
+                          <span class="cellv"><i class="ico" data-icon="check"></i></span>
+                        </td>
+                        <td class="conflict">
+                          <span class="cellv"><i class="ico" data-icon="close"></i></span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <th><span class="ord">2</span>develop</th>
+                        <td class="clean">
+                          <span class="cellv"><i class="ico" data-icon="check"></i></span>
+                        </td>
+                        <td class="self">
+                          <span class="cellv"><i class="ico" data-icon="minus"></i></span>
+                        </td>
+                        <td class="conflict stage-resolved">
+                          <span class="cellv"><i class="ico" data-icon="close"></i></span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <th><span class="ord">3</span>hotfix/login-timeout</th>
+                        <td class="unrelated">
+                          <span class="cellv"><i class="ico" data-icon="minus"></i></span>
+                        </td>
+                        <td class="unrelated">
+                          <span class="cellv"><i class="ico" data-icon="minus"></i></span>
+                        </td>
+                        <td class="clean stage-page">
+                          <span class="cellv"><i class="ico" data-icon="check"></i></span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <th>main</th>
+                        <td class="self">
+                          <span class="cellv"><i class="ico" data-icon="minus"></i></span>
+                        </td>
+                        <td class="clean">
+                          <span class="cellv"><i class="ico" data-icon="check"></i></span>
+                        </td>
+                        <td class="clean">
+                          <span class="cellv"><i class="ico" data-icon="check"></i></span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <aside class="mx-detail">
+                  <h3 class="mono">feature/payment-retry → release/2.4</h3>
+                  <p>存在冲突 · 冲突文件 2 个</p>
+                  <p class="tip-inline">
+                    临时分支 <span class="mono">merge/feature-payment-retry-into-release-2-4</span>（本地）
+                  </p>
+                  <ul class="paths">
+                    <li>src/pay/retry.ts</li>
+                    <li>src/pay/timeout.ts</li>
+                  </ul>
+                  <div class="res-actions">
+                    <button class="btn primary h24" type="button"><i class="ico sm" data-icon="eye"></i>去预演</button>
+                    <button class="btn h24" type="button"><i class="ico sm" data-icon="push"></i>推送临时分支</button>
+                    <button class="btn h24" type="button"><i class="ico sm" data-icon="send"></i>申请 MR</button>
+                  </div>
+                </aside>
+              </div>
+
+              <span class="t3" style="font-size: 11px; color: var(--gc-text-3); line-height: 1.6">
+                矩阵为只读预演缓存，点击单元格可跳到对应 from/into 的预演结果。行高
+                28px，符号与底色双编码，不依赖颜色单一通道；格子的外框与圆点标记处理阶段（本地临时枝 / 已处理 /
+                已开 MR）。
+              </span>
+            </div>
+          </section>
+        </div>
+        </main>
 
       <nav class="dock">
         <a class="dock-item" href="dashboard.html"><i class="ico" data-icon="gauge"></i>工作台</a>
@@ -690,5 +1727,25 @@
 
     <script src="assets/icons.js"></script>
     <script src="assets/switch.js"></script>
+    <script>
+      // 模式切换：单对预演 / 矩阵（与生产一致，静态演示）
+      (function () {
+        var tabs = document.querySelectorAll('#mode-tabs button');
+        var panes = {
+          pair: document.getElementById('mode-pair'),
+          matrix: document.getElementById('mode-matrix'),
+        };
+        tabs.forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var m = btn.getAttribute('data-mode');
+            tabs.forEach(function (b) {
+              b.classList.toggle('on', b === btn);
+            });
+            panes.pair.style.display = m === 'pair' ? 'flex' : 'none';
+            panes.matrix.style.display = m === 'matrix' ? 'flex' : 'none';
+          });
+        });
+      })();
+    </script>
   </body>
 </html>

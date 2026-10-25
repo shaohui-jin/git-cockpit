@@ -28,11 +28,12 @@ const route = useRoute();
 const router = useRouter();
 const { bump } = useRevision();
 
-/** 顶栏页标题：仅声明了 meta 的页面启用（当前只有设置页），其余页面保留页内 page-head */
+/** 顶栏页标题：仅声明了 meta 的页面启用，其余页面保留页内 page-head */
 const PAGE_META: Record<string, { title: string; sub: string }> = {
   '/dashboard': { title: '工作台', sub: '本地 Git 仓库的驾驶舱' },
   '/status': { title: '仓库状态', sub: '工作区与历史' },
-  '/settings': { title: '设置', sub: '本机保存，不上传' }
+  '/settings': { title: '设置', sub: '本机保存，不上传' },
+  '/merge': { title: '合并', sub: '预演与矩阵 · 只读合并不碰工作区' }
 };
 const pageMeta = computed(() => PAGE_META[route.path] ?? null);
 

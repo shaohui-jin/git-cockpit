@@ -125,3 +125,11 @@
 - **glass 零残留收官**：gc-glass 类/规则/3 令牌、ReposView/StatusView 本地 .glass 规则与 8 处类名、--gc-r-glass 全部清除，表面统一 gc-card。
 - **踩坑**：① 大内容块 Write 工具传不动，改用 python stdin 写文件；② StatusView 六元素靠本地 .glass 提供表面，直接删类名会丢底色——须换成 gc-card；③ 全量 e2e 出现 2 个 merge spec 落盘阶段失败，重跑即过（worktree 清理的环境抖动，非回归，与阶段 2 记录同现象）。
 - **待办**：P3 合并/状态两页深水区（见 LAYOUT-GAPS.md）；用户 dev server 目视复核。
+
+### 遗留修复：分支右键菜单定位失效（2026-10-25）
+
+用户报告「分支树右键功能被重构搞没了」。审计结论：功能与 DOM 全在，**定位被覆盖**——菜单 Teleport 到 body + 内联 left/top，`theme.css` 的 `.gc-branch-menu{position:fixed}` 与 EP 的 `.el-dropdown-menu{position:relative;top:0;left:0}` 同特异性，而 EP 样式在懒加载 chunk 里晚于 theme.css 注入，后者胜出 → 菜单渲染到页面末尾视口外。
+
+修复：`.el-dropdown-menu.gc-branch-menu` / `.el-dropdown-menu.gc-card-menu` 双类名（特异性 0,2,0，免疫加载顺序）。与 diff2html 的 important 教训同类：**懒加载晚注入的第三方样式会反制同特异性自定义规则，浮动层定位必须提权**。
+
+同轮全量功能审计（24 个 .vue 的事件绑定/按钮文案/函数/监听/拖拽比对）结论：除本项外无功能丢失；冲突面板文件切换、更改卡目录树、天气 tab、G6 图谱均为已批准的设计性替代。

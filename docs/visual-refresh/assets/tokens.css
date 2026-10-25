@@ -137,9 +137,9 @@
    ========================================================================== */
 html[data-accent='white'] {
   --gc-accent: #eef4f9;
-  --gc-accent-hover: #ffffff;
+  --gc-accent-hover: #fff;
   --gc-accent-active: #c7d3de;
-  --gc-accent-text: #ffffff;
+  --gc-accent-text: #fff;
   --gc-accent-weak: rgba(238, 244, 249, 0.08);
   --gc-accent-weak-strong: rgba(238, 244, 249, 0.1);
   --gc-accent-ink: #0e1218;

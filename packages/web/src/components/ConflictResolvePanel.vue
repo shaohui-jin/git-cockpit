@@ -25,11 +25,12 @@ const props = defineProps<{
 const leftLabel = computed(() => props.leftLabel || '线上');
 const rightLabel = computed(() => props.rightLabel || '我的');
 
-const activePath = ref('');
 const activeHunkId = ref<string | null>(null);
 const autoOnlyExpanded = ref(false);
+/** 已完全解决的文件默认折叠（初始态）；会话中解决的文件保持展开供核对 */
+const collapsed = ref<Set<string>>(new Set());
 const hunksByPath = ref<Record<string, ChangeHunk[]>>({});
-const scrollRootRef = ref<HTMLElement | null>(null);
+const rootRef = ref<HTMLElement | null>(null);
 const blame = ref<ConflictBlameResult | null>(null);
 const blameLoading = ref(false);
 const blameError = ref('');
@@ -41,10 +42,20 @@ function initFromFiles(files: ConflictFile[]): void {
   }
   hunksByPath.value = next;
   const first = files.find((f) => countHunkStats(next[f.path] ?? []).conflicts > 0)?.path ?? files[0]?.path ?? '';
-  activePath.value = first;
   const list = next[first] ?? [];
-  activeHunkId.value = list.find((h) => h.kind === 'conflict')?.id ?? list[0]?.id ?? null;
+  activeHunkId.value =
+    list.find((h) => h.kind === 'conflict' && h.action === 'pending')?.id ??
+    list.find((h) => h.kind === 'conflict')?.id ??
+    list[0]?.id ??
+    null;
   autoOnlyExpanded.value = false;
+  // 进来就已全部解决的文件先折叠，减少噪音
+  const nextCollapsed = new Set<string>();
+  for (const f of files) {
+    const s = countHunkStats(next[f.path] ?? []);
+    if (s.conflicts > 0 && s.pending === 0) nextCollapsed.add(f.path);
+  }
+  collapsed.value = nextCollapsed;
 }
 
 watch(
@@ -53,10 +64,6 @@ watch(
   { immediate: true, deep: true }
 );
 
-const hunks = computed(() => hunksByPath.value[activePath.value] ?? []);
-const conflictHunks = computed(() => hunks.value.filter((h) => h.kind === 'conflict'));
-const activeHunk = computed(() => hunks.value.find((h) => h.id === activeHunkId.value) ?? null);
-
 const conflictFiles = computed(() =>
   props.files.filter((f) => countHunkStats(hunksByPath.value[f.path] ?? []).conflicts > 0)
 );
@@ -64,8 +71,31 @@ const autoOnlyFiles = computed(() =>
   props.files.filter((f) => countHunkStats(hunksByPath.value[f.path] ?? []).conflicts === 0)
 );
 
-const fileStats = computed(() => countHunkStats(hunks.value));
-const conflictFileIndex = computed(() => conflictFiles.value.findIndex((f) => f.path === activePath.value));
+/** 全部文件的 hunk（按 props.files 顺序）：跨文件导航与活跃定位用 */
+const allHunks = computed(() => props.files.flatMap((f) => hunksByPath.value[f.path] ?? []));
+
+/** 活跃 hunk 所属文件（由 activeHunkId 派生，blame 上下文用） */
+const activePath = computed(() => {
+  for (const f of props.files) {
+    if ((hunksByPath.value[f.path] ?? []).some((h) => h.id === activeHunkId.value)) return f.path;
+  }
+  return conflictFiles.value[0]?.path ?? props.files[0]?.path ?? '';
+});
+
+function hunksOf(path: string): ChangeHunk[] {
+  return hunksByPath.value[path] ?? [];
+}
+
+function isCollapsed(path: string): boolean {
+  return collapsed.value.has(path);
+}
+
+function toggleCollapse(path: string): void {
+  const next = new Set(collapsed.value);
+  if (next.has(path)) next.delete(path);
+  else next.add(path);
+  collapsed.value = next;
+}
 
 const allStats = computed(() => {
   let conflicts = 0;
@@ -80,8 +110,10 @@ const allStats = computed(() => {
   return { total: conflicts, resolved, pending };
 });
 
-const activeConflictIndex = computed(() => conflictHunks.value.findIndex((h) => h.id === activeHunkId.value));
+const conflictHunks = computed(() => allHunks.value.filter((h) => h.kind === 'conflict'));
+const activeHunk = computed(() => allHunks.value.find((h) => h.id === activeHunkId.value) ?? null);
 const canPickHunk = computed(() => activeHunk.value?.kind === 'conflict');
+const activeConflictIndex = computed(() => conflictHunks.value.findIndex((h) => h.id === activeHunkId.value));
 
 function fileLabel(path: string): string {
   const s = countHunkStats(hunksByPath.value[path] ?? []);
@@ -89,8 +121,7 @@ function fileLabel(path: string): string {
   return `${s.resolved}/${s.conflicts}`;
 }
 
-function selectFile(path: string): void {
-  activePath.value = path;
+function focusFile(path: string): void {
   const list = hunksByPath.value[path] ?? [];
   const first =
     list.find((h) => h.kind === 'conflict' && h.action === 'pending') ??
@@ -99,22 +130,18 @@ function selectFile(path: string): void {
   activeHunkId.value = first?.id ?? null;
 }
 
-function goConflictFile(delta: number): void {
-  const list = conflictFiles.value;
-  if (list.length < 2) return;
-  let idx = conflictFileIndex.value;
-  if (idx < 0) idx = delta > 0 ? -1 : 0;
-  let next = idx + delta;
-  if (next < 0) next = list.length - 1;
-  else if (next >= list.length) next = 0;
-  const file = list[next];
-  if (file) selectFile(file.path);
+function pathOfHunk(id: string | null): string {
+  if (id == null) return '';
+  for (const f of props.files) {
+    if ((hunksByPath.value[f.path] ?? []).some((h) => h.id === id)) return f.path;
+  }
+  return '';
 }
 
 function updateHunk(id: string, action: HunkAction): void {
-  const path = activePath.value;
-  const list = hunksByPath.value[path];
-  if (!list) return;
+  const path = pathOfHunk(id);
+  const list = path ? hunksByPath.value[path] : undefined;
+  if (!path || !list) return;
   hunksByPath.value = {
     ...hunksByPath.value,
     [path]: list.map((h) => (h.id === id ? { ...h, action } : h))
@@ -129,17 +156,7 @@ function acceptRight(h: ChangeHunk): void {
   updateHunk(h.id, 'accept-right');
 }
 
-function acceptAll(side: 'left' | 'right', path: string): void {
-  const list = hunksByPath.value[path];
-  if (!list) return;
-  if (path !== activePath.value) activePath.value = path;
-  const action: HunkAction = side === 'left' ? 'accept-left' : 'accept-right';
-  hunksByPath.value = {
-    ...hunksByPath.value,
-    [path]: list.map((h) => (h.kind === 'conflict' ? { ...h, action } : h))
-  };
-}
-
+/** 工具条采纳：作用于当前活跃冲突（跨文件跳转后用，不必移到行内按钮） */
 function acceptActive(side: 'left' | 'right'): void {
   const h = activeHunk.value;
   if (!h || h.kind !== 'conflict') return;
@@ -147,13 +164,21 @@ function acceptActive(side: 'left' | 'right'): void {
   else acceptRight(h);
 }
 
-function resetCurrentFile(): void {
-  const path = activePath.value;
+function acceptAll(side: 'left' | 'right', path: string): void {
+  const list = hunksByPath.value[path];
+  if (!list) return;
+  const action: HunkAction = side === 'left' ? 'accept-left' : 'accept-right';
+  hunksByPath.value = {
+    ...hunksByPath.value,
+    [path]: list.map((h) => (h.kind === 'conflict' ? { ...h, action } : h))
+  };
+}
+
+function resetFile(path: string): void {
   const file = props.files.find((f) => f.path === path);
   if (!file) return;
   const next = buildChangeHunks(file);
   hunksByPath.value = { ...hunksByPath.value, [path]: next };
-  activeHunkId.value = next.find((h) => h.kind === 'conflict')?.id ?? next[0]?.id ?? null;
 }
 
 function resultLines(h: ChangeHunk): string[] {
@@ -184,8 +209,11 @@ function goConflict(delta: number): void {
   else if (next >= pool.length) next = 0;
   const target = pool[next]!;
   activeHunkId.value = target.id;
+  // 目标在已折叠的文件里时先展开
+  const path = pathOfHunk(target.id);
+  if (path && isCollapsed(path)) toggleCollapse(path);
   void nextTick(() => {
-    scrollRootRef.value?.querySelector(`[data-hunk-id="${target.id}"]`)?.scrollIntoView({
+    rootRef.value?.querySelector(`[data-hunk-id="${target.id}"]`)?.scrollIntoView({
       block: 'center',
       behavior: 'smooth'
     });
@@ -258,92 +286,49 @@ defineExpose({ buildFiles });
 </script>
 
 <template>
-  <div class="resolve">
+  <div ref="rootRef" class="resolve">
     <div class="resolve-head">
       <span>
-        冲突 {{ allStats.resolved }} / {{ allStats.total }}
+        冲突文件 {{ conflictFiles.length }} · 已决 {{ allStats.resolved }}/{{ allStats.total }}
         <span class="muted"> · 绿=新增 紫=修改（自动进结果） · 红块选 {{ leftLabel }} 或 {{ rightLabel }}</span>
+      </span>
+      <span class="grow" />
+      <span class="head-nav">
+        <el-button size="small" :disabled="!conflictHunks.length" @click="goConflict(-1)">上一处</el-button>
+        <span class="nav-pos"
+          >{{ activeConflictIndex >= 0 ? activeConflictIndex + 1 : 0 }}/{{ conflictHunks.length }}</span
+        >
+        <el-button size="small" :disabled="!conflictHunks.length" @click="goConflict(1)">下一处</el-button>
+      </span>
+      <span class="head-pick">
+        <el-button size="small" :disabled="!canPickHunk" @click="acceptActive('left')">采用{{ leftLabel }}</el-button>
+        <el-button size="small" :disabled="!canPickHunk" @click="acceptActive('right')">采用{{ rightLabel }}</el-button>
       </span>
     </div>
 
     <div class="resolve-body">
-      <div class="file-list">
-        <div class="file-list-head">
-          <span>冲突文件 {{ conflictFiles.length }}</span>
-          <span class="file-nav">
-            <el-button size="small" :disabled="conflictFiles.length < 2" @click="goConflictFile(-1)">‹</el-button>
-            <span class="nav-pos"
-              >{{ conflictFileIndex >= 0 ? conflictFileIndex + 1 : 0 }}/{{ conflictFiles.length }}</span
-            >
-            <el-button size="small" :disabled="conflictFiles.length < 2" @click="goConflictFile(1)">›</el-button>
-          </span>
-        </div>
-        <template v-for="f in conflictFiles" :key="f.path">
+      <!-- 冲突文件：全部平铺，各带文件头与五列选边行 -->
+      <section v-for="f in conflictFiles" :key="f.path" class="cf-file" :class="{ collapsed: isCollapsed(f.path) }">
+        <header class="cf-file-head">
           <button
+            class="collapse-btn"
             type="button"
-            class="file-item"
-            :class="{
-              active: f.path === activePath,
-              done: countHunkStats(hunksByPath[f.path] ?? []).pending === 0
-            }"
-            @click="selectFile(f.path)"
+            :aria-label="isCollapsed(f.path) ? '展开文件' : '收起文件'"
+            @click="toggleCollapse(f.path)"
           >
-            <span class="file-main">
-              <span class="mono path" :title="f.path">{{ f.path.split('/').pop() }}</span>
-              <span class="stat">{{ fileLabel(f.path) }}</span>
-            </span>
+            <GcIcon name="chevron-down" :size="12" :class="{ rotated: isCollapsed(f.path) }" />
           </button>
-          <div v-if="f.path === activePath" class="file-sides">
-            <el-button size="small" @click="acceptAll('left', f.path)">{{ leftLabel }}</el-button>
-            <el-button size="small" @click="acceptAll('right', f.path)">{{ rightLabel }}</el-button>
-          </div>
-        </template>
-        <button
-          v-if="autoOnlyFiles.length"
-          type="button"
-          class="file-item auto-toggle"
-          @click="autoOnlyExpanded = !autoOnlyExpanded"
-        >
-          {{ autoOnlyExpanded ? '▾' : '▸' }} 仅自动合并（{{ autoOnlyFiles.length }}）
-        </button>
-        <template v-if="autoOnlyExpanded">
-          <button
-            v-for="f in autoOnlyFiles"
-            :key="f.path"
-            type="button"
-            class="file-item auto"
-            :class="{ active: f.path === activePath }"
-            @click="selectFile(f.path)"
-          >
-            <span class="file-main">
-              <span class="mono path" :title="f.path">{{ f.path.split('/').pop() }}</span>
-              <span class="stat">{{ fileLabel(f.path) }}</span>
-            </span>
-          </button>
-        </template>
-      </div>
-
-      <div class="merge-wrap">
-        <div class="merge-bar">
-          <span class="mono merge-path" :title="activePath">{{ activePath }}</span>
-          <span class="muted">{{ fileStats.resolved }}/{{ fileStats.conflicts }}</span>
-          <span class="merge-bar-actions">
-            <el-button size="small" :disabled="!conflictHunks.length" @click="goConflict(-1)">上一处</el-button>
-            <span class="nav-pos"
-              >{{ activeConflictIndex >= 0 ? activeConflictIndex + 1 : 0 }}/{{ conflictHunks.length }}</span
-            >
-            <el-button size="small" :disabled="!conflictHunks.length" @click="goConflict(1)">下一处</el-button>
-            <el-button size="small" :disabled="!canPickHunk" @click="acceptActive('left')"
-              >采用{{ leftLabel }}</el-button
-            >
-            <el-button size="small" :disabled="!canPickHunk" @click="acceptActive('right')"
-              >采用{{ rightLabel }}</el-button
-            >
-            <el-button size="small" :disabled="!activePath" @click="resetCurrentFile">重置本文件</el-button>
+          <GcIcon name="file" :size="12" class="cf-ico" />
+          <span class="cf-path mono" :title="f.path">{{ f.path }}</span>
+          <span class="cf-prog">{{ fileLabel(f.path) }}</span>
+          <span class="cf-actions">
+            <el-button size="small" @click="acceptAll('left', f.path)">采用{{ leftLabel }}</el-button>
+            <el-button size="small" @click="acceptAll('right', f.path)">采用{{ rightLabel }}</el-button>
+            <el-button size="small" @click="resetFile(f.path)">重置本文件</el-button>
           </span>
-        </div>
-        <div ref="scrollRootRef" class="merge">
-          <header class="merge-heads">
+        </header>
+        <template v-if="!isCollapsed(f.path)">
+          <div class="merge-heads">
             <div>
               <span class="side-chip ours">OURS · {{ leftLabel }}</span>
             </div>
@@ -353,8 +338,8 @@ defineExpose({ buildFiles });
             <div>
               <span class="side-chip theirs">THEIRS · {{ rightLabel }}</span>
             </div>
-          </header>
-          <div v-if="blameLoading || blameError || blame" class="blame-bar">
+          </div>
+          <div v-if="f.path === activePath && (blameLoading || blameError || blame)" class="blame-bar">
             <span v-if="blameLoading" class="muted">正在溯源作者…</span>
             <span v-else-if="blameError" class="blame-err">{{ blameError }}</span>
             <template v-else>
@@ -362,9 +347,8 @@ defineExpose({ buildFiles });
               <span class="blame-side">{{ rightLabel }}：{{ blameTheirs }}</span>
             </template>
           </div>
-          <div v-if="hunks.length === 0" class="empty">没有可展示的变更</div>
           <div
-            v-for="h in hunks"
+            v-for="h in hunksOf(f.path)"
             :key="h.id"
             class="merge-row"
             :class="[
@@ -412,7 +396,7 @@ defineExpose({ buildFiles });
                 :aria-label="`采用${rightLabel}`"
                 @click.stop="acceptRight(h)"
               >
-                <GcIcon :name="choseRight(h) ? 'check' : 'chevron-left'" :size="12" />
+                <GcIcon :name="choseRight(h) ? 'check' : 'chevron'" :size="12" />
               </button>
             </div>
             <div class="pane pane-theirs">
@@ -421,8 +405,73 @@ defineExpose({ buildFiles });
               ><span v-for="(line, i) in (h.rightLines.length ? h.rightLines : [''])" :key="'T'+i" class="code-line">{{ line || ' ' }}</span></pre>
             </div>
           </div>
-        </div>
+        </template>
+      </section>
+
+      <!-- 仅自动合并的文件：折叠汇总，可展开核对 -->
+      <div v-if="autoOnlyFiles.length" class="cf-auto">
+        <button
+          class="collapse-btn"
+          type="button"
+          :aria-label="autoOnlyExpanded ? '收起自动合并文件' : '展开自动合并文件'"
+          @click="autoOnlyExpanded = !autoOnlyExpanded"
+        >
+          <GcIcon name="chevron-down" :size="12" :class="{ rotated: !autoOnlyExpanded }" />
+        </button>
+        仅自动合并（{{ autoOnlyFiles.length }}）· 无冲突，自动进结果
       </div>
+      <section v-for="f in autoOnlyFiles" v-show="autoOnlyExpanded" :key="`auto-${f.path}`" class="cf-file auto">
+        <header class="cf-file-head">
+          <GcIcon name="file" :size="12" class="cf-ico" />
+          <span class="cf-path mono" :title="f.path">{{ f.path }}</span>
+          <span class="cf-prog">{{ fileLabel(f.path) }}</span>
+        </header>
+        <div class="merge-heads">
+          <div>
+            <span class="side-chip ours">OURS · {{ leftLabel }}</span>
+          </div>
+          <div />
+          <div>结果</div>
+          <div />
+          <div>
+            <span class="side-chip theirs">THEIRS · {{ rightLabel }}</span>
+          </div>
+        </div>
+        <div
+          v-for="h in hunksOf(f.path)"
+          :key="h.id"
+          class="merge-row"
+          :class="[
+            kindClass(h.kind),
+            {
+              active: h.id === activeHunkId,
+              resolved: isResolved(h),
+              'chose-left': choseLeft(h),
+              'chose-right': choseRight(h)
+            }
+          ]"
+          :data-hunk-id="h.id"
+          @click="activeHunkId = h.id"
+        >
+          <div class="pane pane-ours">
+            <pre
+              class="code"
+            ><span v-for="(line, i) in (h.leftLines.length ? h.leftLines : [''])" :key="'L'+i" class="code-line">{{ line || ' ' }}</span></pre>
+          </div>
+          <div class="gutter" />
+          <div class="pane pane-result">
+            <pre
+              class="code"
+            ><span v-for="(line, i) in resultLines(h)" :key="'R'+i" class="code-line">{{ line || ' ' }}</span></pre>
+          </div>
+          <div class="gutter" />
+          <div class="pane pane-theirs">
+            <pre
+              class="code"
+            ><span v-for="(line, i) in (h.rightLines.length ? h.rightLines : [''])" :key="'T'+i" class="code-line">{{ line || ' ' }}</span></pre>
+          </div>
+        </div>
+      </section>
     </div>
   </div>
 </template>
@@ -440,134 +489,124 @@ defineExpose({ buildFiles });
   align-items: center;
   gap: var(--gc-gap);
   flex-shrink: 0;
+  flex-wrap: wrap;
   min-height: var(--gc-row-lg);
   margin-bottom: var(--gc-gap);
   font-size: var(--gc-fs-body);
   color: var(--el-text-color-secondary);
+}
+.head-nav,
+.head-pick {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 2px;
 }
 .nav-pos {
   margin: 0 var(--gc-gap);
   text-align: center;
   font-size: var(--gc-fs-body);
   font-variant-numeric: tabular-nums;
+  color: var(--gc-text-3);
 }
 .muted {
   color: var(--el-text-color-placeholder);
 }
+.grow {
+  flex: 1;
+  min-width: 8px;
+}
+/* 平铺容器：全部冲突文件同屏滚动 */
 .resolve-body {
-  display: flex;
   flex: 1;
   min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gc-gap);
+  padding: var(--gc-gap);
   border: 1px solid var(--gc-line);
   border-radius: var(--gc-radius);
-  overflow: hidden;
   background: var(--gc-card);
 }
-.file-list {
-  width: 220px;
-  flex-shrink: 0;
-  overflow: auto;
+/* 文件区块：文件头 + 五列选边行 */
+.cf-file {
+  flex: none;
+  border: 1px solid var(--gc-line-weak);
+  border-radius: var(--gc-radius);
+  overflow: hidden;
   background: var(--gc-page);
-  border-right: 1px solid var(--gc-line-weak);
 }
-.file-list-head,
-.file-item,
-.file-sides,
-.merge-bar {
+.cf-file-head {
   display: flex;
   align-items: center;
+  gap: var(--gc-gap);
+  flex-wrap: wrap;
   min-height: var(--gc-row-lg);
-  padding: 0 var(--gc-pad);
-  font-size: var(--gc-fs-body);
-  box-sizing: border-box;
-}
-.file-list-head,
-.file-item,
-.merge-bar {
-  gap: var(--gc-gap);
-}
-.file-list-head {
-  justify-content: space-between;
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  background: var(--gc-page);
+  padding: 4px var(--gc-pad);
+  background: var(--gc-card);
   border-bottom: 1px solid var(--gc-line-weak);
+  font-size: var(--gc-fs-body);
+  color: var(--gc-text-2);
+}
+.cf-file.collapsed .cf-file-head {
+  border-bottom: 0;
+}
+.cf-ico {
   color: var(--gc-text-3);
+  flex: none;
 }
-.file-nav,
-.merge-bar-actions {
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-  margin-left: auto;
-}
-.file-item {
-  justify-content: space-between;
-  width: 100%;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.file-main {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--gc-gap);
-  width: 100%;
-  min-width: 0;
-}
-.file-item:hover {
-  background: var(--gc-btn-hover);
-}
-.file-item.active {
-  background: var(--gc-accent-weak);
-  color: var(--gc-accent-text);
-  box-shadow: inset 2px 0 0 var(--gc-accent);
-}
-.file-item.done .stat {
-  color: var(--gc-green);
-}
-.file-item.auto-toggle,
-.file-item.auto {
-  color: var(--el-text-color-secondary);
-}
-.path,
-.merge-path {
+.cf-path {
+  flex: 1;
+  min-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  min-width: 0;
 }
-.merge-path {
-  flex: 1;
+.cf-prog {
+  flex: none;
+  color: var(--gc-text-3);
+  font-variant-numeric: tabular-nums;
 }
-.stat {
-  flex-shrink: 0;
-  color: var(--el-text-color-secondary);
-}
-.file-sides {
-  background: var(--gc-accent-weak);
-  border-bottom: 1px solid var(--gc-line-weak);
-}
-.merge-wrap {
-  flex: 1;
-  min-width: 0;
+.cf-actions {
+  flex: none;
   display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  gap: 4px;
+  flex-wrap: wrap;
 }
-.merge-bar {
-  flex-shrink: 0;
-  border-bottom: 1px solid var(--gc-line-weak);
-  background: var(--gc-card);
+.collapse-btn {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: var(--gc-r-tag);
+  background: transparent;
+  color: var(--gc-text-3);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
 }
-.merge {
-  flex: 1;
-  min-width: 0;
-  overflow: auto;
+.collapse-btn:hover {
+  background: var(--gc-btn-hover);
+  color: var(--gc-text-2);
+}
+.collapse-btn .rotated {
+  transform: rotate(-90deg);
+}
+/* 仅自动合并文件：折叠汇总条 */
+.cf-auto {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  min-height: var(--gc-row-lg);
+  padding: 0 var(--gc-pad);
+  border: 1px solid var(--gc-line-weak);
+  border-radius: var(--gc-radius);
+  background: var(--gc-page);
+  font-size: var(--gc-fs-body);
+  color: var(--gc-text-3);
 }
 .merge-heads,
 .merge-row {
@@ -576,9 +615,6 @@ defineExpose({ buildFiles });
   align-items: stretch;
 }
 .merge-heads {
-  position: sticky;
-  top: 0;
-  z-index: 1;
   min-height: var(--gc-row-lg);
   padding: 0;
   background: var(--gc-page);
