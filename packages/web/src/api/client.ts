@@ -306,6 +306,10 @@ export function mergeOrder(
   return request('GET', `/api/repos/${id}/merge/order?${q.toString()}`);
 }
 
+export function openCliLogin(which: 'gh' | 'glab'): Promise<{ ok: true }> {
+  return request('POST', '/api/settings/cli-login', { which });
+}
+
 export function mrPrepare(
   id: number,
   opts: { into: string; from: string; remote?: string; sourceBranch?: string }

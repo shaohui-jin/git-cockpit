@@ -297,6 +297,42 @@ async function onMatrixPushTemp(payload: { into: string; from: string; branch: s
   if (!ok) lastWriteTool.value = null;
 }
 
+const loginWhich = computed(() => {
+  const p = mrPrep.value;
+  if (!p?.cliError || p.cliInstallUrl) return null;
+  if (p.platform === 'gitlab') return 'glab' as const;
+  if (p.platform === 'github') return 'gh' as const;
+  return null;
+});
+
+async function refreshMrPrep(): Promise<void> {
+  const id = repoId();
+  const temp = applyResult.value?.tempBranch;
+  if (id == null || !temp) return;
+  mrPrep.value = await api.mrPrepare(id, {
+    into: pairInto.value,
+    from: pairFrom.value,
+    sourceBranch: temp
+  });
+}
+
+async function reloadCli(): Promise<void> {
+  try {
+    await refreshMrPrep();
+    if (mrPrep.value && !mrPrep.value.cliError) ElMessage.success('CLI 已登录');
+  } catch (e) {
+    ElMessage.error(e instanceof Error ? e.message : String(e));
+  }
+}
+
+async function openLogin(which: 'gh' | 'glab'): Promise<void> {
+  try {
+    await api.openCliLogin(which);
+  } catch (e) {
+    ElMessage.error(e instanceof Error ? e.message : String(e));
+  }
+}
+
 async function onConfirmed(): Promise<void> {
   const exec: ToolExecResult | null = await executeConfirmed();
   if (!exec?.success) return;
@@ -321,17 +357,10 @@ async function onConfirmed(): Promise<void> {
       backToMatrix();
       return;
     }
-    const id = repoId();
-    if (id != null) {
-      try {
-        mrPrep.value = await api.mrPrepare(id, {
-          into: pairInto.value,
-          from: pairFrom.value,
-          sourceBranch: applyResult.value.tempBranch
-        });
-      } catch {
-        mrPrep.value = null;
-      }
+    try {
+      await refreshMrPrep();
+    } catch {
+      mrPrep.value = null;
     }
     void session.refreshSurvey();
   } else if (lastWriteTool.value === 'git_mr_create') {
@@ -634,7 +663,12 @@ watch([pairInto, pairFrom], () => {
           <p v-if="applyResult.createMrUrl" class="apply-link">
             <a :href="applyResult.createMrUrl" target="_blank" rel="noreferrer">打开创建 MR/PR 页面</a>
           </p>
-          <el-alert v-if="mrPrep?.cliError && !mrPrep.cli" type="warning" :closable="false" :title="mrPrep.cliError" />
+          <el-alert v-if="mrPrep?.cliError && !mrPrep.cli" type="warning" :closable="false">
+            {{ mrPrep.cliError }}
+            <el-button link type="primary" @click="router.push('/settings')">去 MR 配置</el-button>
+            <el-button v-if="loginWhich" link type="primary" @click="openLogin(loginWhich)">去登录</el-button>
+            <el-button link type="primary" @click="reloadCli">重新检测</el-button>
+          </el-alert>
           <div class="apply-actions">
             <el-button type="primary" @click="runCreatePr">创建 PR/MR</el-button>
             <el-button @click="runPreview">重新预演</el-button>

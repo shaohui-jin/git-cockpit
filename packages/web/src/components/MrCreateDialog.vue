@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onUnmounted, reactive, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import * as api from '@/api/client';
 import type { MrTemplateField, PrepareMrResult } from '@/api/types';
@@ -17,6 +18,8 @@ const emit = defineEmits<{
   'update:modelValue': [boolean];
   submit: [payload: Record<string, unknown>];
 }>();
+
+const router = useRouter();
 
 const loading = ref(false);
 const previewing = ref(false);
@@ -53,7 +56,42 @@ const missingRequired = computed(() => {
 
 const canSubmit = computed(() => Boolean(prepare.value && title.value.trim() && missingRequired.value.length === 0));
 const browserMethod = computed(() => prepare.value?.method === 'browser');
-const browserTemplateHint = computed(() => Boolean(enabled.value && browserMethod.value));
+const loginWhich = computed(() => {
+  const p = prepare.value;
+  if (!p?.cliError || p.cliInstallUrl) return null;
+  if (p.platform === 'gitlab') return 'glab' as const;
+  if (p.platform === 'github') return 'gh' as const;
+  return null;
+});
+
+async function openLogin(which: 'gh' | 'glab'): Promise<void> {
+  try {
+    await api.openCliLogin(which);
+  } catch (e) {
+    ElMessage.error(e instanceof Error ? e.message : String(e));
+  }
+}
+
+async function reloadCli(): Promise<void> {
+  if (props.repoId == null || !prepare.value) return;
+  try {
+    const result = await api.mrPrepare(props.repoId, {
+      into: props.into,
+      from: props.from,
+      sourceBranch: props.sourceBranch || undefined
+    });
+    prepare.value = {
+      ...prepare.value,
+      cli: result.cli,
+      cliError: result.cliError,
+      cliInstallUrl: result.cliInstallUrl,
+      platform: result.platform
+    };
+    if (!result.cliError) ElMessage.success('CLI 已登录');
+  } catch (e) {
+    ElMessage.error(e instanceof Error ? e.message : String(e));
+  }
+}
 
 async function copyPreview(): Promise<void> {
   const text = previewMd.value.trim();
@@ -191,14 +229,12 @@ onUnmounted(() => {
     <el-skeleton v-if="loading" :rows="6" animated />
     <template v-else-if="prepare">
       <p class="pair">{{ into }} ← {{ from }}</p>
-      <el-alert v-if="prepare.cliError" type="warning" :closable="false" :title="prepare.cliError" class="mb" />
-      <el-alert
-        v-if="browserTemplateHint"
-        type="warning"
-        :closable="false"
-        class="mb"
-        title="浏览器创建页不会写入这段正文，请复制预览后粘贴。"
-      />
+      <el-alert v-if="prepare.cliError" type="warning" :closable="false" class="mb">
+        {{ prepare.cliError }}
+        <el-button link type="primary" @click="router.push('/settings')">去 MR 配置</el-button>
+        <el-button v-if="loginWhich" link type="primary" @click="openLogin(loginWhich)">去登录</el-button>
+        <el-button link type="primary" @click="reloadCli">重新检测</el-button>
+      </el-alert>
       <div class="split">
         <div class="pane form">
           <el-form label-position="top">

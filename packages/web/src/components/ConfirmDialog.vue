@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import type { ToolExecResult, WritePreview } from '@/api/types';
 
@@ -17,11 +17,28 @@ const props = withDefaults(defineProps<Props>(), {
   note: ''
 });
 
+const BACKUP_TOOLS = new Set([
+  'git_reset_hard',
+  'git_clean',
+  'git_push_force',
+  'git_branch_delete_force',
+  'git_rebase'
+]);
+
 const emit = defineEmits<{
   (e: 'update:visible', v: boolean): void;
-  (e: 'confirm'): void;
+  (e: 'confirm', backupBranch?: boolean): void;
   (e: 'cancel'): void;
 }>();
+
+const offerBackup = computed(() => BACKUP_TOOLS.has(props.tool));
+const backupBranch = ref(true);
+watch(
+  () => props.visible,
+  (v) => {
+    if (v) backupBranch.value = true;
+  }
+);
 
 const command = computed(() => {
   const p = props.preview;
@@ -69,7 +86,7 @@ const previewBody = computed(() => {
 });
 
 function onConfirm(): void {
-  emit('confirm');
+  emit('confirm', offerBackup.value ? backupBranch.value : undefined);
 }
 
 function onCancel(): void {
@@ -88,12 +105,9 @@ function onCancel(): void {
     class="gc-dryrun-dialog"
     @closed="emit('update:visible', false)"
   >
-    <el-alert v-if="risk === 'dangerous'" type="error" :closable="false" show-icon class="risk-alert">
-      <template #title>这是<b>高风险</b>操作，将自动创建备份（临时分支 + stash）</template>
-    </el-alert>
-    <el-alert v-else-if="risk === 'write'" type="warning" :closable="false" show-icon class="risk-alert">
-      <template #title>写操作：执行后将修改仓库状态</template>
-    </el-alert>
+    <el-checkbox v-if="offerBackup" v-model="backupBranch" class="backup-check">
+      备份分支（backup/pre-op-*）
+    </el-checkbox>
 
     <div v-if="command" class="cmd-box">
       <div class="cmd-label"><GcIcon name="dry-run" :size="14" />将执行的命令（dry-run 预览，未实际执行）</div>
@@ -124,7 +138,7 @@ function onCancel(): void {
 </template>
 
 <style scoped>
-.risk-alert {
+.backup-check {
   margin-bottom: var(--gc-gap);
 }
 .cmd-box,

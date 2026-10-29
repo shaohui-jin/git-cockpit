@@ -148,8 +148,9 @@ export async function executeCapability(
       );
     }
 
+    const skipBackup = ctx.source === 'web' && rawArgs.backupBranch === false;
     let backup: BackupResult | null = null;
-    if (!dryRun && def.risk === 'dangerous' && host.config.git.backupOnDangerousOps && git) {
+    if (!dryRun && def.risk === 'dangerous' && host.config.git.backupOnDangerousOps && git && !skipBackup) {
       backup = await new BackupManager(git).createBackup();
       args = { ...args, __backup: { branch: backup.branch, stashRef: backup.stashRef } };
     }

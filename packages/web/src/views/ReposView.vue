@@ -380,19 +380,18 @@ watch(revision, () => {
 
     <!-- 工具栏：状态筛选（失效独立档）+ 打开 / 克隆 / 抓取（常驻，无仓时也能打开第一个仓） -->
     <section class="toolbar">
-      <div v-if="repos.repos.length" class="seg" role="group" aria-label="按状态筛选仓库">
-        <button
+      <el-radio-group v-if="repos.repos.length" class="seg" :model-value="filter" aria-label="按状态筛选仓库">
+        <el-radio-button
           v-for="w in filterTabs"
           :key="w.key"
-          type="button"
-          :class="[w.key, { on: filter === w.key }]"
+          :value="w.key"
           :aria-label="w.aria"
           :title="w.hint"
           @click="setFilter(w.key)"
         >
           {{ w.weather }}<span class="n">{{ w.count }}</span>
-        </button>
-      </div>
+        </el-radio-button>
+      </el-radio-group>
       <span class="spacer" />
       <span v-if="overview.refreshing" class="overview-refreshing" aria-live="polite">更新中…</span>
       <el-input
@@ -582,43 +581,7 @@ watch(revision, () => {
   flex: 1;
 }
 .seg {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px;
-  border-radius: var(--gc-radius);
-  background: var(--gc-page);
-  border: 1px solid var(--gc-line);
   flex: none;
-}
-.seg button {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: 24px;
-  padding: 0 9px;
-  border: 0;
-  border-radius: var(--gc-r-tag);
-  background: transparent;
-  color: var(--gc-text-3);
-  font: inherit;
-  font-size: var(--gc-fs-meta);
-  cursor: pointer;
-  white-space: nowrap;
-  transition:
-    background var(--gc-t-micro) var(--gc-ease),
-    color var(--gc-t-micro) var(--gc-ease);
-}
-.seg button:hover {
-  color: var(--gc-text-2);
-}
-.seg button.on {
-  background: var(--gc-accent-weak);
-  color: var(--gc-accent-text);
-}
-.seg button.lost.on {
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--gc-text-2);
 }
 .seg .n {
   font-family: var(--gc-font-mono);

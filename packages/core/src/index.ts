@@ -54,6 +54,7 @@ export {
   isGitlabRemote,
   parseGithubRepo,
   parseGitlabProject,
+  openCliLogin,
   probeAllMrCli,
   probeMrCli,
   readCliAuthToken,

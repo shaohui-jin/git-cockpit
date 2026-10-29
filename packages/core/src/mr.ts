@@ -23,6 +23,7 @@ import { cliInstallUrl, cliMissingHint, probeMrCli, runMrCli } from './mrCli.ts'
 export {
   GH_INSTALL_URL,
   GLAB_INSTALL_URL,
+  openCliLogin,
   probeAllMrCli,
   probeMrCli,
   readCliAuthToken,

@@ -71,11 +71,11 @@ const run = async () => {
           firstHunk: d ? (d.querySelector('.hunk')?.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80) : null,
           addBg: d ? getComputedStyle(d.querySelector('.dline.add') || d).backgroundColor : null,
           addShadow: d ? getComputedStyle(d.querySelector('.dline.add') || d).boxShadow : null,
-          addColor: d ? getComputedStyle((d.querySelector('.dline.add .code')) || d).color : null,
+          addColor: d ? getComputedStyle(d.querySelector('.dline.add .code') || d).color : null,
           delBg: d ? getComputedStyle(d.querySelector('.dline.del') || d).backgroundColor : null,
-          delColor: d ? getComputedStyle((d.querySelector('.dline.del .code')) || d).color : null,
+          delColor: d ? getComputedStyle(d.querySelector('.dline.del .code') || d).color : null,
           hunkBg: d ? getComputedStyle(d.querySelector('.hunk') || d).backgroundColor : null,
-          rngColor: d ? getComputedStyle((d.querySelector('.hunk .rng')) || d).color : null,
+          rngColor: d ? getComputedStyle(d.querySelector('.hunk .rng') || d).color : null,
           fileHead: d ? (d.querySelector('.diff-file-head')?.textContent || '').replace(/\s+/g, ' ').trim() : null
         };
       });

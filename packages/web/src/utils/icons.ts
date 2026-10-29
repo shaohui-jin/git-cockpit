@@ -3,7 +3,6 @@
    24 网格 / stroke 1.5 / round cap+join / 2px 安全边距 / 几何优先
    全部为自绘内联 SVG 路径数据：无第三方图标库、无 emoji。
    用法：<GcIcon name="branch" /> 或 iconSvg('branch') 取 SVG 字符串。
-   规格源：docs/visual-refresh/assets/icons.js（47 键全集移植）
    ========================================================================== */
 
 /** 图标路径表：key → SVG 内部元素（circle/path/rect，配合外层 svg 骨架） */

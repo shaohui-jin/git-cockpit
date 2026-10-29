@@ -29,6 +29,7 @@ import {
   normalizeRepoMethodKey,
   parseMrTemplateMarkdown,
   pickRemoteName,
+  openCliLogin,
   probeAllMrCli,
   readCliAuthToken,
   renderMrTemplate,
@@ -728,6 +729,14 @@ export async function createWebServer(
       return { preview: renderMrTemplate(template, req.body?.values ?? {}) };
     }
   );
+
+  app.post<{ Body: { which?: string } }>('/api/settings/cli-login', async (req, reply) => {
+    const which = req.body?.which;
+    if (which !== 'gh' && which !== 'glab') return reply.code(400).send({ error: 'which 只能是 gh 或 glab' });
+    const opened = openCliLogin(which);
+    if (!opened.ok) return reply.code(400).send({ error: opened.error });
+    return { ok: true };
+  });
 
   app.get<{ Querystring: { repoId?: string; validateToken?: string } }>('/api/settings', async (req) => {
     const repoId = req.query.repoId ? Number(req.query.repoId) : undefined;

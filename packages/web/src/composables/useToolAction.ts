@@ -48,15 +48,16 @@ export function useToolAction(repoId: () => number | null) {
     }
   }
 
-  /** 用户确认后执行真实操作 */
-  async function executeConfirmed(): Promise<ToolExecResult | null> {
+  /** 用户确认后执行真实操作。backupBranch 仅在高风险确认框取消勾选时为 false。 */
+  async function executeConfirmed(backupBranch?: boolean): Promise<ToolExecResult | null> {
     const id = repoId();
     const action = pending.value;
     if (id === null || !action) return null;
     executing.value = true;
     confirmVisible.value = false;
     try {
-      const exec = await api.runTool(id, action.tool, action.params);
+      const params = backupBranch === false ? { ...action.params, backupBranch: false } : action.params;
+      const exec = await api.runTool(id, action.tool, params);
       if (!exec.success) {
         handleFailure(exec);
         return exec;

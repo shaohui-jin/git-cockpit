@@ -155,9 +155,29 @@ export function cliInstallUrl(which: 'gh' | 'glab'): string {
 
 export function cliMissingHint(which: 'gh' | 'glab'): string {
   if (which === 'gh') {
-    return `未找到本机 gh（GitHub CLI）。本软件不会代为下载，请自行安装：${GH_INSTALL_URL}`;
+    return `未找到本机 gh（GitHub CLI）。请到设置的「MR 配置」改用 Token 或浏览器创建页，或自行安装：${GH_INSTALL_URL}`;
   }
-  return `未找到本机 glab（GitLab CLI）。本软件不会代为下载，请自行安装：${GLAB_INSTALL_URL}`;
+  return `未找到本机 glab（GitLab CLI）。请到设置的「MR 配置」改用 Token 或浏览器创建页，或自行安装：${GLAB_INSTALL_URL}`;
+}
+
+/** 打开可见终端跑 auth login。探测用的隐藏进程关了交互提示，不能用来登录。 */
+export function openCliLogin(which: 'gh' | 'glab'): { ok: true } | { ok: false; error: string } {
+  const bin = resolveCliBin(which);
+  if (!bin) return { ok: false, error: cliMissingHint(which) };
+  if (process.platform !== 'win32') {
+    return { ok: false, error: `请在终端执行：${which} auth login` };
+  }
+  try {
+    const child = spawn('cmd.exe', ['/c', `start "${which} 登录" cmd /k ""${bin}" auth login"`], {
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: false
+    });
+    child.unref();
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 export async function probeMrCli(
@@ -178,12 +198,11 @@ export async function probeMrCli(
   }
   const auth = await runCmd(bin, ['auth', 'status'], options.cwd);
   if (auth.code !== 0) {
-    const login = which === 'gh' ? 'gh auth login' : 'glab auth login';
     return {
       name: which,
       found: true,
       loggedIn: false,
-      error: `${which} 已安装但未登录。请在终端执行：${login}`,
+      error: `${which} 已安装但未登录。请到设置的「MR 配置」改用 Token 或浏览器创建页，或点「去登录」打开终端。`,
       installUrl
     };
   }

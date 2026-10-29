@@ -396,7 +396,9 @@ function isActive(cell: MergeSurveyCell): boolean {
           <el-button v-if="session.stageOf(active) === 'local'" :disabled="loading" @click="pushTemp(active)"
             >推送临时分支</el-button
           >
-          <el-button v-if="session.canCreateMr(active)" :disabled="loading" @click="requestMr(active)">申请 MR</el-button>
+          <el-button v-if="session.canCreateMr(active)" :disabled="loading" @click="requestMr(active)"
+            >申请 MR</el-button
+          >
         </aside>
       </div>
     </div>

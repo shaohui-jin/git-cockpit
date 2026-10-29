@@ -199,8 +199,6 @@ const tabs = computed(() => [
 const activeList = computed<FileStatus[]>(() => tabLists.value[activeTab.value] ?? []);
 const totalFiles = computed(() => tabLists.value.all.length);
 
-
-
 function syncText(b?: BranchInfo): string {
   if (!b || b.remote || !b.upstream) return '';
   const parts: string[] = [];
@@ -296,9 +294,9 @@ async function run(tool: string, params: Record<string, unknown> = {}): Promise<
   await previewAndConfirm(tool, params);
 }
 
-async function onConfirmed(): Promise<void> {
+async function onConfirmed(backupBranch?: boolean): Promise<void> {
   const tool = pending.value?.tool;
-  const res = await executeConfirmed();
+  const res = await executeConfirmed(backupBranch);
   const conflict = res?.error?.code === 'CHERRY_PICK_CONFLICT';
   if (res?.success || conflict) await refresh();
   if (tool === 'git_cherry_pick' && status.value?.operation === 'cherry-pick') {
@@ -963,12 +961,7 @@ onUnmounted(() => {
                   <el-checkbox :model-value="isChecked(f.path)" @click.stop @change="toggleChecked(f.path)" />
                   <span class="file-status" :class="statusClass(f)">{{ statusLetter(f) }}</span>
                   <span class="file-path mono" :title="f.path">{{ f.path }}</span>
-                  <el-button
-                    v-if="f.conflicted"
-                    size="small"
-                    text
-                    type="warning"
-                    @click.stop="stageFile(f)"
+                  <el-button v-if="f.conflicted" size="small" text type="warning" @click.stop="stageFile(f)"
                     >标记已解决(git add)</el-button
                   >
                   <el-button
@@ -1863,8 +1856,6 @@ onUnmounted(() => {
   background: var(--gc-accent-weak);
   color: var(--gc-accent-text);
 }
-
-
 
 .changes-card :deep(.el-card__header),
 .history-card :deep(.el-card__header) {

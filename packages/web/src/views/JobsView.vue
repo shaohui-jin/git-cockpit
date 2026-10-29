@@ -208,71 +208,61 @@ onUnmounted(() => {
 
 <template>
   <div class="page jobs-page">
-    <div class="page-head">
-      <h1>任务</h1>
-      <span class="sub">写操作排队执行，进度实时推送</span>
-      <span v-if="counts.running" class="pulse-count"><i />{{ counts.running }} 进行中</span>
+    <div class="chips">
+      <el-radio-group :model-value="filter">
+        <el-radio-button value="all" @click="setFilter('all')">全部 {{ counts.all }}</el-radio-button>
+        <el-radio-button value="running" @click="setFilter('running')">进行中 {{ counts.running }}</el-radio-button>
+        <el-radio-button value="error" @click="setFilter('error')">失败 {{ counts.error }}</el-radio-button>
+        <el-radio-button value="ok" @click="setFilter('ok')">成功 {{ counts.ok }}</el-radio-button>
+      </el-radio-group>
       <span class="spacer" />
       <el-button :loading="jobs.loading" @click="jobs.load">刷新</el-button>
     </div>
 
-    <div class="chips">
-      <button type="button" class="chip" :class="{ on: filter === 'all' }" @click="setFilter('all')">
-        全部 {{ counts.all }}
-      </button>
-      <button type="button" class="chip" :class="{ on: filter === 'running' }" @click="setFilter('running')">
-        进行中 {{ counts.running }}
-      </button>
-      <button type="button" class="chip" :class="{ on: filter === 'error' }" @click="setFilter('error')">
-        失败 {{ counts.error }}
-      </button>
-      <button type="button" class="chip" :class="{ on: filter === 'ok' }" @click="setFilter('ok')">
-        成功 {{ counts.ok }}
-      </button>
-    </div>
+    <div class="jobs-scroll">
+      <div v-if="!jobs.loading && visibleJobs.length === 0" class="empty gc-card">
+        <strong>还没有后台任务</strong>
+        <p>克隆、矩阵扫描、抓取远程会排在这里。去工作台克隆一个仓。</p>
+      </div>
 
-    <div v-if="!jobs.loading && visibleJobs.length === 0" class="empty gc-card">
-      <strong>还没有后台任务</strong>
-      <p>克隆、矩阵扫描、抓取远程会排在这里。去工作台克隆一个仓。</p>
-    </div>
-
-    <template v-for="g in groups" :key="g.key">
-      <section v-if="groupJobs(g.key).length" class="job-group">
-        <header class="card-head">
-          <GcIcon :name="g.icon" :size="14" />
-          <h3>{{ g.label }}</h3>
-          <span class="cnt">{{ groupJobs(g.key).length }}</span>
-          <span class="spacer" />
-          <span v-if="g.key === 'running'" class="chip plain">并发上限 2</span>
-        </header>
-        <button
-          v-for="j in groupJobs(g.key)"
-          :key="j.id"
-          type="button"
-          class="job"
-          :class="{ on: j.id === activeJobId }"
-          @click="openJob(j.id)"
-        >
-          <span class="job-top">
-            <span class="job-ico" :class="j.status"><GcIcon :name="kindIcon(j.kind)" :size="14" /></span>
-            <span class="job-main">
-              <span class="job-title" :title="jobLine(j)">{{ jobLine(j) }}</span>
-              <span class="job-sub">{{ kindLabel(j.kind) }} · {{ repoLeafOf(j) }} · {{ relTime(j.startedAt) }}</span>
-            </span>
-            <span v-if="j.kind === 'desktop-download' && jobPercent(j) != null" class="job-prog">
-              <span class="bar" :class="j.status">
-                <i class="fill" :style="{ width: (jobPercent(j) ?? 0) + '%' }" />
-                <i v-if="j.status === 'running'" class="scan" />
+      <template v-for="g in groups" :key="g.key">
+        <section v-if="groupJobs(g.key).length" class="job-group">
+          <header class="card-head">
+            <GcIcon :name="g.icon" :size="14" />
+            <h3>{{ g.label }}</h3>
+            <span class="cnt">{{ groupJobs(g.key).length }}</span>
+            <span class="spacer" />
+            <span v-if="g.key === 'running'" class="chip plain">并发上限 2</span>
+          </header>
+          <button
+            v-for="j in groupJobs(g.key)"
+            :key="j.id"
+            type="button"
+            class="job"
+            :class="{ on: j.id === activeJobId }"
+            @click="openJob(j.id)"
+          >
+            <span class="job-top">
+              <span class="job-ico" :class="j.status"><GcIcon :name="kindIcon(j.kind)" :size="14" /></span>
+              <span class="job-main">
+                <span class="job-title" :title="jobLine(j)">{{ jobLine(j) }}</span>
+                <span class="job-sub">{{ kindLabel(j.kind) }} · {{ repoLeafOf(j) }} · {{ relTime(j.startedAt) }}</span>
               </span>
-              <span class="pct">{{ jobPercent(j) }}%</span>
+              <span v-if="j.kind === 'desktop-download' && jobPercent(j) != null" class="job-prog">
+                <span class="bar" :class="j.status">
+                  <i class="fill" :style="{ width: (jobPercent(j) ?? 0) + '%' }" />
+                  <i v-if="j.status === 'running'" class="scan" />
+                </span>
+                <span class="pct">{{ jobPercent(j) }}%</span>
+              </span>
+              <span class="st" :class="j.status">{{ statusLabel(j.status) }}</span>
+              <span class="job-dur">{{ durOf(j) }}</span>
             </span>
-            <span class="st" :class="j.status">{{ statusLabel(j.status) }}</span>
-            <span class="job-dur">{{ durOf(j) }}</span>
-          </span>
-          <span v-if="tailOf(j)" class="job-log" :title="tailOf(j)">{{ tailOf(j) }}</span>
-        </button>
-      </section>
-    </template>
+            <span v-if="tailOf(j)" class="job-log" :title="tailOf(j)">{{ tailOf(j) }}</span>
+          </button>
+        </section>
+      </template>
+    </div>
 
     <!-- 日志抽屉：点任务卡右侧滑出，保留原日志面板全部能力 -->
     <div v-if="activeJob" class="drawer-mask" @click="closeDrawer" />
@@ -337,51 +327,15 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: var(--gc-pad);
-  overflow: auto;
+  overflow: hidden;
 }
-.page-head {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: var(--gc-gap);
-  min-width: 0;
-}
-.page-head h1 {
-  margin: 0;
-  font-size: var(--gc-fs-page);
-  font-weight: 600;
-  line-height: var(--gc-lh-page);
-  color: var(--gc-text);
-  letter-spacing: -0.01em;
-}
-.page-head .sub {
-  font-size: var(--gc-fs-body);
-  color: var(--gc-text-3);
-}
-.page-head .spacer {
+.jobs-scroll {
   flex: 1;
-}
-.pulse-count {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: 20px;
-  padding: 0 8px;
-  border-radius: var(--gc-r-tag);
-  background: var(--gc-accent-weak);
-  color: var(--gc-accent-text);
-  font-size: var(--gc-fs-meta);
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-.pulse-count i {
-  flex: none;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--gc-accent);
-  box-shadow: var(--gc-glow-sm);
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gc-pad);
 }
 .chips {
   flex: none;
@@ -390,25 +344,8 @@ onUnmounted(() => {
   gap: var(--gc-gap);
   align-items: center;
 }
-.chips .chip {
-  border: 0;
-  border-radius: var(--gc-r-tag);
-  padding: 0 var(--gc-pad);
-  height: var(--gc-btn-inline);
-  background: var(--el-fill-color);
-  color: var(--gc-text-3);
-  font: inherit;
-  font-size: var(--gc-fs-meta);
-  cursor: pointer;
-}
-.chips .chip.on {
-  background: var(--gc-accent-weak);
-  color: var(--gc-accent-text);
-}
-.chips .chip.plain {
-  background: transparent;
-  border: 1px solid var(--gc-line);
-  cursor: default;
+.chips .spacer {
+  flex: 1;
 }
 .empty {
   flex: none;

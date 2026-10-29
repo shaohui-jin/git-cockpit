@@ -128,24 +128,19 @@ onMounted(() => {
 
 <template>
   <div class="page conv-page">
-    <div class="page-head">
-      <h1>对话记录</h1>
-      <span class="sub">与 Agent 的每一次协作都留有上下文</span>
-      <span class="spacer" />
-      <el-button :loading="loading" @click="load">刷新</el-button>
-    </div>
-
     <div class="conv-wrap">
       <!-- 左：会话列表 -->
       <aside class="conv-list" v-loading="loading">
         <div class="conv-list-top">
-          <div class="conv-search">
-            <GcIcon name="search" :size="12" />
-            <input v-model="searchText" type="text" placeholder="搜索会话 / 仓库" />
+          <el-input v-model="searchText" class="conv-search" placeholder="搜索会话 / 仓库">
+            <template #prefix><GcIcon name="search" :size="12" /></template>
+          </el-input>
+          <div class="conv-filters">
+            <el-select v-model="repoFilter" clearable placeholder="全部仓库" class="conv-repo">
+              <el-option v-for="opt in repoOptions" :key="opt.path" :label="opt.label" :value="opt.path" />
+            </el-select>
+            <el-button :loading="loading" @click="load">刷新</el-button>
           </div>
-          <el-select v-model="repoFilter" clearable placeholder="全部仓库" class="conv-repo">
-            <el-option v-for="opt in repoOptions" :key="opt.path" :label="opt.label" :value="opt.path" />
-          </el-select>
         </div>
         <div class="conv-items">
           <p v-if="!loading && visible.length === 0" class="conv-miss">没有匹配的对话</p>
@@ -209,29 +204,6 @@ onMounted(() => {
   gap: var(--gc-gap);
   overflow: hidden;
 }
-.page-head {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: var(--gc-gap);
-  min-width: 0;
-}
-.page-head h1 {
-  margin: 0;
-  font-size: var(--gc-fs-page);
-  font-weight: 600;
-  line-height: var(--gc-lh-page);
-  color: var(--gc-text);
-  letter-spacing: -0.01em;
-}
-.page-head .sub {
-  font-size: var(--gc-fs-body);
-  color: var(--gc-text-3);
-}
-.page-head .spacer {
-  flex: 1;
-}
-
 /* ---------- 双栏骨架（对齐设计稿 conv-wrap） ---------- */
 .conv-wrap {
   flex: 1;
@@ -259,32 +231,18 @@ onMounted(() => {
   padding: var(--gc-gap);
   border-bottom: 1px solid var(--gc-line);
 }
-.conv-search {
+.conv-filters {
   display: flex;
   align-items: center;
-  gap: 6px;
-  height: var(--gc-btn-inline);
-  padding: 0 8px;
-  border-radius: var(--gc-r);
-  border: 1px solid var(--gc-line);
-  background: var(--gc-page);
-  color: var(--gc-text-3);
+  gap: var(--gc-gap);
+  min-width: 0;
 }
-.conv-search:focus-within {
-  border-color: var(--gc-accent);
-}
-.conv-search input {
+.conv-filters .conv-repo {
   flex: 1;
   min-width: 0;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--gc-text);
-  font: inherit;
-  font-size: var(--gc-fs-body);
 }
-.conv-search input::placeholder {
-  color: var(--gc-text-placeholder);
+.conv-search {
+  width: 100%;
 }
 .conv-items {
   flex: 1;

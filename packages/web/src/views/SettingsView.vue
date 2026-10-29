@@ -534,7 +534,10 @@ async function clearLlmKey(): Promise<void> {
   <div class="page settings-page">
     <el-alert v-if="settings.error" :title="settings.error" type="error" :closable="false" show-icon class="mb" />
 
-    <div class="settings-col" :class="{ wide: activeTab === 'template' || activeTab === 'git' }">
+    <div
+      class="settings-col"
+      :class="{ wide: activeTab === 'template' || activeTab === 'git', fill: activeTab === 'git' }"
+    >
       <div class="gc-chip-tabs">
         <button
           v-for="t in settingTabs"
@@ -931,12 +934,41 @@ async function clearLlmKey(): Promise<void> {
   gap: var(--gc-s3);
   align-items: start;
 }
+.settings-col.fill {
+  overflow: hidden;
+}
+.settings-col.fill > .tab-pane,
+.settings-col.fill .git-ops-split {
+  flex: 1;
+  min-height: 0;
+}
+.settings-col.fill .git-ops-split {
+  grid-template-rows: minmax(0, 1fr);
+  align-items: stretch;
+}
+.settings-col.fill .git-ops-split > .set-card:first-child {
+  align-self: start;
+}
+.settings-col.fill .git-ops-split > .set-card:last-child {
+  min-height: 0;
+}
+.settings-col.fill .git-ops-split > .set-card:last-child .set-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
 @media (max-width: 959px) {
   .settings-col.wide {
     max-width: 880px;
   }
   .git-ops-split {
     grid-template-columns: 1fr;
+  }
+  .settings-col.fill {
+    overflow: auto;
+  }
+  .settings-col.fill .git-ops-split > .set-card:last-child .set-body {
+    overflow: visible;
   }
 }
 /* set-card 框架：card-head（36px page 底）+ set-body + card-foot */

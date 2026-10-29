@@ -33,7 +33,10 @@ const PAGE_META: Record<string, { title: string; sub: string }> = {
   '/dashboard': { title: '工作台', sub: '本地 Git 仓库的驾驶舱' },
   '/status': { title: '仓库状态', sub: '工作区与历史' },
   '/settings': { title: '设置', sub: '本机保存，不上传' },
-  '/merge': { title: '合并', sub: '预演与矩阵 · 只读合并不碰工作区' }
+  '/merge': { title: '合并', sub: '预演与矩阵 · 只读合并不碰工作区' },
+  '/jobs': { title: '任务', sub: '写操作排队执行，进度实时推送' },
+  '/logs': { title: '操作日志', sub: 'Agent 与本机的每一次工具调用都留痕' },
+  '/conversations': { title: '对话记录', sub: '与 Agent 的每一次协作都留有上下文' }
 };
 const pageMeta = computed(() => PAGE_META[route.path] ?? null);
 

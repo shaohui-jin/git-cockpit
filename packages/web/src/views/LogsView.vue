@@ -94,24 +94,15 @@ onMounted(() => {
 
 <template>
   <div class="page logs-page">
-    <div class="page-head">
-      <h1>操作日志</h1>
-      <span class="sub">Agent 与本机的每一次工具调用都留痕</span>
-      <span class="spacer" />
-      <el-button :loading="logs.loading" @click="logs.load">刷新</el-button>
-      <el-button :disabled="!visible.length" @click="exportCsv">导出 CSV</el-button>
-    </div>
-
     <div class="log-toolbar">
-      <div class="log-search">
-        <GcIcon name="search" :size="12" />
-        <input v-model="searchText" type="text" placeholder="搜索工具 / 参数 / 仓库" />
-      </div>
-      <div class="seg-chips">
-        <button type="button" :class="{ on: statusFilter === 'all' }" @click="statusFilter = 'all'">全部</button>
-        <button type="button" :class="{ on: statusFilter === 'ok' }" @click="statusFilter = 'ok'">成功</button>
-        <button type="button" :class="{ on: statusFilter === 'bad' }" @click="statusFilter = 'bad'">失败</button>
-      </div>
+      <el-input v-model="searchText" class="log-search" placeholder="搜索工具 / 参数 / 仓库">
+        <template #prefix><GcIcon name="search" :size="12" /></template>
+      </el-input>
+      <el-radio-group v-model="statusFilter">
+        <el-radio-button value="all">全部</el-radio-button>
+        <el-radio-button value="ok">成功</el-radio-button>
+        <el-radio-button value="bad">失败</el-radio-button>
+      </el-radio-group>
       <el-select v-model="logs.toolFilter" clearable placeholder="全部工具" class="tool-select" @change="logs.load">
         <el-option v-for="t in tools" :key="t" :label="t" :value="t" />
       </el-select>
@@ -124,6 +115,8 @@ onMounted(() => {
       <span class="log-count"
         >共 <b>{{ logs.logs.length }}</b> 条 · 显示 <b>{{ visible.length }}</b> 条</span
       >
+      <el-button :loading="logs.loading" @click="logs.load">刷新</el-button>
+      <el-button :disabled="!visible.length" @click="exportCsv">导出 CSV</el-button>
     </div>
 
     <div v-if="!logs.loading && logs.logs.length === 0" class="empty gc-card">
@@ -169,28 +162,6 @@ onMounted(() => {
   gap: var(--gc-pad);
   overflow: hidden;
 }
-.page-head {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: var(--gc-gap);
-  min-width: 0;
-}
-.page-head h1 {
-  margin: 0;
-  font-size: var(--gc-fs-page);
-  font-weight: 600;
-  line-height: var(--gc-lh-page);
-  color: var(--gc-text);
-  letter-spacing: -0.01em;
-}
-.page-head .sub {
-  font-size: var(--gc-fs-body);
-  color: var(--gc-text-3);
-}
-.page-head .spacer {
-  flex: 1;
-}
 /* 工具栏：裸行，不加卡片壳（同设置页 gc-chip-tabs 的语言） */
 .log-toolbar {
   flex: none;
@@ -200,59 +171,7 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 .log-search {
-  display: flex;
-  align-items: center;
-  gap: 6px;
   width: 260px;
-  height: var(--gc-btn-inline);
-  padding: 0 8px;
-  border-radius: var(--gc-r);
-  border: 1px solid var(--gc-line);
-  background: var(--gc-page);
-  color: var(--gc-text-3);
-}
-.log-search:focus-within {
-  border-color: var(--gc-accent);
-}
-.log-search input {
-  flex: 1;
-  min-width: 0;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--gc-text);
-  font: inherit;
-  font-size: var(--gc-fs-body);
-}
-.log-search input::placeholder {
-  color: var(--gc-text-placeholder);
-}
-.seg-chips {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px;
-  border-radius: var(--gc-radius);
-  background: var(--gc-page);
-  border: 1px solid var(--gc-line);
-}
-.seg-chips button {
-  border: 0;
-  height: 22px;
-  padding: 0 10px;
-  border-radius: var(--gc-r-tag);
-  background: transparent;
-  color: var(--gc-text-3);
-  font: inherit;
-  font-size: var(--gc-fs-meta);
-  cursor: pointer;
-}
-.seg-chips button:hover {
-  color: var(--gc-text-2);
-}
-.seg-chips button.on {
-  background: var(--gc-accent-weak);
-  color: var(--gc-accent-text);
 }
 .log-toolbar .spacer {
   flex: 1;
