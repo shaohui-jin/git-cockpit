@@ -29,13 +29,16 @@
     "lint:style": "stylelint \"**/*.{css,vue}\"",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "clean": "pnpm -r exec tsc --build --clean"
+    "clean": "pnpm -r exec tsc --build --clean",
+    "test:hooks": "node --test scripts/hooks/*.test.mjs",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
     "@types/node": "^24.0.0",
     "eslint": "^9.17.0",
     "eslint-config-prettier": "^10.1.8",
+    "husky": "^9.1.7",
     "postcss-html": "^2.0.0",
     "prettier": "^3.9.9",
     "stylelint": "^17.15.0",
