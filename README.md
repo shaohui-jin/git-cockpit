@@ -2,7 +2,45 @@
 
 基于 MCP（Model Context Protocol）的 Git 可视化操作工具：Web 端界面 + 供宿主 Agent 调用的 MCP 工具，支持多仓库管理与安全的 Git 操作。
 
-> 完整设计见 [设计文档.md](docs/设计文档.md)。本产品 **不做** Cursor/VS Code 扩展，也不做冲突自动选边。可选聊天（同一 Web + `/api/chat` + Electron 宿主）见 [docs/聊天壳方案.md](docs/聊天壳方案.md)。在 Cursor 里配 MCP **不会**打开聊天页。
+核心是一件事：**把「合不合得进去」这个问题变成可以随便问、反复问的只读操作**。
+合并预演走 `git merge-tree`，在对象库里算一遍，不切分支、不动工作区，
+所以问一次和问一百次的代价一样。
+
+![工作台](docs/images/dashboard.png)
+
+## 它解决什么问题
+
+让 AI Agent 帮你操作 Git，最大的顾虑是「它万一改坏了怎么办」。Git Cockpit 的做法是把操作分层：
+
+- **只读操作随便做** —— 合并预演、合并矩阵、合入顺序建议，全在对象库里算，不碰工作区
+- **写操作先预演** —— 每个写操作都先展示「将执行的命令（dry-run）」，确认后才落盘
+- **落盘在独立 worktree** —— 解决冲突不切换主工作区，出问题不影响你正在写的东西
+
+同时它是个 MCP Server，Cursor / Claude Desktop 可以直接调用这些能力，
+所以 Agent 能看懂「这个分支能不能合进 main」，而不是靠猜。
+
+## 界面
+
+<table>
+<tr>
+<td width="50%"><img src="docs/images/merge-preview.png" alt="合并预演" /><br /><sub>合并预演：三栏对比线上 / 结果 / 我的，逐块标记归属</sub></td>
+<td width="50%"><img src="docs/images/merge-matrix.png" alt="分支矩阵" /><br /><sub>分支矩阵：多分支 × 多目标，一屏看清谁合得进去</sub></td>
+</tr>
+</table>
+
+## 功能一览
+
+| 能力 | 说明 |
+| --- | --- |
+| 多仓库管理 | 一个 daemon 管多个本地仓库，卡片显示脏计数、领先落后 |
+| 合并预演 | 单对分支，给出冲突文件、冲突正文、逐块溯源 |
+| 合并矩阵 | 多分支 × 多目标批量预演，色块区分干净 / 冲突 / 无共祖 |
+| 合入顺序建议 | 多条分支进同一目标时，推演最省事的次序 |
+| 一键解决并推送 | 在独立 worktree 落盘，主工作区不动 |
+| MCP 接入 | stdio 与 Streamable HTTP 两种方式，多个客户端共用同一 daemon |
+
+> 完整设计见 [设计文档.md](docs/设计文档.md)。本产品 **不做** Cursor/VS Code 扩展，也不做冲突自动选边。
+> 可选聊天（同一 Web + `/api/chat` + Electron 宿主）见 [docs/聊天壳方案.md](docs/聊天壳方案.md)。
 
 ## Monorepo 结构
 
