@@ -183,16 +183,7 @@ async function main() {
     } else {
       console.log("未找到矩阵 chip，跳过");
     }
-
-    // 4) 状态页
-    try {
-      await page.goto(`${BASE}/#/status`, { waitUntil: "networkidle" });
-      await page.waitForTimeout(2000);
-      await page.screenshot({ path: join(OUT_DIR, "status.png") });
-      shots.push("status.png");
-    } catch (e) {
-      console.log("状态页截图跳过：" + e.message.split("\n")[0]);
-    }
+    // 状态页不截：它的路径栏会显示临时目录名，且「工作区 + 历史」用文字说明更清楚
   } catch (e) {
     console.error("ERR", e.message);
     console.error(logs.slice(-2000));
